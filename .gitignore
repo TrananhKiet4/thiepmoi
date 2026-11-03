@@ -11,3 +11,4 @@ coverage/
 *.log
 *.dump
 *.bak
+**/.qa-*.png

@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model AdminUser {
+ id String @id @default(uuid()) @db.Uuid
+ email String @unique
+ passwordHash String
+ disabledAt DateTime? @db.Timestamptz(3)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ sessions AdminSession[]
+ events Event[]
+}
+model AdminSession {
+ id String @id @default(uuid()) @db.Uuid
+ adminId String @db.Uuid
+ admin AdminUser @relation(fields:[adminId],references:[id])
+ sessionHash String @unique
+ csrfToken String
+ expiresAt DateTime @db.Timestamptz(3)
+ revokedAt DateTime? @db.Timestamptz(3)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@index([expiresAt])
+}
+model Event {
+ id String @id @default(uuid()) @db.Uuid
+ ownerId String @db.Uuid
+ owner AdminUser @relation(fields:[ownerId],references:[id])
+ slug String @unique
+ draftRevisionId String? @unique @db.Uuid
+ publishedRevisionId String? @db.Uuid
+ version Int @default(1)
+ publishedAt DateTime? @db.Timestamptz(3)
+ rsvpEnabled Boolean @default(true)
+ wishesEnabled Boolean @default(true)
+ wallEnabled Boolean @default(true)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ updatedAt DateTime @updatedAt @db.Timestamptz(3)
+ revisions EventRevision[]
+ guests Guest[]
+ invitations Invitation[]
+ media MediaAsset[]
+ imports ImportBatch[]
+ @@unique([id,ownerId])
+}
+model EventRevision {
+ id String @id @default(uuid()) @db.Uuid
+ eventId String @db.Uuid
+ event Event @relation(fields:[eventId],references:[id])
+ revisionNo Int
+ schemaVersion Int @default(1)
+ contentJson Json
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([eventId,revisionNo])
+ @@unique([id,eventId])
+}
+model Guest {
+ id String @id @default(uuid()) @db.Uuid
+ eventId String @db.Uuid
+ event Event @relation(fields:[eventId],references:[id])
+ guestCode String
+ fullName String
+ displayName String @default("")
+ groupKey String @default("")
+ salutation String @default("")
+ email String @default("")
+ phone String @default("")
+ archivedAt DateTime? @db.Timestamptz(3)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ updatedAt DateTime @updatedAt @db.Timestamptz(3)
+ invitation Invitation?
+ @@unique([eventId,guestCode])
+ @@unique([id,eventId])
+ @@index([eventId,archivedAt,guestCode])
+ @@index([eventId,groupKey])
+}
+model Invitation {
+ id String @id @default(uuid()) @db.Uuid
+ eventId String @db.Uuid
+ event Event @relation(fields:[eventId],references:[id])
+ guestId String @unique @db.Uuid
+ guest Guest @relation(fields:[guestId],references:[id])
+ personalMessage String @default("")
+ tokenHash String @unique
+ tokenCiphertext String
+ keyVersion String
+ revokedAt DateTime? @db.Timestamptz(3)
+ openedAt DateTime? @db.Timestamptz(3)
+ lastOpenedAt DateTime? @db.Timestamptz(3)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ updatedAt DateTime @updatedAt @db.Timestamptz(3)
+ rsvp RSVP?
+ wish Wish?
+ @@index([eventId,revokedAt])
+}
+model RSVP {
+ id String @id @default(uuid()) @db.Uuid
+ invitationId String @unique @db.Uuid
+ invitation Invitation @relation(fields:[invitationId],references:[id])
+ status String
+ note String @default("")
+ version Int @default(1)
+ respondedAt DateTime @default(now()) @db.Timestamptz(3)
+ updatedAt DateTime @updatedAt @db.Timestamptz(3)
+ @@index([status])
+}
+model Wish {
+ id String @id @default(uuid()) @db.Uuid
+ invitationId String @unique @db.Uuid
+ invitation Invitation @relation(fields:[invitationId],references:[id])
+ body String
+ consentPublic Boolean @default(false)
+ moderationStatus String @default("NONE")
+ isPinned Boolean @default(false)
+ approvedAt DateTime? @db.Timestamptz(3)
+ approvedBy String? @db.Uuid
+ deletedAt DateTime? @db.Timestamptz(3)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ updatedAt DateTime @updatedAt @db.Timestamptz(3)
+ @@index([moderationStatus,isPinned,approvedAt,id])
+}
+model MediaAsset {
+ id String @id @default(uuid()) @db.Uuid
+ eventId String @db.Uuid
+ event Event @relation(fields:[eventId],references:[id])
+ storageKey String @unique
+ originalName String @default("")
+ type String
+ mimeType String
+ bytes Int
+ width Int?
+ height Int?
+ alt String @default("")
+ status String @default("READY")
+ variants Json @default("{}")
+ publicReady Boolean @default(false)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+model ImportBatch {
+ id String @id @default(uuid()) @db.Uuid
+ eventId String @db.Uuid
+ event Event @relation(fields:[eventId],references:[id])
+ createdBy String @db.Uuid
+ fileHash String
+ mappingJson Json
+ normalizedRowsJson Json
+ summaryJson Json
+ status String @default("PREVIEWED")
+ expiresAt DateTime @db.Timestamptz(3)
+ committedAt DateTime? @db.Timestamptz(3)
+ resultJson Json?
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@index([eventId,status,expiresAt])
+}
+model AuditLog {
+ id String @id @default(uuid()) @db.Uuid
+ actorAdminId String? @db.Uuid
+ action String
+ entityType String
+ entityId String @db.Uuid
+ eventId String @db.Uuid
+ metadata Json @default("{}")
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@index([eventId,createdAt])
+}
+model IdempotencyRecord {
+ id String @id @default(uuid()) @db.Uuid
+ scope String
+ actorKeyHash String
+ key String
+ requestHash String
+ responseStatus Int
+ responseJson Json
+ expiresAt DateTime @db.Timestamptz(3)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([scope,actorKeyHash,key])
+}
