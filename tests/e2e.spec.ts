@@ -92,6 +92,7 @@ test('real Excel invitations, private responses, moderation, link rotation and e
   await guestPage.goto(firstLink);
   await guestPage.getByRole('button', { name: 'Mở thiệp', exact: true }).click();
   await expect(guestPage.locator('.wish-wall').getByText(wishText, { exact: true })).toBeVisible();
+  await expect(guestPage.locator('.wish-wall').getByRole('alert')).toHaveCount(0);
   await guestPage.getByLabel('Lời chúc của bạn', { exact: true }).fill(wishText + ' — đã chỉnh sửa');
   await guestPage.getByRole('button', { name: 'Gửi lời chúc', exact: true }).click();
   await expect(guestPage.getByText('Lời chúc đã được lưu và đang chờ duyệt. Cảm ơn bạn!', { exact: true })).toBeVisible();
@@ -138,4 +139,84 @@ test('an unfinished date can be saved as a draft and blocks publication', async 
     const restored = await page.request.patch(`/api/v1/admin/events/${before.id}/draft`, { headers: { 'X-CSRF-Token': me.csrfToken, 'If-Match': String(current.version), Origin: 'http://localhost:5173' }, data: { content: before.draft.contentJson } });
     expect(restored.ok()).toBe(true);
   }
+});
+
+test('invitation controls remain reachable in a tall mobile dialog', async ({ page }) => {
+  await page.goto('/admin');
+  await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);
+  await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Một ngày đáng nhớ.' })).toBeVisible();
+  const event = (await (await page.request.get('/api/v1/admin/events/current')).json()).data;
+  const guest = (await (await page.request.get(`/api/v1/admin/events/${event.id}/guests?pageSize=1`)).json()).data.items[0];
+  await navigate(page, 'Khách mời');
+  await page.getByRole('textbox', { name: 'Tìm khách mời' }).fill(guest.guestCode);
+  await page.getByRole('button', { name: 'Lấy link ' + guest.fullName, exact: true }).click();
+  const button = page.getByRole('button', { name: 'Cấp lại link', exact: true });
+  await expect(page.getByRole('dialog')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await button.click({ trial: true, timeout: 5000 });
+  await page.getByRole('button', { name: 'Đóng', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('a lost RSVP response retries the same operation and a version conflict preserves typed notes', async ({ page, context }) => {
+  await page.goto('/admin');
+  await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);
+  await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Một ngày đáng nhớ.' })).toBeVisible();
+  const event = (await (await page.request.get('/api/v1/admin/events/current')).json()).data;
+  const me = (await (await page.request.get('/api/v1/admin/auth/me')).json()).data;
+  const headers = { 'X-CSRF-Token': me.csrfToken, Origin: 'http://localhost:5173' };
+  const created = await page.request.post(`/api/v1/admin/events/${event.id}/guests`, { headers, data: { guestCode: 'RETRY' + Date.now().toString(36).toUpperCase(), fullName: 'Khách kiểm tra gửi lại' } });
+  expect(created.ok()).toBe(true);
+  const guest = (await created.json()).data;
+  const link = (await (await page.request.get(`/api/v1/admin/invitations/${guest.invitation.id}/link`)).json()).data.url;
+  const guestPage = await context.newPage(), keys: string[] = [];
+  let drop = true;
+  await guestPage.route('**/api/v1/guest/rsvp', async route => {
+    keys.push(route.request().headers()['idempotency-key']);
+    const response = await route.fetch();
+    if (drop) { drop = false; expect(response.ok()).toBe(true); await route.abort('failed'); }
+    else await route.fulfill({ response });
+  });
+  await guestPage.goto(link);
+  await guestPage.getByRole('button', { name: 'Mở thiệp', exact: true }).click();
+  const form = guestPage.locator('.guest-form').first();
+  await form.getByRole('button', { name: 'Gửi xác nhận', exact: true }).click();
+  await expect(form.getByRole('alert')).toBeVisible();
+  await form.getByRole('button', { name: 'Gửi xác nhận', exact: true }).click();
+  await expect(form.getByRole('status')).toContainText('Đã lưu lời hồi đáp');
+  expect(keys[1]).toBe(keys[0]);
+  const token = new URL(link).pathname.split('/').at(-1)!;
+  const external = await page.request.put('/api/v1/guest/rsvp', { headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': crypto.randomUUID() }, data: { status: 'DECLINED', note: 'Thay đổi từ phiên khác', expectedVersion: 1 } });
+  expect(external.ok()).toBe(true);
+  const note = form.getByLabel('Nhắn mình một chút (không bắt buộc)', { exact: true });
+  let failRefresh = true;
+  await guestPage.route('**/api/v1/guest/invitation', async route => {
+    if (failRefresh) { failRefresh = false; await route.abort('failed'); }
+    else await route.continue();
+  });
+  await note.fill('Ghi chú vẫn còn khi có xung đột');
+  await form.getByRole('button', { name: 'Gửi xác nhận', exact: true }).click();
+  await expect(form.getByRole('alert')).toContainText('Dữ liệu đã thay đổi');
+  await expect(form.getByRole('status')).toHaveCount(0);
+  await expect(note).toHaveValue('Ghi chú vẫn còn khi có xung đột');
+  await form.getByRole('button', { name: 'Gửi xác nhận', exact: true }).click();
+  await expect(form.getByRole('alert')).toContainText('Dữ liệu đã thay đổi');
+  await expect(form.getByRole('status')).toHaveCount(0);
+  await expect(note).toHaveValue('Ghi chú vẫn còn khi có xung đột');
+  await form.getByRole('button', { name: 'Gửi xác nhận', exact: true }).click();
+  await expect(form.getByRole('status')).toContainText('Đã lưu lời hồi đáp');
+  await expect(form.getByRole('alert')).toHaveCount(0);
+  const record = (await (await page.request.get(`/api/v1/admin/events/${event.id}/guests?q=${guest.guestCode}`)).json()).data.items[0];
+  expect(record.invitation.rsvp.version).toBe(3);
+  expect(record.invitation.rsvp.note).toBe('Ghi chú vẫn còn khi có xung đột');
+  const rotated = await page.request.post(`/api/v1/admin/invitations/${guest.invitation.id}/rotate`, { headers, data: { expectedVersion: record.invitation.version } });
+  expect(rotated.ok()).toBe(true);
+  await note.fill('Ghi chú riêng khi đường dẫn bị thu hồi');
+  await form.getByRole('button', { name: 'Gửi xác nhận', exact: true }).click();
+  await expect(guestPage.getByRole('heading', { name: 'Chưa thể mở thiệp' })).toBeVisible();
+  await expect(note).toHaveCount(0);
 });

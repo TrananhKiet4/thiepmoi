@@ -1416,7 +1416,7 @@ paths:
           name: "q"
           in: "query"
           required: false
-          schema: {"type":"string","maxLength":200}
+          schema: {"type":"string","maxLength":120}
         - {"$ref":"#/components/parameters/Group"}
         -
           name: "status"
@@ -1434,14 +1434,14 @@ paths:
             type: "string"
             enum: ["true","false"]
             default: "false"
-          description: "true includes archived guests regardless of archived filter and retains revoked invitations in response-status filtering."
+          description: "true includes archived guests regardless of archived filter. Export uses the same guest filters as the on-screen list, including revoked historical invitations."
         -
           name: "sort"
           in: "query"
           required: false
           schema:
             type: "string"
-            enum: ["guestCode","fullName","createdAt"]
+            enum: ["guestCode","fullName","createdAt","-guestCode","-fullName","-createdAt"]
             default: "guestCode"
       responses:
         "200":
@@ -2029,8 +2029,8 @@ components:
     Location:
       type: "object"
       properties:
-        startAt: {"type":"string","format":"date-time"}
-        endAt: {"type":"string","format":"date-time"}
+        startAt: {"anyOf":[{"type":"string","format":"date-time"},{"const":""}],"description":"May be empty in draft; required at publication."}
+        endAt: {"anyOf":[{"type":"string","format":"date-time"},{"const":""}],"description":"May be empty in draft; required at publication."}
         venueName: {"type":"string","maxLength":200}
         address: {"type":"string","maxLength":500}
         latitude: {"type":"number","minimum":-90,"maximum":90}
@@ -2199,7 +2199,7 @@ components:
           anyOf:
             - {"$ref":"#/components/schemas/Location"}
             - {"type":"null"}
-        rsvpDeadline: {"type":"string","format":"date-time"}
+        rsvpDeadline: {"anyOf":[{"type":"string","format":"date-time"},{"const":""}],"description":"May be empty in draft; required at publication."}
         wishDeadline:
           anyOf:
             - {"type":"string","format":"date-time"}

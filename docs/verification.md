@@ -1,0 +1,37 @@
+# Báo cáo kiểm tra bản triển khai
+
+Ngày 03/11/2026, kiểm tra local trên Windows, Node24.14.0, PostgreSQL18.4 thật tại loopback54329. Không dùng SQLite hoặc backend mock để xác nhận nghiệp vụ.
+
+## Đã có bằng chứng chạy
+
+- `npm test`:50/50 unit/integration pass sau sửa export lịch sử;8file kiểm thử, PostgreSQL thật, thời gian43,97giây.
+- `npm run typecheck` và `npm run build`: pass; tách bundle khách và admin. Build gần nhất JS entry93,41KB gzip + thiệp10,13KB gzip; ảnh hero minh họa21.634bytes. Đây là dữ liệu demo, không phải kết quả LCP/INP trên mạng di động.
+- 22 kiểm tra Excel/media pass, gồm XLSX lỗi/công thức, streaming ZIP inflation thực, limit2000dòng, stale version rollback, replay commit, export text an toàn, media private/public, xóa asset giữ tham chiếu, MP3/M4A decode thật bằng FFmpeg, AAC hỏng bị từ chối.
+- 13 flow PostgreSQL pass: nháp/xuất bản, quyền chéo event, version, request đồng thời, idempotency, rút/xóa/sửa lời chúc, moderation, cursorwall, lifecycle token và dashboard.
+- Bootstrap admin từ database test sạch tạo được event nháp; chạy lại giữ password hash và không tạo event/guest trùng. Seed dùng ảnh tạo riêng, 12 khách giả và ngày demo2099.
+- Migration deploy trên database mới thành công, có FK cùng event, unique/CHECK và trigger revision bất biến. Reset test từ chối database không kết thúc `_test`.
+- Backup custom pg_dump và pg_restore vào database mới thành công. Đối chiếu Event1/Guest12/Invitation12/RSVP0/Wish0; mọi token trong bản phục hồi giải mã ra đúng SHA-256 lưu trong database. Database nguồn không bị ghi đè.
+- OpenAPI3.1 parse thành công,41paths và420tham chiếu nội bộ được resolve.
+- Sửa export lịch sử có regression RED (khách bị bỏ khỏi XLSX) → GREEN (xuất đúng khách revoked/ATTENDING đang hiển thị). Dùng chung bộ lọc với danh sách.
+
+## Rà soát độc lập
+
+Một reviewer độc lập đã đọc toàn bộ thay đổi và các đường gọi liên quan. Không thấy lỗi Critical; hai Important đã sửa: retry sau mất phản hồi mạng và export lịch sử bỏ sót khách. Cả hai có regression; retry giữ idempotency key cho cùng nội dung, refresh phiên bản khi409 và giữ dữ liệu form. Không có Minor được hoãn.
+
+## Trình duyệt và giới hạn
+
+Giao diện đã được kiểm tra trực quan dashboard và thiệp trên desktop/mobile. Lượt cuối E2E14/14 pass trên desktop và mobile Chromium,50,6giây: nhập Excel, publish, hai link khách riêng, RSVP, lời chúc/duyệt/sửa, rotate, export,6độ rộng320–1440px, draft để trống ngày, thao tác modal nhỏ, retry mất mạng và conflict version. Đã sửa và kiểm tra thêm request wall bị hủy trong StrictMode không hiển thị lỗi giả; success banner cũ không xuất hiện sau409. Ảnh QA sau sửa nằm trong `.data/qa`, không đưa vào source repository.
+
+Chưa đo LCP/CLS/INP trong điều kiện mạng chuẩn, API p95 với100phiên hoặc import commit2000dòng đầy đủ. Không báo đạt các mục tiêu hiệu năng chỉ từ build/test chức năng. Chưa thử trên iOS Safari/Android Chrome thiết bị thật; Chromium emulation không thay thế kiểm tra thiết bị.
+
+Chưa kiểm tra roundtrip S3/CDN production vì chưa cấu hình tài khoản; adapter đã triển khai, private preview dùng proxy cùng origin. Publish S3 thất bại có thể để lại object copy không tham chiếu, cần lifecycle/inventory như runbook. Chưa cấu hình domain/HTTPS, scheduler backup hoặc monitoring production.
+
+`npm audit --omit=dev`:0high/critical,8moderate theo chuỗi phụ thuộc ExcelJS/archiver/glob/minimatch. Ứng dụng không nhận glob pattern hoặc đường dẫn filesystem từ người dùng ở đường này; import được chặn trong worker có giới hạn. Đây không phải tuyên bố loại bỏ advisory: giữ lockfile, đánh giá bản vá/thư viện thay thế trước production; không chạy audit fix --force để hạ ExcelJS thiếu kiểm tra tương thích.
+
+## Đối chiếu nghiệm thu
+
+- AC01,AC06–AC19: đã có kiểm tra API/DB và/hoặc E2E pass; vẫn cần chạy checklist với dữ liệu thật trước khi gửi.
+- AC02–AC05: UI responsive, reduced motion, nhạc chủ động, bản đồ fallback và ICS đã triển khai; ca desktop/mobile Chromium pass, thiết bị thật và chính sách autoplay phần cứng còn chưa kiểm tra.
+- AC20: migration/bootstrap/seed/backup/restore đã chạy; tài liệu và scripts có trong repo, production external services chưa cấu hình.
+
+Mọi thông tin trường, địa điểm, người tốt nghiệp, ảnh và deadline trong demo phải được thay và kiểm tra lại trước khi gửi thiệp thật. Thử một khách riêng, kiểm tra RSVP/consent/rotate và xác nhận backup trước sử dụng.

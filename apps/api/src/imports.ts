@@ -8,6 +8,7 @@ import { config } from './config.js';
 import { requireAdmin } from './auth.js';
 import { AppError, ok, ownedEvent, audit, idempotent } from './http.js';
 import { createInvitationToken, decryptInvitationToken, hashToken } from './crypto.js';
+import { guestFilter } from './guests.js';
 import { columns, validateMapping, parseWorkbook, normalizeRows, type Mapping, type NormalizedRow, type RowError } from './excel-parser.js';
 
 export const importRouter=Router();
@@ -75,11 +76,9 @@ importRouter.post('/admin/imports/:id/commit',requireAdmin,async(req,res)=>{
 });
 importRouter.get('/admin/events/:id/exports/:kind',requireAdmin,async(req,res)=>{
  const eventId=uuid.parse(req.params.id);await ownedEvent(req,eventId);const kind=z.enum(['links','responses']).parse(req.params.kind);
- const query=z.object({q:z.string().max(200).optional(),group:z.string().max(60).optional(),status:z.enum(['ATTENDING','DECLINED','UNANSWERED']).optional(),archived:z.enum(['true','false','all']).default('false'),history:z.enum(['true','false']).default('false'),sort:z.enum(['guestCode','fullName','createdAt']).default('guestCode')}).parse(req.query);
- const where:any={eventId};if(query.history!=='true'&&query.archived!=='all')where.archivedAt=query.archived==='true'?{not:null}:null;
- if(query.q)where.OR=['guestCode','fullName','displayName'].map(key=>({[key]:{contains:query.q,mode:'insensitive'}}));if(query.group)where.groupKey=query.group;
- if(query.status)where.invitation={is:{...(query.status==='UNANSWERED'?{rsvp:{is:null}}:{rsvp:{is:{status:query.status}}}),...(query.history!=='true'?{revokedAt:null}:{})}};
- const guests=await prisma.guest.findMany({where,include:{invitation:{include:{rsvp:true,wish:true}}},orderBy:{[query.sort]:'asc'}}),book=new ExcelJS.Workbook();
+ const query=z.object({q:z.string().trim().max(120).optional(),group:z.string().max(60).optional(),status:z.preprocess(v=>v===''?undefined:v,z.enum(['ATTENDING','DECLINED','UNANSWERED']).optional()),archived:z.enum(['true','false','all']).default('false'),history:z.enum(['true','false']).default('false'),sort:z.enum(['guestCode','fullName','createdAt','-guestCode','-fullName','-createdAt']).default('guestCode')}).parse(req.query);
+ const where=guestFilter({query:{...req.query,archived:query.history==='true'?'all':query.archived}},eventId);
+ const guests=await prisma.guest.findMany({where,include:{invitation:{include:{rsvp:true,wish:true}}},orderBy:[{[query.sort.replace(/^-/,'')]:query.sort.startsWith('-')?'desc':'asc'},{id:'asc'}]}),book=new ExcelJS.Workbook();
  textSheet(book,'Thông tin',['exported_at','filters'],[[new Date().toISOString(),JSON.stringify(query)]]);
  const headers=['guest_code','full_name','display_name','group','salutation','personal_message','email','phone','archived_at','revoked_at'];
  if(kind==='links')headers.push('invitation_url');else headers.push('rsvp_status','rsvp_note','rsvp_updated_at','wish','consent_public','moderation_status','wish_deleted_at');

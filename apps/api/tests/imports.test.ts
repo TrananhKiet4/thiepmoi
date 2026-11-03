@@ -96,4 +96,14 @@ describe('persisted atomic imports and admin exports',()=>{
   const response=await admin('get',`events/${f.event.id}/exports/links`).responseType('blob');expect(response.status).toBe(200);expect(response.headers['cache-control']).toContain('no-store');
   const book=new ExcelJS.Workbook();await book.xlsx.load(response.body);const sheet=book.worksheets[1];expect(sheet.getCell('B2').value).toBe('=SUM(1,2)');expect(sheet.getCell('H2').value).toBe('+0123');expect(sheet.getCell('K2').value).toContain('/i/');expect(book.worksheets[0].getCell('B2').value).toContain('archived');
  });
+ it('exports the same revoked historical attendees shown in the filtered guest list',async()=>{
+  await prisma.rSVP.create({data:{invitationId:f.invitation.id,status:'ATTENDING'}});
+  await prisma.invitation.update({where:{id:f.invitation.id},data:{revokedAt:new Date()}});
+  const query='?archived=all&status=ATTENDING';
+  const list=await admin('get',`events/${f.event.id}/guests${query}`);expect(list.body.data.items).toHaveLength(1);
+  const response=await admin('get',`events/${f.event.id}/exports/responses${query}`).responseType('blob');expect(response.status).toBe(200);
+  const book=new ExcelJS.Workbook();await book.xlsx.load(response.body);
+  expect(book.worksheets[1].getCell('A2').value).toBe('DEMO001');
+  expect(book.worksheets[1].getCell('K2').value).toBe('ATTENDING');
+ });
 });
