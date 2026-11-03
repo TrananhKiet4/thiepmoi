@@ -62,6 +62,7 @@ Build API và web bằng `npm run build`. Để chạy production, cấu hình �
 
 ## Tài liệu
 
+- `docs/project-structure.md`: cấu trúc backend/frontend theo mẫu KLTN và vị trí mã nguồn hiện hành.
 - `docs/admin.md`: nội dung, khách, Excel, lời chúc và checklist gửi thiệp.
 - `docs/openapi.yaml`: hợp đồng API, bảo mật và input/output.
 - `docs/operations.md`: triển khai, storage, backup/restore, key rotation, rollback.

@@ -1,0 +1,10 @@
+{
+  "name": "@invite/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "cd .. && tsx watch backend/src/server.ts",
+    "build": "tsc -p tsconfig.json && node ../scripts/copy-api-assets.mjs",
+    "start": "cd .. && node backend/dist/backend/src/server.js"
+  }
+}

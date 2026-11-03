@@ -1,0 +1,19 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "..",
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "prisma/data/**/*.ts",
+    "../packages/contracts/src/**/*.ts"
+  ],
+  "exclude": [
+    "tests"
+  ]
+}

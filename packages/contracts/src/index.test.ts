@@ -1,6 +1,6 @@
 import {expect,it} from 'vitest';
 import {contentSchema,publicationErrors,guestSchema} from './index.js';
-import {demoContent} from '../../../apps/api/src/demo.js';
+import {demoContent} from '../../../backend/prisma/data/demo.js';
 it('allows clearing required dates in a draft but rejects publication until completed',()=>{
  const draft=demoContent(null);draft.ceremony.startAt='';draft.ceremony.endAt='';draft.rsvpDeadline='';
  const result=contentSchema.safeParse(draft);expect(result.success).toBe(true);

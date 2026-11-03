@@ -1,5 +1,16 @@
 # Báo cáo kiểm tra bản triển khai
 
+## Cập nhật cấu trúc theo KLTN ngày 03/11/2026
+
+Đã chuyển mã sang `backend/` và `frontend/`, chia các lớp/nhóm chức năng như `docs/project-structure.md`. Không thay phiên bản dependency, schema/migration hoặc dữ liệu runtime.
+
+- TypeScript và build: pass với đường dẫn mới.
+- 50/50 unit/integration pass trên PostgreSQL thật, gồm CLI bootstrap/seed tại `backend/scripts/cli.ts`.
+- 14/14 E2E desktop/mobile pass; lượt này dùng API đã biên dịch tại `backend/dist/backend/src/server.js` cùng frontend mới.
+- Worker Excel đã biên dịch được gọi trực tiếp với workbook thật và đọc đúng sheet/header.
+- `npm run db:migrate`: không có migration chờ; `npm ci --dry-run --ignore-scripts`: pass.
+- Đối chiếu lockfile: không đổi phiên bản thư viện; workspace links trỏ đúng backend/frontend.
+
 Ngày 03/11/2026, kiểm tra local trên Windows, Node24.14.0, PostgreSQL18.4 thật tại loopback54329. Không dùng SQLite hoặc backend mock để xác nhận nghiệp vụ.
 
 ## Đã có bằng chứng chạy

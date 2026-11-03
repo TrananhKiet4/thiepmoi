@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "apps/*",
+    "backend",
+    "frontend",
     "packages/*"
   ],
   "engines": {
@@ -14,12 +15,12 @@
     "build": "npm run build -w @invite/api && npm run build -w @invite/web",
     "start": "npm run start -w @invite/api",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p apps/api/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json",
-    "db:migrate": "prisma migrate deploy --schema apps/api/prisma/schema.prisma",
-    "db:generate": "prisma generate --schema apps/api/prisma/schema.prisma",
-    "admin:create": "tsx apps/api/src/cli.ts admin",
-    "seed": "tsx apps/api/src/cli.ts seed",
-    "maintenance": "tsx apps/api/src/cli.ts maintenance",
+    "typecheck": "tsc --noEmit -p backend/tsconfig.json && tsc --noEmit -p frontend/tsconfig.json",
+    "db:migrate": "prisma migrate deploy --schema backend/prisma/schema.prisma",
+    "db:generate": "prisma generate --schema backend/prisma/schema.prisma",
+    "admin:create": "tsx backend/scripts/cli.ts admin",
+    "seed": "tsx backend/scripts/cli.ts seed",
+    "maintenance": "tsx backend/scripts/cli.ts maintenance",
     "test:e2e": "playwright test",
     "test:e2e:prepare": "node scripts/prepare-e2e.mjs",
     "setup:local": "node scripts/setup-local.mjs",

@@ -1,4 +1,4 @@
-import {readFileSync,writeFileSync,existsSync} from 'node:fs';
+import {readFileSync,writeFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 import {parse} from 'dotenv';
@@ -18,8 +18,8 @@ if(!exists.stdout.trim()){const created=spawnSync(exe('createdb'),[...args,'invi
 url.pathname='/invitations_e2e';const e2e=local.replace(env.DATABASE_URL,url.toString());writeFileSync('.env.e2e',e2e,{mode:0o600});
 function run(args,vars){const r=spawnSync(process.execPath,args,{env:{...process.env,...vars},stdio:'inherit',windowsHide:true});if(r.status!==0)process.exit(r.status??1);}
 for(const vars of [env,parse(e2e)]){
- run(['node_modules/prisma/build/index.js','migrate','deploy','--schema','apps/api/prisma/schema.prisma'],vars);
- run(['--import','tsx','apps/api/src/cli.ts','admin'],vars);
- run(['--import','tsx','apps/api/src/cli.ts','seed'],vars);
+ run(['node_modules/prisma/build/index.js','migrate','deploy','--schema','backend/prisma/schema.prisma'],vars);
+ run(['--import','tsx','backend/scripts/cli.ts','admin'],vars);
+ run(['--import','tsx','backend/scripts/cli.ts','seed'],vars);
 }
 console.log('Demo and separate E2E environment ready. Login credentials stored only in ignored .env files.');
