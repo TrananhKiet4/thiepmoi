@@ -8,6 +8,7 @@ import {demoContent} from '../prisma/data/demo.js';
 import {putPrivate} from '../src/services/storage.service.js';
 import {preparePublishedMedia} from '../src/services/media.service.js';
 import {runMaintenance} from '../src/services/maintenance.service.js';
+import {editableContent} from '../../packages/contracts/src/index.js';
 
 const command=process.argv[2];
 try{
@@ -19,7 +20,7 @@ try{
   if(existing)console.log('Admin already exists; password preserved.');
   else console.log('Admin created. Credentials are never printed.');
   if(!await prisma.event.findFirst({where:{ownerId:admin.id}}))await withTransaction(async tx=>{
-   const content=demoContent(null);content.host={fullName:'',university:'',major:'',cohort:''};content.ceremony.venueName='';content.ceremony.address='';content.meetup=null;
+   const content=editableContent(demoContent(null));content.host={fullName:'',university:'',major:'',cohort:''};content.ceremony.venueName='';content.ceremony.address='';
    const event=await tx.event.create({data:{ownerId:admin.id,slug:'graduation-'+admin.id}});
    const revision=await tx.eventRevision.create({data:{eventId:event.id,revisionNo:1,contentJson:content as any}});
    await tx.event.update({where:{id:event.id},data:{draftRevisionId:revision.id}});

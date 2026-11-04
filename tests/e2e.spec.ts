@@ -3,6 +3,51 @@ import ExcelJS from 'exceljs';
 import type { Page } from '@playwright/test';
 import sharp from 'sharp';
 
+test('Vietnamese serif heading renders with one font family instead of mixed fallback glyphs',async({page})=>{
+ await page.goto('/admin');await expect(page.getByRole('button',{name:'Đăng nhập',exact:true})).toBeVisible();
+ const cdp=await page.context().newCDPSession(page);await cdp.send('DOM.enable');await cdp.send('CSS.enable');const {root}=await cdp.send('DOM.getDocument');
+ const {nodeId}=await cdp.send('DOM.querySelector',{nodeId:root.nodeId,selector:'.login-art h1'});const {fonts}=await cdp.send('CSS.getPlatformFontsForNode',{nodeId});
+ expect(new Set(fonts.filter(f=>f.glyphCount>0).map(f=>f.familyName)).size).toBe(1);
+});
+
+test('simplified event editor loads legacy drafts clean and exposes Maps instead of coordinates',async({page})=>{
+ await page.goto('/admin');await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.'})).toBeVisible();await navigate(page,'Nội dung');
+ await expect(page.getByLabel('Link Google Maps',{exact:true})).toBeVisible();
+ for(const label of ['Vĩ độ','Kinh độ'])await expect(page.getByLabel(label,{exact:true})).toHaveCount(0);
+ for(const title of ['Hẹn gặp & chụp ảnh','Hạn tiếp nhận','Lời mở theo nhóm khách'])await expect(page.getByRole('heading',{name:title,exact:true})).toHaveCount(0);
+ await expect(page.getByLabel('Tải ảnh sơ đồ trường',{exact:true})).toBeVisible();
+ await expect(page.locator('.editor-status')).toContainText('Tất cả thay đổi đã được lưu');
+});
+
+test('campus map upload preserves concurrent address edits and survives draft save/preview',async({page},testInfo)=>{
+ test.setTimeout(120000);
+ await page.goto('/admin');await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.'})).toBeVisible();
+ const before=(await (await page.request.get('/api/v1/admin/events/current')).json()).data,me=(await (await page.request.get('/api/v1/admin/auth/me')).json()).data;
+ let release!:()=>void,reached=false;const hold=new Promise<void>(r=>release=r),pattern='**/api/v1/admin/events/*/media';
+ await page.route(pattern,async route=>{if(route.request().method()!=='POST'){await route.continue();return;}const response=await route.fetch();reached=true;await hold;await route.fulfill({response});});
+ try{
+  await navigate(page,'Nội dung');await page.getByLabel('Link Google Maps',{exact:true}).fill('https://maps.app.goo.gl/School123');
+  await page.getByLabel('Tải ảnh sơ đồ trường',{exact:true}).setInputFiles({name:'campus.png',mimeType:'image/png',buffer:await sharp({create:{width:1200,height:800,channels:3,background:'#d6ddc7'}}).png().toBuffer()});
+  await expect.poll(()=>reached,{timeout:30000}).toBe(true);await page.getByLabel('Địa chỉ',{exact:true}).fill('Địa chỉ được sửa trong lúc tải sơ đồ');
+  await expect(page.getByRole('button',{name:'Lưu bản nháp',exact:true})).toBeDisabled();release();
+  await expect(page.getByRole('img',{name:'Sơ đồ trường đã chọn',exact:true})).toBeVisible();await expect(page.getByLabel('Địa chỉ',{exact:true})).toHaveValue('Địa chỉ được sửa trong lúc tải sơ đồ');
+  await page.getByRole('button',{name:'Lưu bản nháp',exact:true}).click();await expect(page.locator('.editor-status')).toContainText('Đã lưu bản nháp');
+  const saved=(await (await page.request.get('/api/v1/admin/events/current')).json()).data.draft.contentJson;
+  expect(saved.ceremony.googleMapsUrl).toBe('https://maps.app.goo.gl/School123');expect(saved.ceremony.mapImageAssetId).toBeTruthy();expect(saved.meetup).toBeNull();expect(saved.rsvpDeadline).toBeNull();expect(saved.wishDeadline).toBeNull();expect(saved.groupMessages).toEqual({});expect(saved.ceremony.latitude).toBeUndefined();
+  await page.screenshot({path:`.data/qa/map-editor-${testInfo.project.name}.png`,fullPage:true});
+  await page.getByRole('button',{name:'Xem trước',exact:true}).click();const dialog=page.getByRole('dialog');await dialog.getByRole('button',{name:'Mở thiệp',exact:true}).click();
+  const map=dialog.locator('.campus-map-image img');await map.scrollIntoViewIfNeeded();await expect.poll(()=>map.evaluate((image:HTMLImageElement)=>image.naturalWidth)).toBeGreaterThan(0);
+  await expect(dialog.getByRole('link',{name:'Mở Google Maps',exact:true})).toHaveAttribute('href','https://maps.app.goo.gl/School123');await expect(dialog.locator('iframe')).toHaveCount(0);await expect(dialog.getByText('Hạn phản hồi:',{exact:false})).toHaveCount(0);
+  await page.screenshot({path:`.data/qa/campus-map-preview-${testInfo.project.name}.png`});await dialog.getByRole('button',{name:'Đóng',exact:true}).click();
+  await page.reload();await expect(page.getByLabel('Link Google Maps',{exact:true})).toHaveValue('https://maps.app.goo.gl/School123');await expect(page.locator('.editor-status')).toContainText('Tất cả thay đổi đã được lưu');
+ }finally{
+  release();await page.unroute(pattern);const current=(await (await page.request.get('/api/v1/admin/events/current')).json()).data;
+  const restored=await page.request.patch(`/api/v1/admin/events/${before.id}/draft`,{headers:{Origin:process.env.APP_ORIGIN!,'X-CSRF-Token':me.csrfToken,'If-Match':String(current.version)},data:{content:before.draft.contentJson}});expect(restored.ok()).toBe(true);
+ }
+});
+
 async function navigate(page: Page, name: string) {
   const menu = page.getByRole('button', { name: 'Mở menu', exact: true });
   if (await menu.isVisible()) await menu.click();

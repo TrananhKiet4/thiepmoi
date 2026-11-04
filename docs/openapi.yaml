@@ -814,7 +814,7 @@ paths:
       operationId: "put_guest_rsvp"
       tags: ["Guest"]
       summary: "Tạo/sửa RSVP độc lập"
-      description: "Requires an active, published invitation and open RSVP control. Server closes writing at now >= published rsvpDeadline. One RSVP per invitation; expectedVersion=0 only for initial creation. Concurrency/version checks are transactional."
+      description: "Requires an active, published invitation and open RSVP control. When a legacy rsvpDeadline is set, the server closes writing at now >= deadline; null has no cutoff. One RSVP per invitation; expectedVersion=0 only for initial creation. Concurrency/version checks are transactional."
       security:
         -
           GuestBearer: []
@@ -2092,10 +2092,12 @@ components:
         endAt: {"anyOf":[{"type":"string","format":"date-time"},{"const":""}],"description":"May be empty in draft; required at publication."}
         venueName: {"type":"string","maxLength":200}
         address: {"type":"string","maxLength":500}
-        latitude: {"type":"number","minimum":-90,"maximum":90}
-        longitude: {"type":"number","minimum":-180,"maximum":180}
+        latitude: {"type":"number","minimum":-90,"maximum":90,"deprecated":true,"description":"Legacy input ignored by the new parser."}
+        longitude: {"type":"number","minimum":-180,"maximum":180,"deprecated":true,"description":"Legacy input ignored by the new parser."}
+        googleMapsUrl: {"type":"string","maxLength":2048,"default":"","description":"Optional HTTPS Maps link: maps.app.goo.gl, maps.google.com, goo.gl/maps or google.com(/.vn)/maps. Other hosts, credentials and ports are rejected; no server-side expansion. Empty falls back to address search."}
+        mapImageAssetId: {"type":["string","null"],"format":"uuid","default":null,"description":"READY IMAGE owned by this event; included in revision ownership, publication and deletion checks."}
         entranceNote: {"type":"string","maxLength":1000}
-      required: ["startAt","endAt","venueName","address","latitude","longitude"]
+      required: ["startAt","endAt","venueName","address"]
     OpeningSection:
       type: "object"
       properties:
@@ -2255,11 +2257,15 @@ components:
           required: ["fullName","university","major"]
         ceremony: {"$ref":"#/components/schemas/Location"}
         meetup:
+          deprecated: true
+          default: null
           anyOf:
             - {"$ref":"#/components/schemas/Location"}
             - {"type":"null"}
-        rsvpDeadline: {"anyOf":[{"type":"string","format":"date-time"},{"const":""}],"description":"May be empty in draft; required at publication."}
+        rsvpDeadline: {"anyOf":[{"type":"string","format":"date-time"},{"const":""},{"type":"null"}],"default":null,"deprecated":true,"description":"Legacy cutoff when set. New editor saves null (no deadline); empty string is invalid for publication."}
         wishDeadline:
+          deprecated: true
+          default: null
           anyOf:
             - {"type":"string","format":"date-time"}
             - {"type":"null"}
@@ -2292,6 +2298,8 @@ components:
             loop: {"type":"boolean","default":true}
           required: ["enabled"]
         groupMessages:
+          deprecated: true
+          default: {}
           type: "object"
           maxProperties: 100
           additionalProperties: {"type":"string","maxLength":1000}
@@ -2320,9 +2328,9 @@ components:
                 closing: "#/components/schemas/ClosingSection"
           minItems: 1
           maxItems: 16
-      required: ["schemaVersion","host","ceremony","rsvpDeadline","theme","music","groupMessages","sections"]
+      required: ["schemaVersion","host","ceremony","theme","music","sections"]
       additionalProperties: false
-      description: "Strings are trimmed and rendered as plain text. Section IDs and section types must each be unique. opening, hero, invitation, map and response must exist and be enabled. Drafts may contain empty descriptive fields, but referenced media must be READY and owned by the event. Publish additionally requires host name/university/major, venue/address, endAt > startAt, RSVP deadline <= meetup (or ceremony) startAt, a hero image, audio when enabled, and a meetup when map uses MEETUP. Media references are asset UUIDs, never arbitrary URLs. See packages/contracts/src/index.ts and docs/reference/dac-ta-goc.md section 11. The example is demonstration data; replace all dates/venues/names and the hero UUID with a READY asset belonging to your event before publishing."
+      description: "Strings are trimmed and rendered as plain text. Section IDs and section types must each be unique. opening, hero, invitation, map and response must exist and be enabled. Drafts may contain empty descriptive fields, but referenced media must be READY and owned by the event. Publish additionally requires host name/university/major, venue/address, endAt > startAt, legacy RSVP deadline <= meetup (or ceremony) startAt when set, a hero image, audio when enabled, and a meetup when map uses MEETUP. Media references are asset UUIDs, never arbitrary URLs. See packages/contracts/src/index.ts and docs/reference/dac-ta-goc.md section 11. The example is demonstration data; replace all dates/venues/names and the hero UUID with a READY asset belonging to your event before publishing."
       example:
         schemaVersion: 1
         host:
@@ -2335,11 +2343,11 @@ components:
           endAt: "2099-12-01T05:00:00Z"
           venueName: "Hội trường mẫu"
           address: "Địa chỉ minh họa"
-          latitude: 10.7769
-          longitude: 106.7009
+          googleMapsUrl: "https://maps.app.goo.gl/School123"
+          mapImageAssetId: null
           entranceNote: "Cổng vào mẫu"
         meetup: null
-        rsvpDeadline: "2099-11-30T16:59:00Z"
+        rsvpDeadline: null
         wishDeadline: null
         timezone: "Asia/Ho_Chi_Minh"
         theme: {"palette":"cream","font":"serif"}
@@ -2348,7 +2356,7 @@ components:
           assetId: null
           volume: 0.25
           loop: true
-        groupMessages: {"ban_be":"Thân mời {{guestName}} đến cùng {{hostName}}."}
+        groupMessages: {}
         sections:
           -
             id: "opening"

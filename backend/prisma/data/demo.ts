@@ -2,8 +2,8 @@ import type {Content} from '../../../packages/contracts/src/index.js';
 
 export function demoContent(heroId:string|null):Content{return {
  schemaVersion:1,host:{fullName:'Người tốt nghiệp',university:'Trường đại học mẫu',major:'Ngành học mẫu',cohort:'DEMO'},
- ceremony:{startAt:'2099-12-01T02:00:00Z',endAt:'2099-12-01T05:00:00Z',venueName:'Hội trường mẫu',address:'Địa chỉ minh họa — vui lòng cập nhật',latitude:10.7769,longitude:106.7009,entranceNote:'Cổng vào mẫu'},
- meetup:{startAt:'2099-12-01T05:00:00Z',endAt:'2099-12-01T06:00:00Z',venueName:'Sân trường mẫu',address:'Điểm hẹn minh họa',latitude:10.7769,longitude:106.7009,entranceNote:''},
+ ceremony:{startAt:'2099-12-01T02:00:00Z',endAt:'2099-12-01T05:00:00Z',venueName:'Hội trường mẫu',address:'Địa chỉ minh họa — vui lòng cập nhật',googleMapsUrl:'',mapImageAssetId:null,entranceNote:'Cổng vào mẫu'},
+ meetup:{startAt:'2099-12-01T05:00:00Z',endAt:'2099-12-01T06:00:00Z',venueName:'Sân trường mẫu',address:'Điểm hẹn minh họa',googleMapsUrl:'',mapImageAssetId:null,entranceNote:''},
  rsvpDeadline:'2099-11-30T16:59:00Z',wishDeadline:null,timezone:'Asia/Ho_Chi_Minh',theme:{palette:'cream',font:'serif'},music:{enabled:false,assetId:null,volume:.25,loop:true},groupMessages:{},
  sections:[
   {id:'opening',type:'opening',enabled:true,order:0,data:{title:'Một lời mời dành riêng cho bạn',messageTemplate:'Thân mời {{guestName}} cùng {{hostName}} lưu giữ một ngày thật đẹp.',coverAssetId:null}},

@@ -12,6 +12,8 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {mkdir,mkdtemp,readFile,unlink,rmdir} from 'node:fs/promises';
 import {join} from 'node:path';
+import {editableContent} from '../../packages/contracts/src/index.js';
+import {randomUUID} from 'node:crypto';
 
 describe('media validation',()=>{
  it('rejects forged image and unsupported SVG',async()=>{
@@ -76,5 +78,25 @@ describe('private staging and retained revision protection',()=>{
   const id=f.content.sections.find(s=>s.type==='hero')!.data as {heroAssetId:string};
   const blocked=await admin('delete',`media/${id.heroAssetId}`);expect(blocked.status).toBe(409);expect(blocked.body.error.code).toBe('ASSET_IN_USE');
   const uploaded=await admin('post',`events/${f.event.id}/media`).attach('file',await image(),'image.jpg');expect((await admin('delete',`media/${uploaded.body.data.id}`)).status).toBe(200);expect(await prisma.mediaAsset.findUnique({where:{id:uploaded.body.data.id}})).toBeNull();
+ });
+ it('enforces campus image ownership, publishes its variants and retains its revision reference',async()=>{
+  const other=await prisma.event.create({data:{ownerId:f.admin.id,slug:'other-'+randomUUID()}}),foreignId=randomUUID();
+  await prisma.mediaAsset.create({data:{id:foreignId,eventId:other.id,storageKey:`${other.id}/${foreignId}/800.webp`,type:'IMAGE',mimeType:'image/webp',bytes:1,variants:{}}});
+  const content=editableContent(f.content);content.ceremony.googleMapsUrl='https://maps.app.goo.gl/School123';content.ceremony.mapImageAssetId=foreignId;
+  const save=(value:unknown,version:number)=>request(app).patch(`/api/v1/admin/events/${f.event.id}/draft`).set('Cookie',f.cookie).set('Origin','http://localhost:5173').set('X-CSRF-Token',f.csrf).set('If-Match',String(version)).send({content:value});
+  expect((await save(content,f.event.version)).status).toBe(422);
+  const uploaded=await admin('post',`events/${f.event.id}/media`).attach('file',await image(),'campus.jpg');expect(uploaded.status).toBe(201);content.ceremony.mapImageAssetId=uploaded.body.data.id;
+  const saved=await save(content,f.event.version);expect(saved.status).toBe(200);
+  expect((await admin('post',`events/${f.event.id}/publish`).send({expectedVersion:saved.body.data.version})).status).toBe(200);
+  const view=await request(app).get('/api/v1/guest/invitation').set('Authorization','Bearer '+f.token);expect(view.status).toBe(200);expect(view.body.data.canRsvp).toBe(true);
+  expect(view.body.data.content.ceremony.googleMapsUrl).toBe('https://maps.app.goo.gl/School123');const media=view.body.data.media[uploaded.body.data.id];expect(media).toBeTruthy();expect((await request(app).get(media.url)).status).toBe(200);
+  expect((await admin('delete',`media/${uploaded.body.data.id}`)).status).toBe(409);
+ });
+ it('rejects an audio asset used as the campus map image at publication',async()=>{
+  const id=randomUUID(),key=`${f.event.id}/${id}/audio.mp3`;
+  await prisma.mediaAsset.create({data:{id,eventId:f.event.id,storageKey:key,type:'AUDIO',mimeType:'audio/mpeg',bytes:1,variants:{'0':{key,mimeType:'audio/mpeg'}}}});
+  const content=editableContent(f.content);content.ceremony.mapImageAssetId=id;
+  const saved=await request(app).patch(`/api/v1/admin/events/${f.event.id}/draft`).set('Cookie',f.cookie).set('Origin','http://localhost:5173').set('X-CSRF-Token',f.csrf).set('If-Match',String(f.event.version)).send({content});expect(saved.status).toBe(200);
+  const published=await admin('post',`events/${f.event.id}/publish`).send({expectedVersion:saved.body.data.version});expect(published.status).toBe(422);expect(published.body.error.code).toBe('INVALID_MEDIA');
  });
 });

@@ -24,6 +24,13 @@ export async function prepareUpload(eventId:string,file:File,purpose:'MEDIA'|'IM
   }
   return upload;
 }
+export async function uploadMedia(eventId:string,file:File,alt:string){
+  if(file.size>10*1024*1024)throw new Error('File vượt quá 10 MB');
+  const upload=await prepareUpload(eventId,file,'MEDIA');
+  if(upload.mode==='direct')return write(`/admin/events/${eventId}/media`,'POST',{uploadId:upload.uploadId,alt});
+  const data=new FormData();data.append('file',file);data.append('alt',alt);
+  return request(`/admin/events/${eventId}/media`,{method:'POST',body:data});
+}
 export async function download(path: string, name: string, token?: string) {
   let response = await fetch(base + path, {headers: token ? {Authorization:`Bearer ${token}`} : {},credentials:'same-origin',cache:'no-store'});
   if (!response.ok) { const data = await response.json().catch(()=>({})); throw new Error(data.error?.message || 'Không tải được file'); }
