@@ -2,6 +2,8 @@
 
 Repo: `TrananhKiet4/thiepmoi`. Root Directory: **`.`**. Framework Preset: **Container**. Không chọn `frontend` hoặc `backend` làm root. Vercel đọc `Dockerfile.vercel`, chạy Node 24 + FFmpeg và phục vụ React/Express cùng domain.
 
+Project đã tạo trong team `trananhkiet4s-projects`: [thiepmoi](https://vercel.com/trananhkiet4s-projects/thiepmoi), ID `prj_8BdA2pnWHjvoJBQRW8Y6Jz9m1Wft`, Container preset/Node 24. Domain Vercel đã xác minh: `https://thiepmoi-murex.vercel.app`. Domain chưa có deployment hoạt động. Profile local đã cập nhật đúng origin; file import 22 biến Production là `.data/vercel-production.env`, ngoài Git, đã loại bootstrap password và DIRECT_URL.
+
 Container Runtime đang Beta. Cấu hình đã chuẩn bị; chỉ phát hành sau khi kiểm tra image Linux và duyệt kết quả. Không chạy database migration hoặc bootstrap admin trong Docker build.
 
 ## 1. Kiểm tra trước khi đẩy code
