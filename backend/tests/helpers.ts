@@ -13,6 +13,7 @@ export {demoContent} from '../prisma/data/demo.js';
 import {demoContent} from '../prisma/data/demo.js';
 export async function resetTestDatabase(){
  if(process.env.NODE_ENV!=='test'||!new URL(process.env.DATABASE_URL!).pathname.endsWith('_test'))throw new Error('Refusing to reset a non-test database');
+ await prisma.temporaryObject.deleteMany();await prisma.rateLimitBucket.deleteMany();
  await prisma.idempotencyRecord.deleteMany();await prisma.auditLog.deleteMany();await prisma.importBatch.deleteMany();await prisma.wish.deleteMany();await prisma.rSVP.deleteMany();await prisma.invitation.deleteMany();await prisma.guest.deleteMany();
  await prisma.event.updateMany({data:{draftRevisionId:null,publishedRevisionId:null}});await prisma.eventRevision.deleteMany();await prisma.mediaAsset.deleteMany();await prisma.event.deleteMany();await prisma.adminSession.deleteMany();await prisma.adminUser.deleteMany();
 }

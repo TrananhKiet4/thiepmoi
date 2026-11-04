@@ -7,6 +7,7 @@ import {createInvitationToken} from '../src/utils/token.js';
 import {demoContent} from '../prisma/data/demo.js';
 import {putPrivate} from '../src/services/storage.service.js';
 import {preparePublishedMedia} from '../src/services/media.service.js';
+import {runMaintenance} from '../src/services/maintenance.service.js';
 
 const command=process.argv[2];
 try{
@@ -51,11 +52,7 @@ try{
    console.log('Demo created: 12 guests, generated illustration, music off, dates in 2099 clearly marked for replacement. Get invitation links from admin; none printed in logs.');
   }
  }else if(command==='maintenance'){
-  const now=new Date();const [sessions,idempotency,imports]=await prisma.$transaction([
-   prisma.adminSession.deleteMany({where:{OR:[{expiresAt:{lt:now}},{revokedAt:{not:null}}]}}),
-   prisma.idempotencyRecord.deleteMany({where:{expiresAt:{lt:now}}}),
-   prisma.importBatch.deleteMany({where:{createdAt:{lt:new Date(Date.now()-7*86400000)}}})
-  ]);console.log(JSON.stringify({sessions:sessions.count,idempotency:idempotency.count,imports:imports.count}));
+  console.log(JSON.stringify(await runMaintenance()));
  }else throw new Error('Use admin, seed or maintenance');
 }catch(error){console.error(error instanceof z.ZodError?'Invalid bootstrap email/password (minimum 12 characters).':(error as Error).message);process.exitCode=1;}
 finally{await prisma.$disconnect();}

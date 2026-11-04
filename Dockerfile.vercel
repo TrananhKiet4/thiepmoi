@@ -1,0 +1,30 @@
+FROM node:24-bookworm-slim AS base
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+
+FROM base AS build
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
+COPY package.json package-lock.json ./
+COPY backend/package.json ./backend/package.json
+COPY frontend/package.json ./frontend/package.json
+COPY packages/contracts/package.json ./packages/contracts/package.json
+RUN npm ci --include=dev
+COPY tsconfig.base.json ./
+COPY backend/ ./backend/
+COPY frontend/ ./frontend/
+COPY packages/contracts/src/ ./packages/contracts/src/
+COPY scripts/copy-api-assets.mjs ./scripts/copy-api-assets.mjs
+# Generation/build never connect to a database; runtime credentials are injected by Vercel.
+RUN DATABASE_URL=postgresql://build:unused@localhost/build DIRECT_URL=postgresql://build:unused@localhost/build npm run db:generate
+RUN npm run build && npm prune --omit=dev
+
+FROM base AS runtime
+ENV NODE_ENV=production HOST=0.0.0.0 PORT=8080 STORAGE_LOCAL_PATH=/tmp/invitation-media
+COPY --from=build --chown=node:node /app/package.json ./package.json
+COPY --from=build --chown=node:node /app/backend/package.json ./backend/package.json
+COPY --from=build --chown=node:node /app/node_modules/ ./node_modules/
+COPY --from=build --chown=node:node /app/backend/dist/ ./backend/dist/
+COPY --from=build --chown=node:node /app/frontend/dist/ ./frontend/dist/
+USER node
+EXPOSE 8080
+CMD ["node", "backend/dist/backend/src/server.js"]

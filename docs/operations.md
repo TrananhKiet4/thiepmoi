@@ -6,6 +6,8 @@ Một instance API Node24 với PostgreSQL và S3 compatible; HTTPS reverse prox
 
 SESSION_SECRET ít nhất 32 ký tự ngẫu nhiên. INVITATION_KEY là base64 32 byte; INVITATION_KEY_VERSION là nhãn phiên bản. DATABASE_URL, storage credentials và mọi secret chỉ đặt ở server, không có VITE prefix. Config thiếu secret hoặc production HTTP/local storage sẽ từ chối startup. VITE_API_BASE_URL mặc định `/api/v1`, không chứa credential.
 
+Với Supabase/Prisma6, `DATABASE_URL` dùng Transaction pooler6543 cho runtime, `DIRECT_URL` dùng Session pooler5432 hoặc direct endpoint cho CLI. `backend/prisma/schema.prisma` cấu hình `directUrl`, nên migrate/status dùng DIRECT_URL và không cần đổi DATABASE_URL qua lại. Cấu hình cả hai ở môi trường build/CLI; không gửi URL có mật khẩu vào log hoặc frontend. Backup pg_dump dùng kết nối session/direct: cấp DATABASE_URL phù hợp riêng cho lệnh backup, không dùng Transaction pooler.
+
 Chạy `npm ci`, `npm run db:generate`, `npm run build`; deploy migration đúng một lần trước chuyển traffic bằng `npm run db:migrate`. Bootstrap admin qua CLI với mật khẩu môi trường, sau đó bỏ mật khẩu bootstrap khỏi cấu hình production. Chạy `npm start` từ root, reverse proxy vào `127.0.0.1:4000`. Không dùng static hosting thay API. `/api` trả lỗi JSON, không bị SPA fallback nuốt.
 
 Tắt log query/body tại proxy và API, đặc biệt path `/i/*`, Authorization, cookies, link export, email/phone và lời chúc. Log ứng dụng chỉ ghi requestId và mã lỗi server. Proxy cần che token trong đường dẫn; không dùng analytics gửi URL đầy đủ. HTML chung không nhúng tên khách hoặc token trong metadata. Bật TLS/HSTS sau khi domain và HTTPS sẵn sàng.

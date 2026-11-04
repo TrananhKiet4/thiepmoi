@@ -1,12 +1,39 @@
 import { test, expect } from '@playwright/test';
 import ExcelJS from 'exceljs';
 import type { Page } from '@playwright/test';
+import sharp from 'sharp';
 
 async function navigate(page: Page, name: string) {
   const menu = page.getByRole('button', { name: 'Mở menu', exact: true });
   if (await menu.isVisible()) await menu.click();
   await page.getByRole('link', { name, exact: true }).click();
 }
+
+test('paginated import keeps whole-batch errors blocking commit on every page', async ({page})=>{
+ await page.goto('/admin');await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);
+ await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.'})).toBeVisible();
+ await navigate(page,'Nhập Excel');
+ const book=new ExcelJS.Workbook(),sheet=book.addWorksheet('Guests'),suffix=Date.now().toString(36).toUpperCase();sheet.addRow(['guest_code','full_name']);
+ for(let i=0;i<201;i++)sheet.addRow(['PAGE'+suffix+i,'Guest '+i]);sheet.addRow(['BAD CODE','Invalid guest code']);
+ await page.getByLabel('File Excel').setInputFiles({name:'pages.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:Buffer.from(await book.xlsx.writeBuffer())});
+ await page.getByRole('button',{name:'Đọc file',exact:true}).click();await expect(page.getByRole('heading',{name:'Ghép cột dữ liệu'})).toBeVisible();
+ await page.getByRole('button',{name:'Kiểm tra dữ liệu'}).click();await expect(page.getByRole('heading',{name:'Kết quả kiểm tra'})).toBeVisible();
+ const navigation=page.locator('[aria-label="Phân trang kết quả nhập"]');await expect(navigation).toContainText('Trang 1 / 3');
+ await navigation.getByRole('button',{name:'Trang sau',exact:true}).click();await expect(navigation).toContainText('Trang 2 / 3');
+ await expect(page.getByRole('button',{name:'Xác nhận nhập',exact:true})).toBeDisabled();await expect(page.getByRole('alert')).toContainText('Có 1 lỗi');
+ await navigation.getByRole('button',{name:'Trang sau',exact:true}).click();await expect(navigation).toContainText('Trang 3 / 3');
+ await expect(navigation.getByRole('button',{name:'Trang sau',exact:true})).toBeDisabled();
+});
+
+test('media upload uses the prepared local transport and displays a private preview',async({page})=>{
+ await page.goto('/admin');await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);
+ await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.'})).toBeVisible();
+ await navigate(page,'Thư viện');const alt='E2E photo '+Date.now();
+ await page.getByLabel('Chọn file').setInputFiles({name:'photo.jpg',mimeType:'image/jpeg',buffer:await sharp({create:{width:120,height:80,channels:3,background:'green'}}).jpeg().toBuffer()});
+ await page.getByLabel('Mô tả ảnh / tên bản nhạc').fill(alt);await page.getByRole('button',{name:'Tải lên thư viện',exact:true}).click();
+ const image=page.getByRole('img',{name:alt,exact:true});await expect(image).toBeVisible();await expect(image).toHaveAttribute('src',/\/admin\/media\/file\?/);
+ await expect.poll(()=>image.evaluate((node:HTMLImageElement)=>node.naturalWidth)).toBe(120);
+});
 
 test('admin can sign in and navigate all management areas', async ({ page }) => {
   await page.goto('/admin');
@@ -136,7 +163,7 @@ test('an unfinished date can be saved as a draft and blocks publication', async 
     await expect(page.getByRole('alert')).toContainText('Vui lòng hoàn thiện nội dung');
   } finally {
     const current = (await (await page.request.get('/api/v1/admin/events/current')).json()).data;
-    const restored = await page.request.patch(`/api/v1/admin/events/${before.id}/draft`, { headers: { 'X-CSRF-Token': me.csrfToken, 'If-Match': String(current.version), Origin: 'http://localhost:5173' }, data: { content: before.draft.contentJson } });
+    const restored = await page.request.patch(`/api/v1/admin/events/${before.id}/draft`, { headers: { 'X-CSRF-Token': me.csrfToken, 'If-Match': String(current.version), Origin: process.env.APP_ORIGIN! }, data: { content: before.draft.contentJson } });
     expect(restored.ok()).toBe(true);
   }
 });
@@ -168,7 +195,7 @@ test('a lost RSVP response retries the same operation and a version conflict pre
   await expect(page.getByRole('heading', { name: 'Một ngày đáng nhớ.' })).toBeVisible();
   const event = (await (await page.request.get('/api/v1/admin/events/current')).json()).data;
   const me = (await (await page.request.get('/api/v1/admin/auth/me')).json()).data;
-  const headers = { 'X-CSRF-Token': me.csrfToken, Origin: 'http://localhost:5173' };
+  const headers = { 'X-CSRF-Token': me.csrfToken, Origin: process.env.APP_ORIGIN! };
   const created = await page.request.post(`/api/v1/admin/events/${event.id}/guests`, { headers, data: { guestCode: 'RETRY' + Date.now().toString(36).toUpperCase(), fullName: 'Khách kiểm tra gửi lại' } });
   expect(created.ok()).toBe(true);
   const guest = (await created.json()).data;

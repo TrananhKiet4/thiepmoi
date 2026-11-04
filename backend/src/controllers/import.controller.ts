@@ -11,25 +11,26 @@ import {createInvitationToken,decryptInvitationToken,hashToken} from '../utils/t
 import {guestFilter} from '../services/guest.service.js';
 import {columns,validateMapping,parseWorkbook,normalizeRows,type Mapping,type NormalizedRow,type RowError} from '../utils/excel-parser.js';
 import type {RequestHandler} from 'express';
+import {readUpload,deleteUploadSource,createExport} from '../services/temporary-object.service.js';
 
 export const uuid=z.string().uuid(),upload=multer({storage:multer.memoryStorage(),limits:{fileSize:5*1024*1024,files:1,fields:2,fieldSize:16000,parts:3}}).single('file');
-export const receive=(req:Request,res:Response,next:any)=>upload(req,res,error=>error?next(new AppError(413,'UPLOAD_LIMIT','XLSX tối đa 5 MB, một file mỗi lần')):next());
+export const receive=(req:Request,res:Response,next:any)=>req.is('multipart/form-data')?upload(req,res,error=>error?next(new AppError(413,'UPLOAD_LIMIT','XLSX tối đa 5 MB, một file mỗi lần')):next()):next();
 export type StoredRows={sheet:string;rows:NormalizedRow[];errors:RowError[];warnings:RowError[]};
-export function file(req:Request){if(!req.file||!req.file.originalname.toLowerCase().endsWith('.xlsx'))throw new AppError(422,'INVALID_XLSX','Chỉ nhận file .xlsx');return req.file.buffer;}
-export function batchView(batch:any){const payload=batch.normalizedRowsJson as StoredRows;return {id:batch.id,status:batch.status,summary:batch.summaryJson,rows:payload.rows,errors:payload.errors.map(e=>({sheet:payload.sheet,...e})),warnings:payload.warnings,expiresAt:batch.expiresAt};}
+export async function file(req:Request,claim=false){if(req.is('application/json')){z.object({uploadId:uuid,sheet:z.string().optional(),mapping:z.unknown().optional()}).strict().parse(req.body);return (await readUpload(req,uuid.parse(req.params.id),req.body.uploadId,'IMPORT',claim)).bytes;}if(!req.file||!req.file.originalname.toLowerCase().endsWith('.xlsx'))throw new AppError(422,'INVALID_XLSX','Chỉ nhận file .xlsx');return req.file.buffer;}
+export function batchView(batch:any,page=1){const payload=batch.normalizedRowsJson as StoredRows,pageSize=100,pages=Math.max(1,Math.ceil(Math.max(payload.rows.length,payload.errors.length,payload.warnings.length)/pageSize));page=Math.min(page,pages);const start=(page-1)*pageSize;return {id:batch.id,status:batch.status,summary:batch.summaryJson,rows:payload.rows.slice(start,start+pageSize),errors:payload.errors.slice(start,start+pageSize).map(e=>({sheet:payload.sheet,...e})),warnings:payload.warnings.slice(start,start+pageSize),expiresAt:batch.expiresAt,pagination:{page,pageSize,pages,totalRows:payload.rows.length,totalErrors:payload.errors.length,totalWarnings:payload.warnings.length}};}
 export async function getBatch(req:Request,id:string,tx:any=prisma){const batch=await tx.importBatch.findUnique({where:{id:uuid.parse(id)}});if(!batch)throw new AppError(404,'NOT_FOUND','Không tìm thấy lần nhập');await ownedEvent(req,batch.eventId,tx);if(batch.createdBy!==req.admin!.id)throw new AppError(404,'NOT_FOUND','Không tìm thấy lần nhập');return batch;}
-export async function sendWorkbook(res:Response,book:ExcelJS.Workbook,name:string){res.set({'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename="${name}.xlsx"`,'Cache-Control':'private, no-store'});res.send(Buffer.from(await book.xlsx.writeBuffer()));}
+export async function sendWorkbook(req:Request,res:Response,book:ExcelJS.Workbook,name:string){const bytes=Buffer.from(await book.xlsx.writeBuffer());if(config.storageDriver==='s3'){ok(res,{downloadUrl:await createExport(req,bytes,name+'.xlsx')});return;}res.set({'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename="${name}.xlsx"`,'Cache-Control':'private, no-store'});res.send(bytes);}
 export function textSheet(book:ExcelJS.Workbook,name:string,headers:string[],rows:unknown[][]){const sheet=book.addWorksheet(name);sheet.addRow(headers);for(const values of rows)sheet.addRow(values.map(value=>value===null||value===undefined?'':String(value)));for(const col of sheet.columns){col.numFmt='@';col.width=24;}sheet.getRow(1).font={bold:true};sheet.views=[{state:'frozen',ySplit:1}];return sheet;}
-export const getAdminImportsTemplate:RequestHandler=async(_req,res)=>{
+export const getAdminImportsTemplate:RequestHandler=async(req,res)=>{
  const book=new ExcelJS.Workbook();textSheet(book,'Khách mời',Object.keys(columns),[['DEMO001','Khách mẫu','Bạn mẫu','ban_be','Bạn','Hẹn gặp bạn trong ngày tốt nghiệp!','demo@example.com','0123456789']]);
- await sendWorkbook(res,book,'mau-khach-moi');
+ await sendWorkbook(req,res,book,'mau-khach-moi');
 };
 export const postAdminEventsImportsInspect:RequestHandler=async(req,res)=>{
- await ownedEvent(req,uuid.parse(req.params.id));try{ok(res,await parseWorkbook(file(req)));}catch(error){if(error instanceof AppError)throw error;throw new AppError(422,'INVALID_XLSX',(error as Error).message);}
+ await ownedEvent(req,uuid.parse(req.params.id));try{ok(res,await parseWorkbook(await file(req)));}catch(error){if(error instanceof AppError)throw error;throw new AppError(422,'INVALID_XLSX',(error as Error).message);}
 };
 export const postAdminEventsImportsPreview:RequestHandler=async(req,res)=>{
- const eventId=uuid.parse(req.params.id);await ownedEvent(req,eventId);const bytes=file(req);let mapping:Mapping,parsed;
- try{mapping=JSON.parse(req.body.mapping);validateMapping(mapping);const sheet=z.string().min(1).max(100).parse(req.body.sheet);parsed=await parseWorkbook(bytes,sheet,mapping);}catch(error){throw new AppError(422,'INVALID_XLSX',(error as Error).message);}
+ const eventId=uuid.parse(req.params.id);await ownedEvent(req,eventId);const bytes=await file(req,true);try{let mapping:Mapping,parsed;
+ try{mapping=typeof req.body.mapping==='string'?JSON.parse(req.body.mapping):req.body.mapping;validateMapping(mapping);const sheet=z.string().min(1).max(100).parse(req.body.sheet);parsed=await parseWorkbook(bytes,sheet,mapping);}catch(error){throw new AppError(422,'INVALID_XLSX',(error as Error).message);}
  const normalized=normalizeRows(parsed.rows!,mapping),existing=await prisma.guest.findMany({where:{eventId,guestCode:{in:normalized.rows.map(row=>row.values.guestCode)}},include:{invitation:true}}),byCode=new Map(existing.map(g=>[g.guestCode,g]));
  const summary={created:0,updated:0,unchanged:0,errors:normalized.errors.length,warnings:normalized.warnings.length};
  for(const row of normalized.rows){
@@ -42,11 +43,12 @@ export const postAdminEventsImportsPreview:RequestHandler=async(req,res)=>{
  }
  const batch=await prisma.importBatch.create({data:{eventId,createdBy:req.admin!.id,fileHash:createHash('sha256').update(bytes).digest('hex'),mappingJson:mapping,normalizedRowsJson:JSON.parse(JSON.stringify({sheet:req.body.sheet,...normalized})),summaryJson:summary,expiresAt:new Date(Date.now()+86400000)}});
  ok(res,batchView(batch),201);
+ }finally{if(req.is('application/json'))await deleteUploadSource(req.body.uploadId).catch(()=>{});}
 };
-export const getAdminImports:RequestHandler=async(req,res)=>ok(res,batchView(await getBatch(req,uuid.parse(req.params.id))));
+export const getAdminImports:RequestHandler=async(req,res)=>ok(res,batchView(await getBatch(req,uuid.parse(req.params.id)),z.coerce.number().int().min(1).max(100000).default(1).parse(req.query.page)));
 export const getAdminImportsReport:RequestHandler=async(req,res)=>{
  const batch=await getBatch(req,uuid.parse(req.params.id)),payload=batch.normalizedRowsJson as unknown as StoredRows,book=new ExcelJS.Workbook();
- textSheet(book,'Lỗi',['sheet','row','column','message'],payload.errors.map(e=>[payload.sheet,e.row,e.column,e.message]));textSheet(book,'Cảnh báo',['sheet','row','column','message'],payload.warnings.map(e=>[payload.sheet,e.row,e.column,e.message]));await sendWorkbook(res,book,'bao-cao-nhap');
+ textSheet(book,'Lỗi',['sheet','row','column','message'],payload.errors.map(e=>[payload.sheet,e.row,e.column,e.message]));textSheet(book,'Cảnh báo',['sheet','row','column','message'],payload.warnings.map(e=>[payload.sheet,e.row,e.column,e.message]));await sendWorkbook(req,res,book,'bao-cao-nhap');
 };
 export const postAdminImportsCommit:RequestHandler=async(req,res)=>{
  const id=uuid.parse(req.params.id);z.object({}).strict().parse(req.body);await getBatch(req,id);
@@ -84,5 +86,5 @@ export const getAdminEventsExports:RequestHandler=async(req,res)=>{
  const rows=guests.map(g=>{const i=g.invitation,row:unknown[]=[g.guestCode,g.fullName,g.displayName,g.groupKey,g.salutation,i?.personalMessage??'',g.email,g.phone,g.archivedAt?.toISOString(),i?.revokedAt?.toISOString()];
   if(kind==='links')row.push(i?`${config.appOrigin}/i/${decryptInvitationToken(i.id,i.tokenCiphertext,i.keyVersion)}`:'');
   else row.push(i?.rsvp?.status??'UNANSWERED',i?.rsvp?.note??'',i?.rsvp?.updatedAt.toISOString(),i?.wish?.body??'',i?.wish?.consentPublic??false,i?.wish?.moderationStatus??'NONE',i?.wish?.deletedAt?.toISOString());return row;});
- textSheet(book,kind==='links'?'Link thiệp':'Phản hồi',headers,rows);await sendWorkbook(res,book,kind==='links'?'link-thiep':'phan-hoi');
+ textSheet(book,kind==='links'?'Link thiệp':'Phản hồi',headers,rows);await sendWorkbook(req,res,book,kind==='links'?'link-thiep':'phan-hoi');
 };

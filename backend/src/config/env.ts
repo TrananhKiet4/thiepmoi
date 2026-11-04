@@ -1,5 +1,6 @@
 import {config as loadEnv} from 'dotenv';
 import {resolve} from 'node:path';
+import {tmpdir} from 'node:os';
 
 loadEnv({path:resolve(process.cwd(),process.env.NODE_ENV==='test'?'.env.test':'.env'),quiet:true});
 function required(name:string,min=1){const value=process.env[name];if(!value||value.length<min||value.includes('REPLACE_WITH'))throw new Error(`Missing/invalid ${name}; configure server environment`);return value;}
@@ -13,9 +14,9 @@ if(production&&storageDriver!=='s3')throw new Error('Production requires S3 stor
 const oldKeys=JSON.parse(process.env.INVITATION_OLD_KEYS??'{}') as Record<string,string>;
 for(const value of Object.values(oldKeys))if(Buffer.from(value,'base64').length!==32)throw new Error('Invalid old invitation key');
 export const config={
- production,port:Number(process.env.PORT??4000),appOrigin:origin.origin,databaseUrl:required('DATABASE_URL'),sessionSecret:required('SESSION_SECRET',32),
+ production,port:Number(process.env.PORT??4000),host:process.env.HOST??'127.0.0.1',appOrigin:origin.origin,databaseUrl:required('DATABASE_URL'),sessionSecret:required('SESSION_SECRET',32),
  invitationKey,invitationKeyVersion:process.env.INVITATION_KEY_VERSION??'1',invitationOldKeys:oldKeys,
- storageDriver:storageDriver as 'local'|'s3',storageRoot:resolve(process.env.STORAGE_LOCAL_PATH??'.data/media'),
+ storageDriver:storageDriver as 'local'|'s3',storageRoot:resolve(process.env.STORAGE_LOCAL_PATH??(production?resolve(tmpdir(),'invitation-media'):'.data/media')),
  storageEndpoint:process.env.STORAGE_ENDPOINT??'',storageRegion:process.env.STORAGE_REGION??'auto',
  storageBucketPrivate:process.env.STORAGE_BUCKET_PRIVATE??'',storageBucketPublic:process.env.STORAGE_BUCKET_PUBLIC??'',
  storageAccessKey:process.env.STORAGE_ACCESS_KEY??'',storageSecretKey:process.env.STORAGE_SECRET_KEY??'',

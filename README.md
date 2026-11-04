@@ -47,6 +47,17 @@ Chạy lại admin:create không đổi mật khẩu tài khoản đã có. Seed
 
 ## Kiểm tra và build
 
+Supabase ORM → Prisma dùng hai URL: `DATABASE_URL` là Transaction pooler cổng6543 (thêm `pgbouncer=true`) cho ứng dụng; `DIRECT_URL` là Session pooler cổng5432 hoặc direct connection cho Prisma CLI/migrations. Dán đúng hai URL từ Dashboard vào `.env.production.local`, thay mật khẩu placeholder, giữ file ngoài Git. Dự án đã có Prisma và migration tại `backend/prisma`, không chạy lại `prisma init`.
+
+Kiểm tra profile này trước khi chạy migration:
+
+```powershell
+node --env-file=.env.production.local node_modules/prisma/build/index.js validate --schema backend/prisma/schema.prisma
+node --env-file=.env.production.local node_modules/prisma/build/index.js migrate status --schema backend/prisma/schema.prisma
+```
+
+`migrate status` chỉ kiểm tra trạng thái; trên database mới nó có thể báo migration chưa áp dụng. Khi đã xác nhận đúng project, tạo bảng bằng cùng lệnh trên với `migrate deploy`. Không dùng `prisma db push` thay migration production. Local setup tự đặt cả hai URL vào đúng database local/test; không dùng URL Supabase production trong bộ test.
+
 ```powershell
 npm test
 npm run typecheck
@@ -70,3 +81,7 @@ Build API và web bằng `npm run build`. Để chạy production, cấu hình �
 - `docs/superpowers/specs/2026-11-03-thiep-moi-tot-nghiep-design.md`: thiết kế đã duyệt.
 
 Ứng dụng không gửi tin nhắn hoặc email tự động; quản trị viên sao chép link/tin mẫu và tự gửi.
+
+## Triển khai Vercel
+
+Hướng dẫn một container chạy web + API với Supabase: [docs/deploy-vercel.md](docs/deploy-vercel.md). Chọn Container preset tại root repo; không triển khai riêng thư mục frontend.

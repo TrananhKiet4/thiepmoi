@@ -16,8 +16,21 @@ export async function request(path: string, options: RequestInit = {}, token?: s
 }
 export function useApi(path: string, enabled = true) { return useQuery({ queryKey: [path], queryFn: ({signal}) => request(path, {signal}), enabled, retry: false }); }
 export function write(path: string, method: string, data?: unknown, token?: string, extra?: HeadersInit) { return request(path, {method, headers: extra, body: data === undefined ? undefined : JSON.stringify(data)}, token); }
+export async function prepareUpload(eventId:string,file:File,purpose:'MEDIA'|'IMPORT'):Promise<{mode:'multipart'}|{mode:'direct';uploadId:string}>{
+  const upload=await write(`/admin/events/${eventId}/uploads`,'POST',{name:file.name,bytes:file.size,purpose});
+  if(upload.mode==='direct'){
+    const response=await fetch(upload.url,{method:'PUT',headers:upload.headers,body:file,credentials:'omit',referrerPolicy:'no-referrer'});
+    if(!response.ok)throw new Error('Không tải được file lên kho lưu trữ. Vui lòng thử lại.');
+  }
+  return upload;
+}
 export async function download(path: string, name: string, token?: string) {
-  const response = await fetch(base + path, {headers: token ? {Authorization:`Bearer ${token}`} : {},credentials:'same-origin',cache:'no-store'});
+  let response = await fetch(base + path, {headers: token ? {Authorization:`Bearer ${token}`} : {},credentials:'same-origin',cache:'no-store'});
   if (!response.ok) { const data = await response.json().catch(()=>({})); throw new Error(data.error?.message || 'Không tải được file'); }
+  if(response.headers.get('content-type')?.includes('application/json')){
+    const {data}=await response.json();
+    response=await fetch(data.downloadUrl,{credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer'});
+    if(!response.ok)throw new Error('Link tải đã hết hạn. Vui lòng tải lại.');
+  }
   const url=URL.createObjectURL(await response.blob()), a=document.createElement('a'); a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }

@@ -11,11 +11,12 @@ const exe=n=>bin?join(bin,n+(process.platform==='win32'?'.exe':'')):n;
 function run(name,args,env={}){const r=spawnSync(exe(name),args,{encoding:'utf8',env:{...process.env,...env},windowsHide:true,stdio:name==='pg_ctl'?'ignore':'pipe',timeout:30000});if(r.error||r.status!==0)throw new Error(`${name}: ${r.error?.message??r.stderr??r.stdout}`);return r.stdout??'';}
 if(!existsSync('.env')){
  const pass=randomBytes(24).toString('hex');
- const env=readFileSync('.env.example','utf8').replace('local_dev_only',pass).replace('REPLACE_WITH_AT_LEAST_32_RANDOM_CHARACTERS',randomBytes(48).toString('hex')).replace('REPLACE_WITH_BASE64_32_BYTE_KEY',randomBytes(32).toString('base64'));
+ const env=readFileSync('.env.example','utf8').replaceAll('local_dev_only',pass).replace('REPLACE_WITH_AT_LEAST_32_RANDOM_CHARACTERS',randomBytes(48).toString('hex')).replace('REPLACE_WITH_BASE64_32_BYTE_KEY',randomBytes(32).toString('base64'));
  writeFileSync('.env',env,{mode:0o600});
 }
 const {parse}=await import('dotenv');const env=parse(readFileSync('.env'));
 const db=new URL(env.DATABASE_URL);assert.equal(db.hostname,'localhost','This helper is local-only');assert.equal(db.port,'54329','Use an isolated development port');
+if(!env.DIRECT_URL)writeFileSync('.env',readFileSync('.env','utf8')+'\nDIRECT_URL='+JSON.stringify(env.DATABASE_URL)+'\n',{mode:0o600});
 const pgdata=resolve(rootData,'postgres');
 if(!existsSync(join(pgdata,'PG_VERSION'))){
  const passfile=join(rootData,'.init-password');writeFileSync(passfile,db.password,{mode:0o600});
@@ -38,5 +39,6 @@ for(const name of ['invitations','invitations_test']){
  if(!present.trim())run('createdb',['-h','127.0.0.1','-p','54329','-U',db.username,name],{PGPASSWORD:db.password});
 }
 const testDb=new URL(env.DATABASE_URL);testDb.pathname='/invitations_test';
-writeFileSync('.env.test',readFileSync('.env','utf8').replace(env.DATABASE_URL,testDb.toString())+'\nNODE_ENV=test\n',{mode:0o600});
+const testEnv=readFileSync('.env','utf8').replaceAll(env.DATABASE_URL,testDb.toString()).replace(/^DIRECT_URL=.*$/m,'DIRECT_URL='+JSON.stringify(testDb.toString()));
+writeFileSync('.env.test',testEnv+'\nNODE_ENV=test\n',{mode:0o600});
 console.log('Local PostgreSQL ready at localhost:54329; isolated dev/test databases and ignored environment files ready.');

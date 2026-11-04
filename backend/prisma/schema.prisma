@@ -4,6 +4,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 model AdminUser {
  id String @id @default(uuid()) @db.Uuid
@@ -13,6 +14,7 @@ model AdminUser {
  createdAt DateTime @default(now()) @db.Timestamptz(3)
  sessions AdminSession[]
  events Event[]
+ temporaryObjects TemporaryObject[]
 }
 model AdminSession {
  id String @id @default(uuid()) @db.Uuid
@@ -44,6 +46,7 @@ model Event {
  invitations Invitation[]
  media MediaAsset[]
  imports ImportBatch[]
+ temporaryObjects TemporaryObject[]
  @@unique([id,ownerId])
 }
 model EventRevision {
@@ -180,4 +183,27 @@ model IdempotencyRecord {
  expiresAt DateTime @db.Timestamptz(3)
  createdAt DateTime @default(now()) @db.Timestamptz(3)
  @@unique([scope,actorKeyHash,key])
+}
+model TemporaryObject {
+ id String @id @default(uuid()) @db.Uuid
+ adminId String @db.Uuid
+ admin AdminUser @relation(fields:[adminId],references:[id])
+ eventId String @db.Uuid
+ event Event @relation(fields:[eventId],references:[id])
+ purpose String
+ storageKey String @unique
+ originalName String
+ bytes Int
+ uploadExpiresAt DateTime @db.Timestamptz(3)
+ expiresAt DateTime @db.Timestamptz(3)
+ claimedAt DateTime? @db.Timestamptz(3)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@index([adminId,expiresAt])
+ @@index([expiresAt])
+}
+model RateLimitBucket {
+ key String @id
+ hits Int
+ expiresAt DateTime @db.Timestamptz(3)
+ @@index([expiresAt])
 }

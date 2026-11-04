@@ -15,10 +15,15 @@ const args=['-h','127.0.0.1','-p',url.port,'-U',url.username];
 const exists=spawnSync(exe('psql'),[...args,'-d','postgres','-tAc',"SELECT 1 FROM pg_database WHERE datname='invitations_e2e'"],{encoding:'utf8',env:pgEnv,windowsHide:true});
 if(exists.status!==0)throw new Error('Local PostgreSQL not ready');
 if(!exists.stdout.trim()){const created=spawnSync(exe('createdb'),[...args,'invitations_e2e'],{env:pgEnv,windowsHide:true});if(created.status!==0)throw new Error('Could not create E2E database');}
-url.pathname='/invitations_e2e';const e2e=local.replace(env.DATABASE_URL,url.toString());writeFileSync('.env.e2e',e2e,{mode:0o600});
+url.pathname='/invitations_e2e';let e2e=local.replaceAll(env.DATABASE_URL,url.toString());
+e2e=/^DIRECT_URL=/m.test(e2e)?e2e.replace(/^DIRECT_URL=.*$/m,'DIRECT_URL='+JSON.stringify(url.toString())):e2e+'\nDIRECT_URL='+JSON.stringify(url.toString())+'\n';
+for(const [key,value] of Object.entries({PORT:'4401',APP_ORIGIN:'http://localhost:4174',CORS_ORIGINS:'http://localhost:4174',WEB_PORT:'4174',API_PROXY_TARGET:'http://localhost:4401'})){
+ const line=new RegExp('^'+key+'=.*$','m');e2e=line.test(e2e)?e2e.replace(line,()=>key+'='+value):e2e+'\n'+key+'='+value;
+}
+writeFileSync('.env.e2e',e2e,{mode:0o600});
 function run(args,vars){const r=spawnSync(process.execPath,args,{env:{...process.env,...vars},stdio:'inherit',windowsHide:true});if(r.status!==0)process.exit(r.status??1);}
 for(const vars of [env,parse(e2e)]){
- run(['node_modules/prisma/build/index.js','migrate','deploy','--schema','backend/prisma/schema.prisma'],vars);
+ run(['node_modules/prisma/build/index.js','migrate','deploy','--schema','backend/prisma/schema.prisma'],{...vars,DIRECT_URL:vars.DATABASE_URL});
  run(['--import','tsx','backend/scripts/cli.ts','admin'],vars);
  run(['--import','tsx','backend/scripts/cli.ts','seed'],vars);
 }
