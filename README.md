@@ -84,4 +84,6 @@ Build API và web bằng `npm run build`. Để chạy production, cấu hình �
 
 ## Triển khai Vercel
 
+Production: [thiepmoi-murex.vercel.app](https://thiepmoi-murex.vercel.app) · [Quản trị](https://thiepmoi-murex.vercel.app/admin). Bản phát hành hiện tại lấy từ nhánh `codex/vercel-container`; các lần cập nhật tiếp theo cần tạo deployment mới từ commit đã kiểm thử.
+
 Hướng dẫn một container chạy web + API với Supabase: [docs/deploy-vercel.md](docs/deploy-vercel.md). Chọn Container preset tại root repo; không triển khai riêng thư mục frontend.

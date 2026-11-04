@@ -2,7 +2,7 @@
 
 Repo: `TrananhKiet4/thiepmoi`. Root Directory: **`.`**. Framework Preset: **Container**. Không chọn `frontend` hoặc `backend` làm root. Vercel đọc `Dockerfile.vercel`, chạy Node 24 + FFmpeg và phục vụ React/Express cùng domain.
 
-Project đã tạo trong team `trananhkiet4s-projects`: [thiepmoi](https://vercel.com/trananhkiet4s-projects/thiepmoi), ID `prj_8BdA2pnWHjvoJBQRW8Y6Jz9m1Wft`, Container preset/Node 24. Domain Vercel đã xác minh: `https://thiepmoi-murex.vercel.app`. Domain chưa có deployment hoạt động. Profile local đã cập nhật đúng origin; file import 22 biến Production là `.data/vercel-production.env`, ngoài Git, đã loại bootstrap password và DIRECT_URL.
+Project đã tạo trong team `trananhkiet4s-projects`: [thiepmoi](https://vercel.com/trananhkiet4s-projects/thiepmoi), ID `prj_8BdA2pnWHjvoJBQRW8Y6Jz9m1Wft`, Container preset/Node 24. Production hoạt động tại `https://thiepmoi-murex.vercel.app`, deployment `dpl_4yGsMJtj5cZge537YfqZxyUMLPUy`, mã ứng dụng commit `5725bcd` trên nhánh `codex/vercel-container`. Profile local đã cập nhật đúng origin; file import 22 biến Production là `.data/vercel-production.env`, ngoài Git, đã loại bootstrap password và DIRECT_URL. Các biến chỉ áp dụng Production, dùng `APP_STORAGE_DRIVER` để tránh trùng tên biến riêng của Buildah.
 
 Container Runtime đang Beta. Cấu hình đã chuẩn bị; chỉ phát hành sau khi kiểm tra image Linux và duyệt kết quả. Không chạy database migration hoặc bootstrap admin trong Docker build.
 

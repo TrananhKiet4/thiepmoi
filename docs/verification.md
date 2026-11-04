@@ -1,5 +1,17 @@
 # Báo cáo kiểm tra bản triển khai
 
+## Production đã phát hành ngày 04/11/2026
+
+URL: [thiepmoi-murex.vercel.app](https://thiepmoi-murex.vercel.app), quản trị `/admin`. Vercel báo READY cho deployment `dpl_4yGsMJtj5cZge537YfqZxyUMLPUy`, đúng commit `5725bcdad98b3449ae95cc4dce386127fe17030e`, target Production và nhánh `codex/vercel-container`.
+
+- Đã push nhánh riêng theo phê duyệt. Migration `202611040001_cloud_transfers` đã áp dụng lên Supabase; kiểm tra ngay sau đó xác nhận số admin/event/guest/invitation giữ nguyên so với backup và hai bảng mới đều RLS=true.
+- Build đầu tiên lỗi vì biến ứng dụng `STORAGE_DRIVER=s3` trùng tên biến Buildah. Đã đổi sang `APP_STORAGE_DRIVER`, giữ fallback tên cũ cho local và đổi tên key trên Vercel mà không đọc/đổi giá trị. Test mới được kiểm tra RED→GREEN; tổng backend 70/70, typecheck pass. Image Linux sửa lại đã qua đầy đủ kiểm tra runtime bằng PostgreSQL test riêng.
+- Kiểm tra HTTPS trên domain Production bằng Chromium thực tế pass: health/live và health/ready 200; đăng nhập và tải dashboard; cookie Secure/HttpOnly/SameSite=Lax; thiếu CSRF bị chặn; session cũ mất hiệu lực sau đăng xuất.
+- Upload ảnh PNG tự sinh 4.924.479 byte qua giao diện: file đi thẳng tới Supabase S3, API chỉ nhận metadata/uploadId. Preview private hiển thị đúng trong browser; ảnh thử và variants đã được xóa qua API. Ảnh lazy-load được cuộn vào viewport trong kiểm tra.
+- Tải template XLSX bằng private signed URL qua giao diện pass. File export thử thuộc lifecycle TemporaryObject thông thường. Link thiệp sai không lộ dữ liệu; không có client exception trong lượt xác minh cuối. Không chỉnh nội dung draft, publish sự kiện hoặc tạo khách mời thật để kiểm tra.
+
+Backup public schema đã có và kiểm tra inventory, chưa diễn tập restore. Giữ các giới hạn về thiết bị thật/hiệu năng và 8 advisory moderate của dependency đã nêu dưới đây; không coi kiểm tra chức năng là kiểm chứng các giới hạn đó.
+
 ## Cập nhật Vercel/container ngày 04/11/2026
 
 - Backend 67/67 và E2E desktop/mobile 18/18 pass; typecheck/build pass sau lượt sửa review. OpenAPI 3.1 đã parse: 43 paths, 436 references hợp lệ.
@@ -12,7 +24,7 @@
 - S3 thật đã qua PUT/GET trực tiếp từ browser với file 5 MiB, chặn anonymous private và Content-Length sai chữ ký; object thử đã xóa. S3 private preview/export hiện dùng signed GET, không proxy file lớn qua Vercel.
 - Image build dùng working tree, bao gồm thay đổi có sẵn của người dùng là caret `^6.19.3` cho dev Prisma trong package/lockfile; phiên bản resolved vẫn 6.19.3. Hai thay đổi này cùng `.gitignore` được giữ nguyên, chưa đưa vào commit triển khai.
 
-Chủ tài khoản đã cấp quyền cho team `trananhkiet4s-projects`. Đã tạo project `thiepmoi` (`prj_8BdA2pnWHjvoJBQRW8Y6Jz9m1Wft`), Container preset/Node 24, domain `thiepmoi-murex.vercel.app` được Vercel xác minh. Profile local đã cập nhật origin/domain; file import `.data/vercel-production.env` chứa 22 biến, không có bootstrap password/DIRECT_URL và được gitignore. Người dùng đã import; API metadata xác nhận đủ 22 biến chỉ có target Production, không còn Preview và không giải mã giá trị. Bản backup schema public 35.701 byte đã tạo theo ủy quyền riêng, kiểm tra inventory thành công (1 admin, 1 event, 0 guests/invitations); chưa diễn tập restore. Chưa push nhánh, migrate cloud hoặc deploy; chờ duyệt phát hành cuối.
+Chủ tài khoản đã cấp quyền cho team `trananhkiet4s-projects`. Đã tạo project `thiepmoi` (`prj_8BdA2pnWHjvoJBQRW8Y6Jz9m1Wft`), Container preset/Node 24, domain `thiepmoi-murex.vercel.app` được Vercel xác minh. Profile local đã cập nhật origin/domain; file import `.data/vercel-production.env` chứa 22 biến, không có bootstrap password/DIRECT_URL và được gitignore. Người dùng đã import; API metadata xác nhận đủ 22 biến chỉ có target Production, không còn Preview và không giải mã giá trị. Bản backup schema public 35.701 byte đã tạo theo ủy quyền riêng, kiểm tra inventory thành công (1 admin, 1 event, 0 guests/invitations); chưa diễn tập restore. Người dùng sau đó đã duyệt push/migrate/deploy; kết quả Production ở đầu báo cáo.
 
 ## Cập nhật cấu trúc theo KLTN ngày 03/11/2026
 
