@@ -37,7 +37,7 @@ Các biến cần lấy từ profile local hiện có:
 
 - `DATABASE_URL`: Supabase Transaction pooler 6543, bật SSL theo URL Supabase cung cấp. Với Prisma 6 trên server tự scale, đặt `pgbouncer=true`, `connection_limit=1`, `pool_timeout=10` nếu URL chưa có các tham số này.
 - `SESSION_SECRET`, `INVITATION_KEY`, `INVITATION_KEY_VERSION`; giữ nguyên giá trị đã dùng để tạo dữ liệu. Nếu đã xoay khóa, giữ cả `INVITATION_OLD_KEYS`.
-- `STORAGE_DRIVER=s3`, `STORAGE_ENDPOINT`, `STORAGE_REGION`.
+- `APP_STORAGE_DRIVER=s3`, `STORAGE_ENDPOINT`, `STORAGE_REGION`. Dùng tên `APP_STORAGE_DRIVER` trên Vercel vì `STORAGE_DRIVER` là biến riêng của Buildah; tên cũ vẫn được hỗ trợ cho môi trường local.
 - `STORAGE_BUCKET_PRIVATE=invitation-private`, `STORAGE_BUCKET_PUBLIC=invitation-public`.
 - `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`, `PUBLIC_MEDIA_BASE_URL`.
 - `CRON_SECRET`: ít nhất 32 ký tự ngẫu nhiên, dùng để Vercel gọi cron có xác thực.

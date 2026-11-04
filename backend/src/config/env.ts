@@ -9,7 +9,8 @@ if(!['http:','https:'].includes(origin.protocol)||origin.origin!==required('APP_
 const production=process.env.NODE_ENV==='production';
 if(production&&origin.protocol!=='https:')throw new Error('Production APP_ORIGIN requires HTTPS');
 const invitationKey=required('INVITATION_KEY');if(Buffer.from(invitationKey,'base64').length!==32)throw new Error('INVITATION_KEY must be base64 of 32 bytes');
-const storageDriver=process.env.STORAGE_DRIVER??'local';if(!['local','s3'].includes(storageDriver))throw new Error('Invalid STORAGE_DRIVER');
+// Buildah reserves STORAGE_DRIVER; APP_STORAGE_DRIVER is safe for Vercel builds.
+const storageDriver=process.env.APP_STORAGE_DRIVER??process.env.STORAGE_DRIVER??'local';if(!['local','s3'].includes(storageDriver))throw new Error('Invalid APP_STORAGE_DRIVER');
 if(production&&storageDriver!=='s3')throw new Error('Production requires S3 storage');
 const oldKeys=JSON.parse(process.env.INVITATION_OLD_KEYS??'{}') as Record<string,string>;
 for(const value of Object.values(oldKeys))if(Buffer.from(value,'base64').length!==32)throw new Error('Invalid old invitation key');
