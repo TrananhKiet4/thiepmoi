@@ -72,3 +72,16 @@ it('paginates previews while errors outside the visible rows still block the who
  expect(page.body.data.errors).toHaveLength(1);expect(page.body.data.pagination).toEqual({page:2,pageSize:100,pages:3,totalRows:201,totalErrors:101,totalWarnings:0});
  expect((await admin(`imports/${batch.id}/commit`,{})).status).toBe(422);
 });
+it('counts live PUT capabilities even after their source was claimed',async()=>{
+ const previous={storageDriver:config.storageDriver,storageEndpoint:config.storageEndpoint,storageRegion:config.storageRegion,storageAccessKey:config.storageAccessKey,storageSecretKey:config.storageSecretKey,storageBucketPrivate:config.storageBucketPrivate};
+ Object.assign(config,{storageDriver:'s3',storageEndpoint:'http://127.0.0.1:9',storageRegion:'us-east-1',storageAccessKey:'test-access',storageSecretKey:'test-secret',storageBucketPrivate:'private'});
+ try{
+  await prisma.temporaryObject.createMany({data:Array.from({length:20},()=>({adminId:f.admin.id,eventId:f.event.id,purpose:'MEDIA',storageKey:`${f.event.id}/${randomUUID()}/source.bin`,originalName:'photo.jpg',bytes:100,claimedAt:new Date(),uploadExpiresAt:new Date(Date.now()+300000),expiresAt:new Date(Date.now()+1800000)}))});
+  expect((await admin(`events/${f.event.id}/uploads`,{purpose:'MEDIA',name:'photo.jpg',bytes:100})).status).toBe(429);
+ }finally{Object.assign(config,previous);}
+});
+it.each([[16384,3],[200,50]])('rejects inspect metadata with header length %i across %i sheets',async(length,sheets)=>{
+  const book=new ExcelJS.Workbook();for(let i=0;i<sheets;i++)book.addWorksheet('Sheet'+i).addRow(Array(100).fill('字'.repeat(length)));
+  const response=await request(app).post(`/api/v1/admin/events/${f.event.id}/imports/inspect`).set('Cookie',f.cookie).set('Origin','http://localhost:5173').set('X-CSRF-Token',f.csrf).attach('file',Buffer.from(await book.xlsx.writeBuffer()),'headers.xlsx');
+  expect(response.status).toBe(422);expect(Buffer.byteLength(response.text)).toBeLessThan(4096);
+});

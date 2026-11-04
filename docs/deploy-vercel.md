@@ -85,7 +85,7 @@ Kiểm tra trên domain đã xác minh:
 5. Xem media ở bản nháp qua URL private có chữ ký; URL không có chữ ký phải bị chặn. Chỉ media đã publish mới có URL public.
 6. `/api/maintenance` không có Bearer phải trả 401 khi đã cấu hình. Vercel Cron chạy `0 0 * * *` UTC, tương đương 07:00 giờ Việt Nam/Thái Lan; Vercel gửi `CRON_SECRET` trong Authorization.
 
-File tạm hết hạn không còn được xử lý/tải bằng URL đã cấp, nhưng object vật lý có thể tồn tại đến lượt cron kế tiếp. Mỗi lượt cron dọn tối đa 100 object, có giới hạn thời gian; lỗi xóa giữ metadata để retry. Theo dõi số dọn lỗi và lượng tồn đọng; với lượng file lớn hơn khả năng một lượt/ngày, tăng lịch tần suất phù hợp plan trước khi mở rộng sử dụng.
+File tạm hết hạn không còn được xử lý/tải bằng URL đã cấp, nhưng object vật lý có thể tồn tại đến lượt cron kế tiếp. Mỗi lượt cron dọn tối đa 100 object, có giới hạn thời gian; lỗi xóa giữ metadata để retry. Mỗi nhóm database dọn tối đa 1.000 dòng, bỏ qua dòng đang khóa, với lock timeout 250 ms và statement timeout 2 giây; `failedTasks` ghi nhóm cần thử lại. Dọn object chạy trước các nhóm này. Theo dõi số dọn lỗi và lượng tồn đọng; với lượng file lớn hơn khả năng một lượt/ngày, tăng lịch tần suất phù hợp plan trước khi mở rộng sử dụng.
 
 ## 6. Rollback
 

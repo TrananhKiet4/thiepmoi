@@ -24,7 +24,7 @@ export class PostgresRateLimitStore implements Store{
    RETURNING "hits","expiresAt"`;
   return {totalHits:rows[0].hits,resetTime:rows[0].expiresAt};
  }
- async decrement(key:string){await prisma.$executeRaw`UPDATE "RateLimitBucket" SET "hits"=GREATEST("hits"-1,0) WHERE "key"=${this.key(key)} AND "expiresAt">clock_timestamp()`;}
+ async decrement(key:string){try{await prisma.$executeRaw`UPDATE "RateLimitBucket" SET "hits"=GREATEST("hits"-1,0) WHERE "key"=${this.key(key)} AND "expiresAt">clock_timestamp()`;}catch{console.error(JSON.stringify({code:'RATE_LIMIT_DECREMENT_FAILED'}));}}
  async resetKey(key:string){await prisma.rateLimitBucket.deleteMany({where:{key:this.key(key)}});}
 }
 export const rateLimitStore=(namespace:string)=>config.production?new PostgresRateLimitStore(namespace):new BoundedMemoryStore();

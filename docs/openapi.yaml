@@ -4,7 +4,7 @@ jsonSchemaDialect: "https://json-schema.org/draft/2020-12/schema"
 info:
   title: "Thiệp mời tốt nghiệp API"
   version: "1.0.0"
-  description: "Contract for the implemented Express routes. Base /api/v1; health operations override the server base to /. Success JSON is {data}; errors are {error:{code,message,fields?,requestId?}} (rate limiter errors may omit requestId). All API responses carry X-Request-ID. Personal data, links, exports and previews are private, no-store; local public media has a long cache lifetime. IDs are UUIDs, timestamps ISO 8601 UTC. No admin/guest API returns token hashes, encrypted invitation tokens, password hashes or session hashes. Only explicitly authorized admin link/export endpoints return the plaintext invitation URL. JSON limit 100 KB. All guest requests count toward 120/min/IP; guest writes additionally count toward 20/min/token+IP (memory limiter, one instance). Admin owner authorization applies to every selected entity. Content defaults/normalization are defined in packages/contracts/src/index.ts."
+  description: "Contract for the implemented Express routes. Base /api/v1; health operations override the server base to /. Success JSON is {data}; errors are {error:{code,message,fields?,requestId?}} (rate limiter errors may omit requestId). All API responses carry X-Request-ID. Personal data, links, exports and previews are private, no-store; local public media has a long cache lifetime. IDs are UUIDs, timestamps ISO 8601 UTC. No admin/guest API returns token hashes, encrypted invitation tokens, password hashes or session hashes. Only explicitly authorized admin link/export endpoints return the plaintext invitation URL. JSON limit 100 KB. All guest requests count toward 120/min/IP; guest writes additionally count toward 20/min/token+IP (shared PostgreSQL counters in production; bounded memory in development). Admin owner authorization applies to every selected entity. Content defaults/normalization are defined in packages/contracts/src/index.ts."
 servers:
   - {"url":"/api/v1","description":"Same-origin API (development via Vite proxy, production behind HTTPS reverse proxy)"}
 tags:
@@ -1171,6 +1171,8 @@ paths:
               schema: {"type":"string"}
               description: "attachment; filename=..."
           content:
+            "application/json":
+              schema: {"$ref":"#/components/schemas/DownloadLinkEnvelope"}
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
               schema: {"type":"string","format":"binary"}
         "400": {"$ref":"#/components/responses/Error400"}
@@ -1218,6 +1220,8 @@ paths:
       requestBody:
         required: true
         content:
+          "application/json":
+            schema: {"type":"object","properties":{"uploadId":{"type":"string","format":"uuid"}},"required":["uploadId"],"additionalProperties":false}
           "multipart/form-data":
             schema:
               type: "object"
@@ -1268,6 +1272,8 @@ paths:
       requestBody:
         required: true
         content:
+          "application/json":
+            schema: {"type":"object","properties":{"uploadId":{"type":"string","format":"uuid"},"sheet":{"type":"string","minLength":1,"maxLength":100},"mapping":{"type":"object","additionalProperties":{"type":"string","maxLength":200},"required":["guest_code","full_name"]}},"required":["uploadId","sheet","mapping"],"additionalProperties":false}
           "multipart/form-data":
             schema:
               type: "object"
@@ -1293,6 +1299,7 @@ paths:
         -
           AdminCookie: []
       parameters:
+        - {"name":"page","in":"query","schema":{"type":"integer","minimum":1,"maximum":100000,"default":1},"description":"Rows, errors and warnings are independently sliced into pages of 100; summary describes the whole batch."}
         - {"$ref":"#/components/parameters/Id"}
       responses:
         "200":
@@ -1339,6 +1346,8 @@ paths:
               schema: {"type":"string"}
               description: "attachment; filename=..."
           content:
+            "application/json":
+              schema: {"$ref":"#/components/schemas/DownloadLinkEnvelope"}
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
               schema: {"type":"string","format":"binary"}
         "400": {"$ref":"#/components/responses/Error400"}
@@ -1456,6 +1465,8 @@ paths:
               schema: {"type":"string"}
               description: "attachment; filename=..."
           content:
+            "application/json":
+              schema: {"$ref":"#/components/schemas/DownloadLinkEnvelope"}
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
               schema: {"type":"string","format":"binary"}
         "400": {"$ref":"#/components/responses/Error400"}
@@ -1541,6 +1552,8 @@ paths:
       requestBody:
         required: true
         content:
+          "application/json":
+            schema: {"type":"object","properties":{"uploadId":{"type":"string","format":"uuid"},"alt":{"type":"string","maxLength":500}},"required":["uploadId"],"additionalProperties":false}
           "multipart/form-data":
             schema:
               type: "object"
@@ -1661,6 +1674,10 @@ paths:
           required: true
           schema: {"type":"string"}
       responses:
+        "302":
+          description: "S3 mode: redirect to a private signed GET valid for 5 minutes, after session and ownership checks."
+          headers:
+            Location: {"schema":{"type":"string","format":"uri"}}
         "200":
           description: "Private media bytes; signed URL also requires a valid owner admin session."
           headers:
@@ -1758,8 +1775,50 @@ paths:
                 required: ["ok"]
       servers:
         - {"url":"/"}
+  "/admin/events/{id}/uploads":
+    post:
+      operationId: prepare_private_upload
+      tags: ["Media", "Excel"]
+      summary: "Prepare a private direct upload; use before sending a file on Vercel"
+      description: "MEDIA is at most 10 MiB (JPEG/PNG/WebP/MP3/M4A); IMPORT at most 5 MiB (.xlsx). At most 20 live PUT capabilities or unclaimed active sources per administrator. Direct URLs expire after 5 minutes; source processing expires after 30 minutes. PUT exactly the declared bytes with returned headers and no app credentials. Inspect does not consume uploadId; media completion and import preview consume it once. XLSX headers are at most 200 characters and aggregate inspection metadata at most 1 MiB. Local mode returns multipart and retains the original multipart routes."
+      security: [{"AdminCookie":[],"AdminCsrf":[]}]
+      parameters:
+        - {"$ref":"#/components/parameters/Id"}
+        - {"$ref":"#/components/parameters/Origin"}
+        - {"$ref":"#/components/parameters/Csrf"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type":"object","properties":{"purpose":{"enum":["MEDIA","IMPORT"]},"name":{"type":"string","minLength":1,"maxLength":255},"bytes":{"type":"integer","minimum":1,"maximum":10485760}},"required":["purpose","name","bytes"],"additionalProperties":false}
+      responses:
+        "200":
+          description: "Direct upload information or local multipart transport"
+          content:
+            application/json:
+              schema: {"type":"object","properties":{"data":{"oneOf":[{"type":"object","properties":{"mode":{"const":"multipart"}},"required":["mode"]},{"type":"object","properties":{"mode":{"const":"direct"},"uploadId":{"type":"string","format":"uuid"},"url":{"type":"string","format":"uri"},"headers":{"type":"object","additionalProperties":{"type":"string"}}},"required":["mode","uploadId","url","headers"]}]}},"required":["data"]}
+        "400": {"$ref":"#/components/responses/Error400"}
+        "401": {"$ref":"#/components/responses/Error401"}
+        "403": {"$ref":"#/components/responses/Error403"}
+        "404": {"$ref":"#/components/responses/Error404"}
+        "409": {"$ref":"#/components/responses/Error409"}
+        "429": {"$ref":"#/components/responses/Error429"}
+        "500": {"$ref":"#/components/responses/Error500"}
+  "/api/maintenance":
+    servers: [{"url":"/"}]
+    get:
+      operationId: daily_maintenance
+      summary: "Authenticated daily Vercel cron"
+      description: "Bearer CRON_SECRET (at least 32 random characters). Cleans at most 100 temporary objects within a time budget and at most 1,000 rows per database cleanup job; locked rows are skipped, SQL lock/statement timeouts apply. Failed deletes retain object metadata for retry; failedTasks identifies database jobs to retry."
+      security: [{"CronBearer":[]}]
+      responses:
+        "200": {"description":"Cleanup counts in data; temporaryObjects has deleted/failed counts and failedTasks lists database jobs that failed."}
+        "401": {"$ref":"#/components/responses/Error401"}
+        "503": {"$ref":"#/components/responses/Error503"}
+        "500": {"$ref":"#/components/responses/Error500"}
 components:
   securitySchemes:
+    CronBearer: {"type":"http","scheme":"bearer"}
     AdminCookie:
       type: "apiKey"
       in: "cookie"
@@ -2842,6 +2901,12 @@ components:
         updated: {"type":"integer","minimum":0}
         unchanged: {"type":"integer","minimum":0}
       required: ["created","updated","unchanged"]
+    DownloadLinkEnvelope:
+      description: "S3 export/report/template responses return a private signed GET URL valid for 60 seconds; objects are retained for 10 minutes. Local mode returns XLSX directly."
+      type: object
+      properties:
+        data: {"type":"object","properties":{"downloadUrl":{"type":"string","format":"uri"}},"required":["downloadUrl"]}
+      required: [data]
     ImportBatch:
       type: "object"
       properties:
@@ -2861,15 +2926,18 @@ components:
         rows:
           type: "array"
           items: {"$ref":"#/components/schemas/ImportRow"}
-          maxItems: 2000
+          maxItems: 100
         errors:
           type: "array"
           items: {"$ref":"#/components/schemas/RowError"}
+          maxItems: 100
         warnings:
           type: "array"
           items: {"$ref":"#/components/schemas/RowError"}
+          maxItems: 100
         expiresAt: {"type":"string","format":"date-time"}
-      required: ["id","status","summary","rows","errors","warnings","expiresAt"]
+        pagination: {"type":"object","properties":{"page":{"type":"integer"},"pageSize":{"const":100},"pages":{"type":"integer"},"totalRows":{"type":"integer"},"totalErrors":{"type":"integer"},"totalWarnings":{"type":"integer"}},"required":["page","pageSize","pages","totalRows","totalErrors","totalWarnings"]}
+      required: ["id","status","summary","rows","errors","warnings","expiresAt","pagination"]
     Inspect:
       type: "object"
       properties:

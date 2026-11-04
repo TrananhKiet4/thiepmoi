@@ -17,7 +17,7 @@ export async function createUpload(req:Request,eventId:string,input:unknown){
  if(config.storageDriver==='local')return {mode:'multipart' as const};
  const id=randomUUID(),now=new Date(),storageKey=`${eventId}/${id}/source.bin`;
  await withTransaction(async tx=>{
-  if(await tx.temporaryObject.count({where:{adminId:req.admin!.id,purpose:{in:['MEDIA','IMPORT']},claimedAt:null,expiresAt:{gt:now}}})>=20)throw new AppError(429,'UPLOAD_LIMIT','Tối đa 20 file đang chờ; vui lòng thử lại sau');
+  if(await tx.temporaryObject.count({where:{adminId:req.admin!.id,purpose:{in:['MEDIA','IMPORT']},OR:[{uploadExpiresAt:{gt:now}},{claimedAt:null,expiresAt:{gt:now}}]}})>=20)throw new AppError(429,'UPLOAD_LIMIT','Đã đạt giới hạn 20 lượt tải còn hiệu lực; vui lòng thử lại sau');
   await tx.temporaryObject.create({data:{id,adminId:req.admin!.id,eventId,purpose:value.purpose,storageKey,originalName:value.name.replace(/[\x00-\x1f\x7f\\/]/g,'_'),bytes:value.bytes,uploadExpiresAt:new Date(now.getTime()+300000),expiresAt:new Date(now.getTime()+1800000)}});
  });
  return {mode:'direct' as const,uploadId:id,url:await uploadUrl(storageKey,value.bytes),headers:{'Content-Type':'application/octet-stream'}};

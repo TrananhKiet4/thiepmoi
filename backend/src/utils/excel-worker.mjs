@@ -32,9 +32,10 @@ try {
  if(book.worksheets.length>50)throw new Error('Tối đa 50 sheet');
  const sheets=book.worksheets.map(sheet=>{
   if(sheet.columnCount>100)throw new Error('Tối đa 100 cột');
-  const headers=[];for(let col=1;col<=sheet.columnCount;col++)headers.push(cellString(sheet.getCell(1,col)));
+  const headers=[];for(let col=1;col<=sheet.columnCount;col++){const header=cellString(sheet.getCell(1,col));if(header.length>200)throw new Error('Tiêu đề cột tối đa 200 ký tự');headers.push(header);}
   return {name:sheet.name,headers};
  });
+ if(Buffer.byteLength(JSON.stringify({sheets}))>1024*1024)throw new Error('Tổng thông tin sheet và tiêu đề vượt 1 MB');
  if(!workerData.sheet){parentPort.postMessage({sheets});}
  else {
   const sheet=book.getWorksheet(workerData.sheet);if(!sheet)throw new Error('Không tìm thấy sheet');
@@ -57,4 +58,4 @@ try {
   }
   parentPort.postMessage({sheets,rows});
  }
-}catch(error){parentPort.postMessage({error:error.message||'Không đọc được XLSX'});}
+}catch(error){parentPort.postMessage({error:String(error.message||'Không đọc được XLSX').slice(0,500)});}
