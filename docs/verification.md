@@ -12,7 +12,7 @@
 - S3 thật đã qua PUT/GET trực tiếp từ browser với file 5 MiB, chặn anonymous private và Content-Length sai chữ ký; object thử đã xóa. S3 private preview/export hiện dùng signed GET, không proxy file lớn qua Vercel.
 - Image build dùng working tree, bao gồm thay đổi có sẵn của người dùng là caret `^6.19.3` cho dev Prisma trong package/lockfile; phiên bản resolved vẫn 6.19.3. Hai thay đổi này cùng `.gitignore` được giữ nguyên, chưa đưa vào commit triển khai.
 
-Chủ tài khoản đã cấp quyền cho team `trananhkiet4s-projects`. Đã tạo project `thiepmoi` (`prj_8BdA2pnWHjvoJBQRW8Y6Jz9m1Wft`), Container preset/Node 24, domain `thiepmoi-murex.vercel.app` được Vercel xác minh. Profile local đã cập nhật origin/domain; file import `.data/vercel-production.env` chứa 22 biến, không có bootstrap password/DIRECT_URL và được gitignore. Đang chờ import Production; chưa push nhánh, migrate cloud hoặc deploy.
+Chủ tài khoản đã cấp quyền cho team `trananhkiet4s-projects`. Đã tạo project `thiepmoi` (`prj_8BdA2pnWHjvoJBQRW8Y6Jz9m1Wft`), Container preset/Node 24, domain `thiepmoi-murex.vercel.app` được Vercel xác minh. Profile local đã cập nhật origin/domain; file import `.data/vercel-production.env` chứa 22 biến, không có bootstrap password/DIRECT_URL và được gitignore. Người dùng đã import; API metadata xác nhận đủ 22 biến chỉ có target Production, không còn Preview và không giải mã giá trị. Bản backup schema public 35.701 byte đã tạo theo ủy quyền riêng, kiểm tra inventory thành công (1 admin, 1 event, 0 guests/invitations); chưa diễn tập restore. Chưa push nhánh, migrate cloud hoặc deploy; chờ duyệt phát hành cuối.
 
 ## Cập nhật cấu trúc theo KLTN ngày 03/11/2026
 
