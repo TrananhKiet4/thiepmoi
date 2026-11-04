@@ -1,5 +1,19 @@
 # Báo cáo kiểm tra bản triển khai
 
+## Cập nhật Vercel/container ngày 04/11/2026
+
+- Backend 67/67 và E2E desktop/mobile 18/18 pass; typecheck/build pass sau lượt sửa review. OpenAPI 3.1 đã parse: 43 paths, 436 references hợp lệ.
+- Docker Engine Linux 29.9.2 đã chạy. `docker build -f Dockerfile.vercel -t thiepmoi:verify .` exit 0; image `sha256:beab7bb4e99d59188a1fe24c9cb9fd2d00322c7d14f7ba008427c2d05396dd83`, khoảng 1,58 GB uncompressed, runtime user `node`.
+- Image chạy Node 24.22.2/Linux, user không phải root; không có `.env`, `.env.production.local`, `.data` hoặc `.git` của workspace trong image.
+- Đã tạo PostgreSQL 18 container riêng, áp dụng cả hai migration và bootstrap tài khoản test bằng credentials ngẫu nhiên. Không dùng database hoặc credentials Supabase production trong lượt kiểm tra Linux.
+- HTTP checks trong container pass: readiness, root/admin/deep links SPA, JSON API 404, login, Secure/HttpOnly cookie flags, session, event/draft, CSRF 403, logout 204, phiên đã thu hồi 401, cron xác thực. Đây là kiểm tra HTTP nội bộ với Origin/cookie test; HTTPS/browser trên domain Vercel thật chưa kiểm tra.
+- Native Argon2, Sharp tạo ba variant ảnh, full decode MP3 và M4A bằng FFmpeg đều pass trong image production sau khi prune dev dependencies.
+- Chỉ các container/network test tự tạo đã được dừng và dọn; các tài nguyên Docker khác không bị thay đổi.
+- S3 thật đã qua PUT/GET trực tiếp từ browser với file 5 MiB, chặn anonymous private và Content-Length sai chữ ký; object thử đã xóa. S3 private preview/export hiện dùng signed GET, không proxy file lớn qua Vercel.
+- Image build dùng working tree, bao gồm thay đổi có sẵn của người dùng là caret `^6.19.3` cho dev Prisma trong package/lockfile; phiên bản resolved vẫn 6.19.3. Hai thay đổi này cùng `.gitignore` được giữ nguyên, chưa đưa vào commit triển khai.
+
+Chưa push nhánh, chưa migrate Supabase cloud, chưa tạo được project/deploy Vercel. Tài khoản Vercel đã xác minh là `trananhkiet4`; thao tác tạo project trả 403 vì kết nối chưa có grant cho team `trananhkiet4s-projects`. Cần chủ tài khoản cấp quyền team trước khi tiếp tục cấu hình project/domain và phát hành.
+
 ## Cập nhật cấu trúc theo KLTN ngày 03/11/2026
 
 Đã chuyển mã sang `backend/` và `frontend/`, chia các lớp/nhóm chức năng như `docs/project-structure.md`. Không thay phiên bản dependency, schema/migration hoặc dữ liệu runtime.
@@ -35,7 +49,7 @@ Giao diện đã được kiểm tra trực quan dashboard và thiệp trên des
 
 Chưa đo LCP/CLS/INP trong điều kiện mạng chuẩn, API p95 với100phiên hoặc import commit2000dòng đầy đủ. Không báo đạt các mục tiêu hiệu năng chỉ từ build/test chức năng. Chưa thử trên iOS Safari/Android Chrome thiết bị thật; Chromium emulation không thay thế kiểm tra thiết bị.
 
-Chưa kiểm tra roundtrip S3/CDN production vì chưa cấu hình tài khoản; adapter đã triển khai, private preview dùng proxy cùng origin. Publish S3 thất bại có thể để lại object copy không tham chiếu, cần lifecycle/inventory như runbook. Chưa cấu hình domain/HTTPS, scheduler backup hoặc monitoring production.
+Trong lượt kiểm tra ban đầu ngày 03/11 chưa có tài khoản S3 nên chưa kiểm tra roundtrip; xem kết quả cập nhật 04/11 phía trên. Publish S3 thất bại có thể để lại object copy không tham chiếu, cần inventory/dọn có đối chiếu database như runbook. Chưa cấu hình domain/HTTPS, scheduler backup hoặc monitoring production.
 
 `npm audit --omit=dev`:0high/critical,8moderate theo chuỗi phụ thuộc ExcelJS/archiver/glob/minimatch. Ứng dụng không nhận glob pattern hoặc đường dẫn filesystem từ người dùng ở đường này; import được chặn trong worker có giới hạn. Đây không phải tuyên bố loại bỏ advisory: giữ lockfile, đánh giá bản vá/thư viện thay thế trước production; không chạy audit fix --force để hạ ExcelJS thiếu kiểm tra tương thích.
 

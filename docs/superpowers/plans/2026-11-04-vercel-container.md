@@ -68,7 +68,7 @@
 - [x] Implement bounded maintenance service/router and CLI reuse. Add PostgreSQL store selection for production. Add HOST config and production /tmp default for S3.
 - [x] Add multistage Node 24 Debian slim + FFmpeg Dockerfile, narrowly scoped COPY and dockerignore. Runtime nonroot, bind 0.0.0.0:8080, build both workspaces and exclude bootstrap/secrets. Add daily Vercel cron JSON.
 - [x] Run focused tests, typecheck, build and suite.
-- [ ] Build/run image, inspect env-file exclusion and verify health/SPA/audio in Linux — blocked by Docker engine startup error.
+- [x] Build/run image, inspect env-file exclusion and verify health/SPA/audio in Linux — passed after Docker Engine started.
 - [x] Commit task files and ledger evidence.
 
 ### Task 4: End-to-end verification and release preparation
@@ -85,4 +85,4 @@ Every spec section maps to tasks 1–4; the five review focus conditions have ro
 
 ## Verified status (2026-11-04)
 
-Local implementation is committed on codex/vercel-container. Final backend 67/67, desktop/mobile E2E 18/18, typecheck/build and OpenAPI parse/reference checks pass. Real browser S3 transfer of 5 MiB passed, anonymous access and wrong signed length were rejected, test object deleted. Four confirmed review findings fixed with regression tests; a fifth concurrency allegation was withdrawn after reproduction attempts preserved the counter. Linux image verification remains pending; no cloud migration, project creation, push or deploy has run.
+Local implementation is committed on codex/vercel-container. Final backend 67/67, desktop/mobile E2E 18/18, typecheck/build and OpenAPI parse/reference checks pass. Real browser S3 transfer of 5 MiB passed, anonymous access and wrong signed length were rejected, test object deleted. Four confirmed review findings fixed with regression tests; a fifth concurrency allegation was withdrawn after reproduction attempts preserved the counter. Linux image build and isolated PostgreSQL 18 runtime checks passed: Node 24.22.2, nonroot, private workspace files excluded, SPA/API/auth/CSRF/cron and Sharp/MP3/M4A verified. Verification containers/network cleaned. No cloud migration, project creation, push or deploy has run; Vercel project creation was rejected with 403 pending a team grant for the connected app.
