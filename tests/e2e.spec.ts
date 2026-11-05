@@ -3,6 +3,13 @@ import ExcelJS from 'exceljs';
 import type { Page } from '@playwright/test';
 import sharp from 'sharp';
 
+test('configured admin alias signs in through the username field',async({page})=>{
+ await page.goto('/admin');await page.getByLabel('Email').fill('admin');
+ await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);
+ await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.',exact:true})).toBeVisible();
+});
+
 test('Vietnamese serif heading renders with one font family instead of mixed fallback glyphs',async({page})=>{
  await page.goto('/admin');await expect(page.getByRole('button',{name:'Đăng nhập',exact:true})).toBeVisible();
  const cdp=await page.context().newCDPSession(page);await cdp.send('DOM.enable');await cdp.send('CSS.enable');const {root}=await cdp.send('DOM.getDocument');

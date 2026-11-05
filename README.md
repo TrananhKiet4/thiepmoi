@@ -36,7 +36,7 @@ npm run db:migrate
 
 Tạo secret bằng `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`; tạo riêng từng secret. Không dùng ví dụ placeholder hoặc commit `.env`. Database test phải tách riêng với tên kết thúc `_test` và thông tin trong `.env.test`; helper reset test sẽ từ chối database phát triển.
 
-Khởi tạo admin từ biến môi trường `ADMIN_BOOTSTRAP_EMAIL` và `ADMIN_BOOTSTRAP_PASSWORD` tối thiểu 12 ký tự:
+Khởi tạo admin từ biến môi trường `ADMIN_BOOTSTRAP_EMAIL` và `ADMIN_BOOTSTRAP_PASSWORD` tối thiểu 12 ký tự khi tạo tài khoản mới. Nếu tài khoản đã tồn tại, lệnh giữ nguyên mật khẩu trong database. Có thể đăng nhập bằng email hoặc tên `admin`; tên `admin` trỏ tới đúng email trong `ADMIN_BOOTSTRAP_EMAIL`, vẫn kiểm tra hash mật khẩu và dùng phiên đăng nhập như bình thường. Trên Vercel cần cấu hình `ADMIN_BOOTSTRAP_EMAIL` cho Production để dùng tên `admin`; không cần đưa mật khẩu bootstrap lên Vercel.
 
 ```powershell
 npm run admin:create

@@ -20,7 +20,7 @@ paths:
       operationId: "post_admin_auth_login"
       tags: ["Authentication"]
       summary: "Đăng nhập quản trị"
-      description: "Creates a signed sid cookie, HttpOnly, SameSite=Lax, Path=/, Secure in production; absolute lifetime 12 hours. No public registration or default password. 429 after 5 failed attempts per 15 minutes, using separate per-account and per-IP counters."
+      description: "Accepts an email address or admin, which resolves to the existing account selected by ADMIN_BOOTSTRAP_EMAIL. Verifies its stored Argon2 hash; no public registration or password bypass. Creates a signed sid cookie, HttpOnly, SameSite=Lax, Path=/, Secure in production; absolute lifetime 12 hours. 429 after 5 failed attempts per 15 minutes, using separate per-account and per-IP counters; the alias and email share one account counter."
       security: []
       parameters:
         - {"$ref":"#/components/parameters/Origin"}
@@ -2860,7 +2860,7 @@ components:
     LoginInput:
       type: "object"
       properties:
-        email: {"type":"string","maxLength":254,"format":"email"}
+        email: {"type":"string","maxLength":254,"description":"Trimmed, case-insensitive email address or the configured admin alias.","anyOf":[{"format":"email"},{"const":"admin"}]}
         password: {"type":"string","maxLength":200,"minLength":1}
       required: ["email","password"]
       additionalProperties: false

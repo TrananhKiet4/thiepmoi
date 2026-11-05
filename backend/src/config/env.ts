@@ -15,6 +15,7 @@ if(production&&storageDriver!=='s3')throw new Error('Production requires S3 stor
 const oldKeys=JSON.parse(process.env.INVITATION_OLD_KEYS??'{}') as Record<string,string>;
 for(const value of Object.values(oldKeys))if(Buffer.from(value,'base64').length!==32)throw new Error('Invalid old invitation key');
 export const config={
+ adminBootstrapEmail:(process.env.ADMIN_BOOTSTRAP_EMAIL??'').trim().toLowerCase(),
  production,port:Number(process.env.PORT??4000),host:process.env.HOST??'127.0.0.1',appOrigin:origin.origin,databaseUrl:required('DATABASE_URL'),sessionSecret:required('SESSION_SECRET',32),
  invitationKey,invitationKeyVersion:process.env.INVITATION_KEY_VERSION??'1',invitationOldKeys:oldKeys,
  storageDriver:storageDriver as 'local'|'s3',storageRoot:resolve(process.env.STORAGE_LOCAL_PATH??(production?resolve(tmpdir(),'invitation-media'):'.data/media')),

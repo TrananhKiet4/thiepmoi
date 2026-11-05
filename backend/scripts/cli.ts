@@ -14,9 +14,8 @@ const command=process.argv[2];
 try{
  if(command==='admin'){
   const email=z.string().trim().email().transform(s=>s.toLowerCase()).parse(process.env.ADMIN_BOOTSTRAP_EMAIL);
-  const password=z.string().min(12).max(200).parse(process.env.ADMIN_BOOTSTRAP_PASSWORD);
   const existing=await prisma.adminUser.findUnique({where:{email}});
-  const admin=existing??await prisma.adminUser.create({data:{email,passwordHash:await hash(password)}});
+  const admin=existing??await prisma.adminUser.create({data:{email,passwordHash:await hash(z.string().min(12).max(200).parse(process.env.ADMIN_BOOTSTRAP_PASSWORD))}});
   if(existing)console.log('Admin already exists; password preserved.');
   else console.log('Admin created. Credentials are never printed.');
   if(!await prisma.event.findFirst({where:{ownerId:admin.id}}))await withTransaction(async tx=>{
