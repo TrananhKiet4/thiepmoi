@@ -9,7 +9,7 @@ function validGoogleMapsUrl(value:string){
  if(!value)return true;
  try{const url=new URL(value);if(url.protocol!=='https:'||url.username||url.password||url.port)return false;
   if(url.hostname==='maps.app.goo.gl')return url.pathname!=='/';
-  if(url.hostname==='maps.google.com')return true;
+  if(url.hostname==='maps.google.com')return url.pathname==='/'||/^\/maps(?:\/|$)/.test(url.pathname);
   if(url.hostname==='goo.gl')return url.pathname.startsWith('/maps/');
   return ['google.com','www.google.com','google.com.vn','www.google.com.vn'].includes(url.hostname)&&/^\/maps(?:\/|$)/.test(url.pathname);
  }catch{return false;}

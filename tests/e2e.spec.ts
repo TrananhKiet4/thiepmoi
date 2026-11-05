@@ -30,7 +30,10 @@ test('campus map upload preserves concurrent address edits and survives draft sa
  try{
   await navigate(page,'Nội dung');await page.getByLabel('Link Google Maps',{exact:true}).fill('https://maps.app.goo.gl/School123');
   await page.getByLabel('Tải ảnh sơ đồ trường',{exact:true}).setInputFiles({name:'campus.png',mimeType:'image/png',buffer:await sharp({create:{width:1200,height:800,channels:3,background:'#d6ddc7'}}).png().toBuffer()});
-  await expect.poll(()=>reached,{timeout:30000}).toBe(true);await page.getByLabel('Địa chỉ',{exact:true}).fill('Địa chỉ được sửa trong lúc tải sơ đồ');
+  await expect.poll(()=>reached,{timeout:30000}).toBe(true);
+  await page.getByRole('button',{name:'Giao diện & nhạc',exact:true}).click();await page.getByRole('button',{name:'Thông tin sự kiện',exact:true}).click();
+  await expect(page.getByLabel('Tải ảnh sơ đồ trường',{exact:true})).toBeDisabled();await expect(page.getByLabel('Chọn ảnh sơ đồ từ thư viện',{exact:true})).toBeDisabled();
+  await page.getByLabel('Địa chỉ',{exact:true}).fill('Địa chỉ được sửa trong lúc tải sơ đồ');
   await expect(page.getByRole('button',{name:'Lưu bản nháp',exact:true})).toBeDisabled();release();
   await expect(page.getByRole('img',{name:'Sơ đồ trường đã chọn',exact:true})).toBeVisible();await expect(page.getByLabel('Địa chỉ',{exact:true})).toHaveValue('Địa chỉ được sửa trong lúc tải sơ đồ');
   await page.getByRole('button',{name:'Lưu bản nháp',exact:true}).click();await expect(page.locator('.editor-status')).toContainText('Đã lưu bản nháp');
@@ -43,7 +46,7 @@ test('campus map upload preserves concurrent address edits and survives draft sa
   await page.screenshot({path:`.data/qa/campus-map-preview-${testInfo.project.name}.png`});await dialog.getByRole('button',{name:'Đóng',exact:true}).click();
   await page.reload();await expect(page.getByLabel('Link Google Maps',{exact:true})).toHaveValue('https://maps.app.goo.gl/School123');await expect(page.locator('.editor-status')).toContainText('Tất cả thay đổi đã được lưu');
  }finally{
-  release();await page.unroute(pattern);const current=(await (await page.request.get('/api/v1/admin/events/current')).json()).data;
+  release();await page.unrouteAll({behavior:'wait'});const current=(await (await page.request.get('/api/v1/admin/events/current')).json()).data;
   const restored=await page.request.patch(`/api/v1/admin/events/${before.id}/draft`,{headers:{Origin:process.env.APP_ORIGIN!,'X-CSRF-Token':me.csrfToken,'If-Match':String(current.version)},data:{content:before.draft.contentJson}});expect(restored.ok()).toBe(true);
  }
 });

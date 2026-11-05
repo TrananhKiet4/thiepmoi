@@ -16,7 +16,7 @@ it.each(['https://maps.app.goo.gl/School123','https://www.google.com/maps/place/
  const value={startAt:'',endAt:'',venueName:'School',address:'Address',googleMapsUrl,mapImageAssetId:null};
  const result=contracts.locationSchema.safeParse(value);expect(result.success).toBe(true);if(result.success)expect(result.data.googleMapsUrl).toBe(googleMapsUrl);
 });
-it.each(['javascript:alert(1)','http://maps.app.goo.gl/School','https://www.google.com.evil.test/maps','https://maps.app.goo.gl@evil.test/School','https://user@www.google.com/maps','https://www.google.com/url?q=https://evil.test','https://www.google.com:444/maps'])('rejects a non-Maps or unsafe destination: %s',googleMapsUrl=>{
+it.each(['javascript:alert(1)','http://maps.app.goo.gl/School','https://www.google.com.evil.test/maps','https://maps.app.goo.gl@evil.test/School','https://user@www.google.com/maps','https://www.google.com/url?q=https://evil.test','https://www.google.com:444/maps','https://maps.google.com/url?q=https://evil.test','https://maps.google.com/accounts'])('rejects a non-Maps or unsafe destination: %s',googleMapsUrl=>{
  expect(contracts.locationSchema.safeParse({...demoContent(null).ceremony,googleMapsUrl}).success).toBe(false);
 });
 it('reads old coordinate JSON without retaining coordinate controls in the new content',()=>{

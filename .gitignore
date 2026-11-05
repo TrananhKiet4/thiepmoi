@@ -12,3 +12,7 @@ coverage/
 *.dump
 *.bak
 **/.qa-*.png
+backend/.agents
+backend/.claude
+backend/.cursor
+backend/.devin
