@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import ExcelJS from 'exceljs';
 import type { Page } from '@playwright/test';
 import sharp from 'sharp';
+function credentialFromLink(url:string){const [,,code,slug]=new URL(url).pathname.split('/');return code.length===5?code+'.'+slug:code;}
 
 test('configured admin alias signs in through the username field',async({page})=>{
  await page.goto('/admin');await page.getByLabel('Email').fill('admin');
@@ -177,7 +178,12 @@ test('real Excel invitations, private responses, moderation, link rotation and e
   expect(g1.phone).toBe('0900123456');
   const firstLink = (await (await page.request.get(`/api/v1/admin/invitations/${g1.invitation.id}/link`)).json()).data.url;
   const secondLink = (await (await page.request.get(`/api/v1/admin/invitations/${g2.invitation.id}/link`)).json()).data.url;
+  expect(new URL(firstLink).pathname).toMatch(new RegExp('/i/[A-Za-z0-9]{5}/khach-dau-'+suffix.toLowerCase()+'$'));
+  expect(new URL(secondLink).pathname).toMatch(new RegExp('/i/[A-Za-z0-9]{5}/khach-sau-'+suffix.toLowerCase()+'$'));
   const guestPage = await context.newPage();
+  await guestPage.goto(firstLink.replace(/\/[^/]+$/,'/khach-khac'));
+  await expect(guestPage.getByRole('heading',{name:'Chưa thể mở thiệp',exact:true})).toBeVisible();
+  await expect(guestPage.getByText(guestName,{exact:true})).toHaveCount(0);
   await guestPage.goto(firstLink);
   await expect(guestPage.getByRole('heading', { name: guestName, exact: true })).toBeVisible();
   const originalViewport=guestPage.viewportSize()!;
@@ -331,7 +337,7 @@ test('a lost RSVP response retries the same operation and a version conflict pre
   await form.getByRole('button', { name: 'Gửi xác nhận', exact: true }).click();
   await expect(form.getByRole('status')).toContainText('Đã lưu lời hồi đáp');
   expect(keys[1]).toBe(keys[0]);
-  const token = new URL(link).pathname.split('/').at(-1)!;
+  const token = credentialFromLink(link);
   const external = await page.request.put('/api/v1/guest/rsvp', { headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': crypto.randomUUID() }, data: { status: 'DECLINED', note: 'Thay đổi từ phiên khác', expectedVersion: 1 } });
   expect(external.ok()).toBe(true);
   const note = form.getByLabel('Nhắn mình một chút (không bắt buộc)', { exact: true });

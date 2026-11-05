@@ -99,7 +99,19 @@ model Invitation {
  updatedAt DateTime @updatedAt @db.Timestamptz(3)
  rsvp RSVP?
  wish Wish?
+ links InvitationLink[]
  @@index([eventId,revokedAt])
+}
+model InvitationLink {
+ codeHash String @id
+ invitationId String @db.Uuid
+ invitation Invitation @relation(fields:[invitationId],references:[id])
+ tokenHash String
+ slug String
+ codeCiphertext String
+ keyVersion String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([invitationId,tokenHash,slug])
 }
 model RSVP {
  id String @id @default(uuid()) @db.Uuid

@@ -3,12 +3,12 @@ import multer from 'multer';
 import ExcelJS from 'exceljs';
 import {z} from 'zod';
 import {randomUUID,createHash} from 'node:crypto';
-import {prisma} from '../config/database.js';
+import {prisma,withTransaction} from '../config/database.js';
 import {config} from '../config/env.js';
 import {AppError} from '../errors/app-error.js';
 import {ok,ownedEvent,audit,idempotent} from '../utils/http.js';
-import {createInvitationToken,decryptInvitationToken,hashToken} from '../utils/token.js';
-import {guestFilter} from '../services/guest.service.js';
+import {createInvitationToken,hashToken} from '../utils/token.js';
+import {guestFilter,invitationLink} from '../services/guest.service.js';
 import {columns,validateMapping,parseWorkbook,normalizeRows,type Mapping,type NormalizedRow,type RowError} from '../utils/excel-parser.js';
 import type {RequestHandler} from 'express';
 import {readUpload,deleteUploadSource,createExport} from '../services/temporary-object.service.js';
@@ -83,8 +83,9 @@ export const getAdminEventsExports:RequestHandler=async(req,res)=>{
  textSheet(book,'Thông tin',['exported_at','filters'],[[new Date().toISOString(),JSON.stringify(query)]]);
  const headers=['guest_code','full_name','display_name','group','salutation','personal_message','email','phone','archived_at','revoked_at'];
  if(kind==='links')headers.push('invitation_url');else headers.push('rsvp_status','rsvp_note','rsvp_updated_at','wish','consent_public','moderation_status','wish_deleted_at');
- const rows=guests.map(g=>{const i=g.invitation,row:unknown[]=[g.guestCode,g.fullName,g.displayName,g.groupKey,g.salutation,i?.personalMessage??'',g.email,g.phone,g.archivedAt?.toISOString(),i?.revokedAt?.toISOString()];
-  if(kind==='links')row.push(i?`${config.appOrigin}/i/${decryptInvitationToken(i.id,i.tokenCiphertext,i.keyVersion)}`:'');
-  else row.push(i?.rsvp?.status??'UNANSWERED',i?.rsvp?.note??'',i?.rsvp?.updatedAt.toISOString(),i?.wish?.body??'',i?.wish?.consentPublic??false,i?.wish?.moderationStatus??'NONE',i?.wish?.deletedAt?.toISOString());return row;});
+ const rows:unknown[][]=[];
+ for(const g of guests){const i=g.invitation,row:unknown[]=[g.guestCode,g.fullName,g.displayName,g.groupKey,g.salutation,i?.personalMessage??'',g.email,g.phone,g.archivedAt?.toISOString(),i?.revokedAt?.toISOString()];
+  if(kind==='links')row.push(i?await withTransaction(tx=>invitationLink(tx,i,g.fullName)):'');
+  else row.push(i?.rsvp?.status??'UNANSWERED',i?.rsvp?.note??'',i?.rsvp?.updatedAt.toISOString(),i?.wish?.body??'',i?.wish?.consentPublic??false,i?.wish?.moderationStatus??'NONE',i?.wish?.deletedAt?.toISOString());rows.push(row);}
  textSheet(book,kind==='links'?'Link thiệp':'Phản hồi',headers,rows);await sendWorkbook(req,res,book,kind==='links'?'link-thiep':'phan-hoi');
 };

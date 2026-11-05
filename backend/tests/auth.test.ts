@@ -1,7 +1,7 @@
 import {beforeEach,describe,it,expect} from 'vitest';
 import request from 'supertest';
 import {createApp} from '../src/app.js';
-import {resetTestDatabase,setupTestData} from './helpers.js';
+import {resetTestDatabase,setupTestData,credentialFromLink} from './helpers.js';
 import {prisma} from '../src/config/database.js';
 import {config} from '../src/config/env.js';
 import {hash} from '@node-rs/argon2';
@@ -9,6 +9,17 @@ import {hash} from '@node-rs/argon2';
 const app=createApp();let f:Awaited<ReturnType<typeof setupTestData>>;
 beforeEach(async()=>{await resetTestDatabase();f=await setupTestData();});
 describe('admin trust boundaries',()=>{
+ it('limits short-code guessing by recipient name across IPs without counting valid reads',async()=>{
+  const link=await request(app).get(`/api/v1/admin/invitations/${f.invitation.id}/link`).set('Cookie',f.cookie),credential=credentialFromLink(link.body.data.url),[code,slug]=credential.split('.'),wrong=(code==='ABCDE'?'FGHIJ':'ABCDE')+'.'+slug;
+  const limited=createApp();limited.set('trust proxy',1);process.env.NODE_ENV='development';
+  try{
+   const valid=await Promise.all(Array.from({length:6},(_,i)=>request(limited).get('/api/v1/guest/invitation').set('X-Forwarded-For',`192.0.2.${i+30}`).set('Authorization','Bearer '+credential)));
+   expect(valid.map(response=>response.status)).toEqual([200,200,200,200,200,200]);
+   for(let i=0;i<6;i++)expect((await request(limited).put('/api/v1/guest/rsvp').set('X-Forwarded-For',`192.0.2.${i+60}`).set('Authorization','Bearer '+credential).send({})).status).toBe(400);
+   for(let i=0;i<5;i++)expect((await request(limited).get('/api/v1/guest/invitation').set('X-Forwarded-For',`192.0.2.${i+40}`).set('Authorization','Bearer '+wrong)).status).toBe(401);
+   expect((await request(limited).get('/api/v1/guest/invitation').set('X-Forwarded-For','192.0.2.50').set('Authorization','Bearer '+wrong)).status).toBe(429);
+  }finally{process.env.NODE_ENV='test';}
+ });
  it('logs in as admin using the configured account and its stored password hash',async()=>{
   const previous=config.adminBootstrapEmail;config.adminBootstrapEmail=f.admin.email;
   try{

@@ -1,9 +1,9 @@
-import {type RequestHandler} from 'express';
+import {type Request,type RequestHandler} from 'express';
 import {rateLimit} from 'express-rate-limit';
 import {timingSafeEqual} from 'node:crypto';
 import {prisma} from '../config/database.js';
 import {config} from '../config/env.js';
-import {hashToken} from '../utils/token.js';
+import {hashToken,parseShortCredential,invitationLinkHashes} from '../utils/token.js';
 import {AppError} from '../errors/app-error.js';
 import {rateLimitStore} from './rate-limit.store.js';
 
@@ -20,10 +20,26 @@ export const requireAdmin:RequestHandler=async(req,_res,next)=>{
 };
 export const guestReadLimiter=rateLimit({store:rateLimitStore('guest-read'),windowMs:60000,limit:120,standardHeaders:'draft-8',legacyHeaders:false,skip:()=>process.env.NODE_ENV==='test',message:{error:{code:'RATE_LIMITED',message:'Vui lòng thử lại sau'}}});
 export const guestWriteLimiter=rateLimit({store:rateLimitStore('guest-write'),windowMs:60000,limit:20,standardHeaders:'draft-8',legacyHeaders:false,keyGenerator:req=>hashToken((req.get('Authorization')??'')+'|'+req.ip),skip:req=>process.env.NODE_ENV==='test'||['GET','HEAD'].includes(req.method),validate:{keyGeneratorIpFallback:false},message:{error:{code:'RATE_LIMITED',message:'Bạn gửi quá nhanh, vui lòng chờ'}}});
-export const requireGuest:RequestHandler=async(req,_res,next)=>{
+export const requireGuest:RequestHandler=async(req,res,next)=>{
  const header=req.get('Authorization')??'';
- if(!/^Bearer [A-Za-z0-9_-]{43}$/.test(header))throw new AppError(401,'TOKEN_INVALID','Link mời không hợp lệ');
- const inv=await prisma.invitation.findUnique({where:{tokenHash:hashToken(header.slice(7))},include:{guest:true,event:true,rsvp:true,wish:true}});
+ const short=header.startsWith('Bearer ')?parseShortCredential(header.slice(7)):null,include={guest:true,event:true,rsvp:true,wish:true} as const;
+ let inv:Request['invitation']|null=null;
+ if(short){
+  // ReadCommitted sees the latest failure budget after waiting for the name lock.
+  const result=await prisma.$transaction(async tx=>{
+   const limited=process.env.NODE_ENV!=='test',key='short-link-failures:'+hashToken(short[2]);
+   if(limited)await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key},0))::text`;
+   const now=new Date(),bucket=limited?await tx.rateLimitBucket.findUnique({where:{key}}):null,unexpired=bucket&&bucket.expiresAt>now;
+   if(unexpired&&bucket.hits>=5)return {inv:null,retryAfter:Math.max(1,Math.ceil((bucket.expiresAt.getTime()-now.getTime())/1000))};
+   const links=await tx.invitationLink.findMany({where:{codeHash:{in:invitationLinkHashes(short[1],short[2])}},include:{invitation:{include}},take:2});
+   const candidate=links.length===1&&links[0].tokenHash===links[0].invitation.tokenHash?links[0].invitation:null;
+   if(!candidate&&limited){const expiresAt=unexpired?bucket.expiresAt:new Date(now.getTime()+900000),hits=unexpired?bucket.hits+1:1;await tx.rateLimitBucket.upsert({where:{key},create:{key,hits,expiresAt},update:{hits,expiresAt}});}
+   return {inv:candidate,retryAfter:0};
+  },{isolationLevel:'ReadCommitted',maxWait:10000,timeout:30000});
+  if(result.retryAfter){res.set('Retry-After',String(result.retryAfter));throw new AppError(429,'SHORT_LINK_LIMIT','Quá nhiều lần thử mã cho tên này, hãy thử lại sau 15 phút');}
+  inv=result.inv;
+ }else if(/^Bearer [A-Za-z0-9_-]{43}$/.test(header))inv=await prisma.invitation.findUnique({where:{tokenHash:hashToken(header.slice(7))},include});
+ else throw new AppError(401,'TOKEN_INVALID','Link mời không hợp lệ');
  if(!inv)throw new AppError(401,'TOKEN_INVALID','Thiệp không khả dụng');
  if(inv.revokedAt||inv.guest.archivedAt)throw new AppError(404,'INVITATION_NOT_AVAILABLE','Thiệp không khả dụng');
  if(!inv.event.publishedRevisionId)throw new AppError(404,'EVENT_NOT_AVAILABLE','Thiệp chưa sẵn sàng');

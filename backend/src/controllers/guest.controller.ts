@@ -4,11 +4,10 @@ import type {Prisma} from '@prisma/client';
 import {guestSchema,rsvpSchema,versionSchema} from '../../../packages/contracts/src/index.js';
 import {withTransaction} from '../config/database.js';
 import {audit,ok,ownedEvent,pagination} from '../utils/http.js';
-import {createInvitationToken,decryptInvitationToken} from '../utils/token.js';
-import {config} from '../config/env.js';
+import {createInvitationToken} from '../utils/token.js';
 import {conflict,lockEvent} from '../services/event.service.js';
 import type {RequestHandler} from 'express';
-import {uuid,include,safeGuest,guestFilter,adminGuest,adminInvitation} from '../services/guest.service.js';
+import {uuid,include,safeGuest,guestFilter,adminGuest,adminInvitation,invitationLink} from '../services/guest.service.js';
 
 export const getAdminEventsGuests:RequestHandler=async(req,res)=>{
  const eventId=uuid.parse(req.params.id),{page,pageSize,skip}=pagination(req);
@@ -34,7 +33,7 @@ export function postAdminGuestsAction(action:'archive'|'restore'):RequestHandler
  ok(res,await withTransaction(async tx=>{const found=await adminGuest(tx,req,id);await lockEvent(tx,found.eventId);const guest=await adminGuest(tx,req,id);if(guest.version!==expectedVersion)throw conflict();const updated=await tx.guest.update({where:{id,version:expectedVersion},data:{archivedAt:action==='archive'?new Date():null,version:{increment:1}},include});await audit(tx,req,`GUEST_${action.toUpperCase()}`,guest.eventId,'Guest',id);return safeGuest(updated);}));
 };}
 export const getAdminInvitationsLink:RequestHandler=async(req,res)=>{
- ok(res,await withTransaction(async tx=>{const inv=await adminInvitation(tx,req,uuid.parse(req.params.id)),token=decryptInvitationToken(inv.id,inv.tokenCiphertext,inv.keyVersion),url=`${config.appOrigin}/i/${token}`;return {url,message:`Thân mời ${inv.guest.displayName||inv.guest.fullName} xem thiệp mời tốt nghiệp: ${url}`};}));
+ ok(res,await withTransaction(async tx=>{const inv=await adminInvitation(tx,req,uuid.parse(req.params.id)),url=await invitationLink(tx,inv,inv.guest.fullName);return {url,message:`Thân mời ${inv.guest.displayName||inv.guest.fullName} xem thiệp mời tốt nghiệp: ${url}`};}));
 };
 export function postAdminInvitationsAction(action:'revoke'|'rotate'):RequestHandler{return async(req,res)=>{
  const id=uuid.parse(req.params.id),{expectedVersion}=versionSchema.parse(req.body);

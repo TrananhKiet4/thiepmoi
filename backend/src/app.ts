@@ -31,7 +31,7 @@ export function createApp(){
  app.use('/api/v1',authRouter,eventsRouter,guestsRouter,guestRouter,wishesAdminRouter,importRouter,mediaRouter,uploadRouter);
  app.use(maintenanceRouter);
  app.use('/api',(_req,_res,next)=>next(new AppError(404,'NOT_FOUND','API không tồn tại')));
- if(config.production){const web=resolve('frontend/dist');app.use(express.static(web,{index:false}));app.get(['/','/admin','/admin/*path','/i/:token'],(_req,res)=>res.sendFile(resolve(web,'index.html')));}
+ if(config.production){const web=resolve('frontend/dist');app.use(express.static(web,{index:false}));app.get(['/','/admin','/admin/*path','/i/:token','/i/:token/:guestName'],(_req,res)=>res.sendFile(resolve(web,'index.html')));}
  app.use((_req,_res,next)=>next(new AppError(404,'NOT_FOUND','Không tìm thấy trang')));
  app.use(errorHandler);return app;
 }

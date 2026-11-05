@@ -3,7 +3,9 @@ import request from 'supertest';
 import {randomUUID} from 'node:crypto';
 import {createApp} from '../src/app.js';
 import {prisma} from '../src/config/database.js';
-import {resetTestDatabase,setupTestData} from './helpers.js';
+import {resetTestDatabase,setupTestData,credentialFromLink} from './helpers.js';
+import {vi} from 'vitest';
+import * as tokens from '../src/utils/token.js';
 
 const app=createApp();
 let f:Awaited<ReturnType<typeof setupTestData>>;
@@ -12,6 +14,17 @@ const admin=(method:'get'|'post'|'put'|'patch',path:string)=>request(app)[method
 beforeEach(async()=>{await resetTestDatabase();f=await setupTestData();});
 
 describe('published invitation and immutable content',()=>{
+ it('issues a stable five-character named link while keeping the original capability valid',async()=>{
+  await prisma.guest.update({where:{id:f.guest.id},data:{fullName:'Đặng Thị Ánh',displayName:'Bạn Ánh'}});
+  const first=await admin('get',`invitations/${f.invitation.id}/link`);expect(first.status).toBe(200);
+  const url=new URL(first.body.data.url),parts=url.pathname.split('/');expect(parts).toHaveLength(4);expect(parts[2]).toMatch(/^[A-Za-z0-9]{5}$/);expect(parts[3]).toBe('dang-thi-anh');
+  expect((await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url).toBe(first.body.data.url);
+  expect(first.body.data.message).toContain(first.body.data.url);
+  const credential=parts[2]+'.'+parts[3];expect((await guest('get','invitation',credential)).body.data.guest.fullName).toBe('Đặng Thị Ánh');
+  expect((await guest('get','invitation',parts[2]+'.nguoi-khac')).status).toBe(401);
+  expect((await guest('get','invitation')).status).toBe(200);
+  expect((await prisma.invitation.findUniqueOrThrow({where:{id:f.invitation.id}})).tokenHash).toBe(f.invitation.tokenHash);
+ });
  it('previews draft personalization without creating opens or responses and validates publication',async()=>{
   const changed={...f.content,host:{...f.content.host,fullName:'Preview host'},groupMessages:{friends:'Hi {{guestName}} from {{hostName}}'}};
   await prisma.guest.update({where:{id:f.guest.id},data:{groupKey:'friends',displayName:'Friend'}});
@@ -103,7 +116,7 @@ describe('versioned guest responses',()=>{
   expect((await guest('put','rsvp').set('Idempotency-Key',key).send(body)).status).toBe(404);
   expect((await admin('post',`invitations/${f.invitation.id}/rotate`).send({expectedVersion:2})).status).toBe(200);
   const link=await admin('get',`invitations/${f.invitation.id}/link`);
-  const newToken=link.body.data.url.split('/i/')[1];
+  const newToken=credentialFromLink(link.body.data.url);
   expect(newToken).not.toBe(f.token);
   expect((await guest('get','invitation',newToken)).body.data.rsvp.status).toBe('DECLINED');
   expect((await guest('get','invitation')).status).toBe(401);
@@ -155,11 +168,13 @@ describe('admin guest lifecycle and summary',()=>{
   expect(guests.body.data.total).toBe(1);
   expect((await admin('get',`events/${f.event.id}/wishes?status=`)).status).toBe(200);
  });
- it('keeps links stable on edits, preserves revocation on restore, and excludes inactive invitations',async()=>{
+ it('keeps issued links valid on name edits, preserves revocation on restore, and excludes inactive invitations',async()=>{
   const original=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url;
   const edit=await admin('patch',`guests/${f.guest.id}`).send({guestCode:f.guest.guestCode,fullName:'Renamed',expectedVersion:1,expectedInvitationVersion:1});
   expect(edit.status).toBe(200);
-  expect((await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url).toBe(original);
+  const renamed=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url;expect(renamed).toMatch(/\/renamed$/);
+  expect((await guest('get','invitation',credentialFromLink(original))).body.data.guest.fullName).toBe('Renamed');
+  expect((await guest('get','invitation',credentialFromLink(renamed))).status).toBe(200);
   expect(JSON.stringify(edit.body)).not.toMatch(/tokenHash|tokenCiphertext|keyVersion/);
   await admin('post',`invitations/${f.invitation.id}/revoke`).send({expectedVersion:1});
   await admin('post',`guests/${f.guest.id}/archive`).send({expectedVersion:2});
@@ -177,5 +192,32 @@ describe('admin guest lifecycle and summary',()=>{
   expect(calendar.headers['content-type']).toContain('text/calendar');
   expect(calendar.text).toContain(`UID:${f.event.id}@graduation-invitation`);
   expect(JSON.stringify((await guest('get','invitation')).body)).not.toMatch(/tokenHash|tokenCiphertext|keyVersion|@example/);
+ });
+});
+describe('short invitation link allocation',()=>{
+ it('shares one stable alias between simultaneous requests',async()=>{
+  const responses=await Promise.all([1,2,3].map(()=>admin('get',`invitations/${f.invitation.id}/link`)));
+  expect(responses.map(r=>r.status)).toEqual([200,200,200]);expect(new Set(responses.map(r=>r.body.data.url)).size).toBe(1);
+  expect(await prisma.invitationLink.count({where:{invitationId:f.invitation.id}})).toBe(1);
+ });
+ it('resamples collisions and separates guests with the same name',async()=>{
+  const first=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url,code=new URL(first).pathname.split('/')[2],replacement=code==='Z9q8R'?'N7k6M':'Z9q8R';
+  const second=await admin('post',`events/${f.event.id}/guests`).send({guestCode:'SAME-NAME',fullName:f.guest.fullName,displayName:'Khách thứ hai'});
+  const random=vi.spyOn(tokens,'createInvitationLinkCode').mockReturnValueOnce(code).mockReturnValueOnce(replacement);
+  try{const link=await admin('get',`invitations/${second.body.data.invitation.id}/link`);expect(link.status).toBe(200);expect(new URL(link.body.data.url).pathname.split('/')[2]).toBe(replacement);
+   expect((await guest('get','invitation',credentialFromLink(link.body.data.url))).body.data.guest.displayName).toBe('Khách thứ hai');
+   expect((await guest('get','invitation',credentialFromLink(first))).body.data.guest.displayName).toBe(f.guest.displayName);
+  }finally{random.mockRestore();}
+ });
+ it('invalidates every old alias on rotation while preserving responses and the legacy capability before rotation',async()=>{
+  const first=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url;
+  expect((await guest('put','rsvp',credentialFromLink(first)).set('Idempotency-Key',randomUUID()).send({status:'ATTENDING',expectedVersion:0})).status).toBe(200);
+  await admin('patch',`guests/${f.guest.id}`).send({guestCode:f.guest.guestCode,fullName:'Tên mới',expectedVersion:1,expectedInvitationVersion:1});
+  const second=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url;
+  expect((await guest('get','invitation',credentialFromLink(first))).status).toBe(200);expect((await guest('get','invitation')).status).toBe(200);
+  expect((await admin('post',`invitations/${f.invitation.id}/rotate`).send({expectedVersion:1})).status).toBe(200);
+  for(const token of [credentialFromLink(first),credentialFromLink(second),f.token])expect((await guest('get','invitation',token)).status).toBe(401);
+  const current=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url;
+  expect((await guest('get','invitation',credentialFromLink(current))).body.data.rsvp.status).toBe('ATTENDING');
  });
 });

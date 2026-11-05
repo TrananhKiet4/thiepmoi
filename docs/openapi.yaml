@@ -1833,8 +1833,8 @@ components:
     GuestBearer:
       type: "http"
       scheme: "bearer"
-      bearerFormat: "32 random bytes encoded as a 43-character base64url token"
-      description: "Invitation capability from /i/{token}; send in Authorization, never query/body. Every call checks publication, revocation and archive; writes/replays recheck inside the transaction."
+      bearerFormat: "Legacy 43-character token, or five-character code followed by a dot and recipient slug"
+      description: "For /i/{code}/{guestSlug}, send Authorization: Bearer {code}.{guestSlug}. The five-character code is bound to the issued name and current invitation token. Legacy /i/{token} credentials remain valid. Short-code authentication failures are limited to five per15minutes per name across IPs; successful credentials do not consume that failure budget. Every call checks publication, revocation and archive; writes/replays recheck inside the transaction. Never send credentials in query/body."
     AdminCsrf:
       type: "apiKey"
       in: "header"

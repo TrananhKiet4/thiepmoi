@@ -94,7 +94,7 @@ describe('persisted atomic imports and admin exports',()=>{
  it('exports formula-like input as string cells with filter metadata',async()=>{
   await prisma.guest.update({where:{id:f.guest.id},data:{fullName:'=SUM(1,2)',phone:'+0123'}});
   const response=await admin('get',`events/${f.event.id}/exports/links`).responseType('blob');expect(response.status).toBe(200);expect(response.headers['cache-control']).toContain('no-store');
-  const book=new ExcelJS.Workbook();await book.xlsx.load(response.body);const sheet=book.worksheets[1];expect(sheet.getCell('B2').value).toBe('=SUM(1,2)');expect(sheet.getCell('H2').value).toBe('+0123');expect(sheet.getCell('K2').value).toContain('/i/');expect(book.worksheets[0].getCell('B2').value).toContain('archived');
+  const book=new ExcelJS.Workbook();await book.xlsx.load(response.body);const sheet=book.worksheets[1];expect(sheet.getCell('B2').value).toBe('=SUM(1,2)');expect(sheet.getCell('H2').value).toBe('+0123');expect(sheet.getCell('K2').value).toMatch(/\/i\/[A-Za-z0-9]{5}\/sum-1-2$/);expect(book.worksheets[0].getCell('B2').value).toContain('archived');
  });
  it('exports the same revoked historical attendees shown in the filtered guest list',async()=>{
   await prisma.rSVP.create({data:{invitationId:f.invitation.id,status:'ATTENDING'}});

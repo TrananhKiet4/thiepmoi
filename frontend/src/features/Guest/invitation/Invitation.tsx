@@ -8,7 +8,7 @@ import {ApiError,download,request} from '../../../lib/api';
 import {Action,ErrorBox,Field,Loading} from '../../../components/ui/index';
 import {date} from '../../../utils/date';
 
-export default function Guest(){const {token=''}=useParams();return <GuestData key={token} token={token}/>;}
+export default function Guest(){const {token='',guestName}=useParams(),credential=token.length===5&&guestName?token+'.'+encodeURIComponent(guestName):token;return <GuestData key={credential} token={credential}/>;}
 function GuestData({token}:{token:string}) {
   const cache=useQueryClient(), controllers=useRef(new Set<AbortController>()),operations=useRef(new Map<string,{body:string;key:string}>()),[blocked,setBlocked]=useState<unknown>(null);
   const query=useQuery({queryKey:['invitation',token],queryFn:({signal})=>request('/guest/invitation',{signal},token) as Promise<InvitationView>,retry:false,gcTime:0});
