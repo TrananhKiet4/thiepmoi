@@ -1566,8 +1566,8 @@ paths:
     patch:
       operationId: "patch_admin_media_id"
       tags: ["Media"]
-      summary: "Sửa mô tả thay thế media"
-      description: ""
+      summary: "Sửa tên hiển thị hoặc mô tả thay thế media"
+      description: "Updates metadata only. originalName is the display name used in the admin library and media selectors; storage keys, variants and existing invitation references stay unchanged. Requires at least one field."
       security:
         -
           AdminCookie: []
@@ -1584,7 +1584,13 @@ paths:
               type: "object"
               properties:
                 alt: {"type":"string","maxLength":500}
-              required: ["alt"]
+                originalName:
+                  type: "string"
+                  minLength: 1
+                  maxLength: 255
+                  pattern: '^[^\x00-\x1f\x7f\\/]+$'
+                  description: "Trimmed, non-empty display name; control characters and directory separators are rejected."
+              minProperties: 1
               additionalProperties: false
       responses:
         "200":
@@ -1600,7 +1606,7 @@ paths:
               schema:
                 type: "object"
                 properties:
-                  data: {"$ref":"#/components/schemas/MediaView"}
+                  data: {"$ref":"#/components/schemas/MediaItem"}
                 required: ["data"]
         "400": {"$ref":"#/components/responses/Error400"}
         "401": {"$ref":"#/components/responses/Error401"}

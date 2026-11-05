@@ -54,7 +54,8 @@ export const postAdminEventsMedia:RequestHandler=async(req,res)=>{
 };
 export const patchAdminMedia:RequestHandler=async(req,res)=>{
  const id=uuid.parse(req.params.id),asset=await prisma.mediaAsset.findUnique({where:{id}});if(!asset)throw new AppError(404,'NOT_FOUND','Không tìm thấy media');await ownedEvent(req,asset.eventId);
- const {alt}=z.object({alt:z.string().trim().max(500)}).strict().parse(req.body);ok(res,await mediaView(await prisma.mediaAsset.update({where:{id},data:{alt}}),true));
+ const data=z.object({alt:z.string().trim().max(500).optional(),originalName:z.string().trim().min(1).max(255).regex(/^[^\x00-\x1f\x7f\\/]+$/,'Tên không được chứa ký tự điều khiển hoặc dấu phân cách thư mục').optional()}).strict().refine(value=>Object.keys(value).length>0,'Vui lòng nhập tên hoặc mô tả').parse(req.body);
+ const updated=await prisma.mediaAsset.update({where:{id},data});ok(res,{...await mediaView(updated,true),originalName:updated.originalName,bytes:updated.bytes,createdAt:updated.createdAt});
 };
 export const deleteAdminMedia:RequestHandler=async(req,res)=>{
  const id=uuid.parse(req.params.id);

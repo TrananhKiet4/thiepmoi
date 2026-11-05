@@ -64,9 +64,28 @@ describe('media validation',()=>{
 
 describe('private staging and retained revision protection',()=>{
  const app=createApp();let f:Awaited<ReturnType<typeof setupTestData>>;
- const admin=(method:'get'|'post'|'delete',path:string)=>request(app)[method](`/api/v1/admin/${path}`).set('Cookie',f.cookie).set('Origin','http://localhost:5173').set('X-CSRF-Token',f.csrf);
+ const admin=(method:'get'|'post'|'patch'|'delete',path:string)=>request(app)[method](`/api/v1/admin/${path}`).set('Cookie',f.cookie).set('Origin','http://localhost:5173').set('X-CSRF-Token',f.csrf);
  const image=()=>sharp({create:{width:100,height:150,channels:3,background:'green'}}).jpeg().toBuffer();
  beforeEach(async()=>{await resetTestDatabase();f=await setupTestData();});
+ it('renames media metadata without changing its stored files or revision references',async()=>{
+  const asset=await prisma.mediaAsset.findFirstOrThrow({where:{eventId:f.event.id}});
+  const response=await admin('patch',`media/${asset.id}`).send({originalName:'Ảnh lễ tốt nghiệp.webp',alt:'Khoảnh khắc nhận bằng'});
+  expect(response.status).toBe(200);expect(response.body.data.originalName).toBe('Ảnh lễ tốt nghiệp.webp');
+  const saved=await prisma.mediaAsset.findUniqueOrThrow({where:{id:asset.id}});
+  expect(saved.storageKey).toBe(asset.storageKey);expect(saved.variants).toEqual(asset.variants);expect(saved.alt).toBe('Khoảnh khắc nhận bằng');
+  expect((await admin('get',`events/${f.event.id}/media`)).body.data.items.find((item:any)=>item.id===asset.id).originalName).toBe('Ảnh lễ tốt nghiệp.webp');
+  expect((await admin('delete',`media/${asset.id}`)).status).toBe(409);
+ });
+ it('keeps alt-only updates compatible and rejects invalid or foreign media names',async()=>{
+  const asset=await prisma.mediaAsset.findFirstOrThrow({where:{eventId:f.event.id}});
+  expect((await admin('patch',`media/${asset.id}`).send({alt:'Mô tả mới'})).status).toBe(200);
+  for(const name of ['', '   ','../photo.jpg','folder\\photo.jpg','a\u0000b','x'.repeat(256)])expect((await admin('patch',`media/${asset.id}`).send({originalName:name})).status).toBe(400);
+  expect((await admin('patch',`media/${asset.id}`).send({})).status).toBe(400);
+  const owner=await prisma.adminUser.create({data:{email:'media-owner@example.test',passwordHash:'unused'}}),event=await prisma.event.create({data:{ownerId:owner.id,slug:'foreign-media'}});
+  const foreign=await prisma.mediaAsset.create({data:{eventId:event.id,storageKey:`${event.id}/${randomUUID()}/image.webp`,originalName:'foreign.webp',type:'IMAGE',mimeType:'image/webp',bytes:1}});
+  expect((await admin('patch',`media/${foreign.id}`).send({originalName:'renamed.webp'})).status).toBe(404);
+  expect((await prisma.mediaAsset.findUniqueOrThrow({where:{id:foreign.id}})).originalName).toBe('foreign.webp');
+ });
  it('keeps upload private until publication and requires admin even with preview signature',async()=>{
   const response=await admin('post',`events/${f.event.id}/media`).field('alt','Photo').attach('file',await image(),'image.jpg');expect(response.status).toBe(201);const asset=response.body.data;
   expect(asset.url).toContain('/admin/media/file?');expect((await request(app).get(asset.url)).status).toBe(401);expect((await request(app).get(asset.url).set('Cookie',f.cookie)).status).toBe(200);

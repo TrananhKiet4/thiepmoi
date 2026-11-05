@@ -90,6 +90,34 @@ test('media upload uses the prepared local transport and displays a private prev
  await expect.poll(()=>image.evaluate((node:HTMLImageElement)=>node.naturalWidth)).toBe(120);
 });
 
+test('batch media upload keeps successful files and retries only failures, then persists a renamed image',async({page},testInfo)=>{
+ test.setTimeout(120000);
+ await page.goto('/admin');await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);
+ await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.'})).toBeVisible();await navigate(page,'Thư viện');
+ const suffix=Date.now().toString(36),names=[`batch-a-${suffix}.jpg`,`batch-b-${suffix}.jpg`,`batch-c-${suffix}.jpg`],buffer=await sharp({create:{width:120,height:160,channels:3,background:'#bbccdd'}}).jpeg().toBuffer();
+ let fail=true;
+ await page.route('**/api/v1/admin/events/*/media',async route=>{
+  if(fail&&route.request().method()==='POST'&&route.request().postDataBuffer()?.includes(Buffer.from(names[1]))){fail=false;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'TEMPORARY_UPLOAD_ERROR',message:'Tạm thời chưa tải được file'}})});}
+  else await route.continue();
+ });
+ await expect(page.getByLabel('Chọn file')).toHaveJSProperty('multiple',true);
+ await page.getByLabel('Chọn file').setInputFiles(names.map(name=>({name,mimeType:'image/jpeg',buffer})));
+ await page.getByRole('button',{name:'Tải lên thư viện',exact:true}).click();
+ await expect(page.getByRole('status')).toContainText('Đã tải 2/3 file');await expect(page.locator('.upload-errors')).toContainText(names[1]);
+ await page.locator('.upload-panel').screenshot({path:`.data/qa/media-batch-errors-${testInfo.project.name}.png`});
+ for(const name of [names[0],names[2]])await expect(page.locator('.media-card').filter({hasText:name})).toHaveCount(1);
+ await page.getByRole('button',{name:'Thử lại các file lỗi',exact:true}).click();await expect(page.getByRole('status')).toContainText('Đã tải 1/1 file');
+ for(const name of names)await expect(page.locator('.media-card').filter({hasText:name})).toHaveCount(1);
+ const card=page.locator('.media-card').filter({hasText:names[0]}),newName='Lễ tốt nghiệp '+suffix;
+ await card.getByLabel('Tên hiển thị',{exact:true}).fill(newName);await card.getByLabel('Mô tả thay thế',{exact:true}).fill('Mô tả khác với tên ảnh');
+ await card.getByRole('button',{name:'Lưu thay đổi',exact:true}).click();await expect(page.locator('.media-card').filter({hasText:newName}).getByLabel('Tên hiển thị',{exact:true})).toHaveValue(newName);
+ await page.reload();await expect(page.locator('.media-card').filter({hasText:newName}).getByLabel('Tên hiển thị',{exact:true})).toHaveValue(newName);
+ await page.locator('.media-card').filter({hasText:newName}).screenshot({path:`.data/qa/media-renamed-${testInfo.project.name}.png`});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await navigate(page,'Nội dung');await expect(page.getByLabel('Chọn ảnh sơ đồ từ thư viện').getByRole('option',{name:newName,exact:true})).toHaveCount(1);
+ await page.getByRole('button',{name:'Các chặng thiệp',exact:true}).click();await expect(page.getByLabel('Ảnh chính',{exact:true}).getByRole('option',{name:newName,exact:true})).toHaveCount(1);
+});
+
 test('admin can sign in and navigate all management areas', async ({ page }) => {
   await page.goto('/admin');
   await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL || 'admin@example.test');
