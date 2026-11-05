@@ -108,7 +108,7 @@ test('admin login fits a small screen', async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test('real Excel invitations, private responses, moderation, link rotation and export', async ({ page, context }) => {
+test('real Excel invitations, private responses, moderation, link rotation and export', async ({ page, context }, testInfo) => {
   test.setTimeout(120_000);
   const suffix = Date.now().toString(36).toUpperCase();
   const first = 'E2E' + suffix + 'A', second = 'E2E' + suffix + 'B';
@@ -145,13 +145,35 @@ test('real Excel invitations, private responses, moderation, link rotation and e
   const guestPage = await context.newPage();
   await guestPage.goto(firstLink);
   await expect(guestPage.getByRole('heading', { name: guestName, exact: true })).toBeVisible();
-  await guestPage.getByRole('button', { name: 'Mở thiệp', exact: true }).click();
+  const originalViewport=guestPage.viewportSize()!;
+  for(const width of [320,375,390]){
+    await guestPage.setViewportSize({width,height:900});
+    expect(await guestPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    const lines=await guestPage.locator('.envelope-heading>span').evaluate(element=>{const range=document.createRange();range.selectNodeContents(element);return range.getClientRects().length;});
+    expect(lines).toBe(1);
+  }
+  await guestPage.setViewportSize(originalViewport);
+  await guestPage.screenshot({path:`.data/qa/guest-envelope-${testInfo.project.name}.png`,fullPage:true});
+  await guestPage.locator('.envelope-year').scrollIntoViewIfNeeded();
+  await guestPage.getByRole('button', { name: 'Mở thiệp', exact: true }).press('Enter');
+  await expect(guestPage.locator('.hero-text h1')).toBeFocused();
+  await expect.poll(()=>guestPage.evaluate(()=>scrollY)).toBe(0);
+  await guestPage.setViewportSize({...originalViewport,height:1300});
+  await guestPage.screenshot({path:`.data/qa/guest-hero-${testInfo.project.name}.png`,animations:'disabled'});
+  await guestPage.setViewportSize(originalViewport);
+  await expect(guestPage.locator('.guest-recipient').first()).toContainText(guestName);
+  await expect(guestPage.locator('.guest-form').first()).toContainText(guestName);
+  await expect(guestPage.getByRole('textbox', { name: 'Họ và tên', exact: true })).toHaveCount(0);
+  await guestPage.getByRole('navigation', { name: 'Các phần của thiệp' }).getByRole('link', { name: 'Địa điểm', exact: true }).click();
+  await expect(guestPage.locator('#location')).toBeInViewport();
   for (const width of [320, 375, 390, 768, 1024, 1440]) {
     await guestPage.setViewportSize({ width, height: 900 });
     expect(await guestPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
+  await guestPage.setViewportSize(originalViewport);
   await guestPage.getByRole('button', { name: 'Gửi xác nhận', exact: true }).click();
   await expect(guestPage.getByRole('status')).toContainText('Đã lưu lời hồi đáp');
+  await guestPage.locator('.guest-form').first().screenshot({path:`.data/qa/guest-response-${testInfo.project.name}.png`});
   await guestPage.getByLabel('Lời chúc của bạn', { exact: true }).fill(wishText);
   await guestPage.getByLabel('Tôi đồng ý hiển thị tên và lời chúc').check();
   await guestPage.getByRole('button', { name: 'Gửi lời chúc', exact: true }).click();
@@ -160,6 +182,10 @@ test('real Excel invitations, private responses, moderation, link rotation and e
   await expect(guestPage.getByRole('heading', { name: otherName, exact: true })).toBeVisible();
   await expect(guestPage.getByText(guestName, { exact: true })).toHaveCount(0);
   expect(await guestPage.evaluate(() => localStorage.length)).toBe(0);
+  await guestPage.getByRole('button', { name: 'Mở thiệp', exact: true }).click();
+  await expect(guestPage.locator('.guest-recipient').first()).toContainText(otherName);
+  await expect(guestPage.locator('.guest-form').first()).toContainText(otherName);
+  await expect(guestPage.locator('.guest-form').first().getByRole('status')).toHaveCount(0);
   await navigate(page, 'Lời chúc');
   const card = page.locator('.moderation-card').filter({ hasText: wishText });
   await card.getByRole('button', { name: 'Duyệt', exact: true }).click();
@@ -206,6 +232,12 @@ test('an unfinished date can be saved as a draft and blocks publication', async 
     await expect(page.locator('.editor-status')).toContainText('Đã lưu bản nháp');
     const draft = (await (await page.request.get('/api/v1/admin/events/current')).json()).data;
     expect(draft.draft.contentJson.ceremony.startAt).toBe('');
+    await page.getByRole('button',{name:'Xem trước',exact:true}).click();
+    const preview=page.getByRole('dialog');
+    await expect(preview.locator('.envelope-year')).toHaveText('CLASS OF …');
+    await preview.getByRole('button',{name:'Mở thiệp',exact:true}).click();
+    await expect(preview.locator('.hero-text h1')).toBeVisible();
+    await preview.getByRole('button',{name:'Đóng',exact:true}).click();
     await page.getByRole('button', { name: 'Công bố & tiếp nhận', exact: true }).click();
     await page.getByRole('button', { name: 'Công bố thiệp', exact: true }).click();
     await expect(page.getByRole('alert')).toContainText('Vui lòng hoàn thiện nội dung');
