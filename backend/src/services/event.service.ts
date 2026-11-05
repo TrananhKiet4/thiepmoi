@@ -1,6 +1,6 @@
 import type {Event,Guest,Invitation,RSVP,Wish} from '@prisma/client';
 import {type Content} from '../../../packages/contracts/src/index.js';
-import {type Tx} from '../config/database.js';
+import {prisma,type Tx} from '../config/database.js';
 import {AppError} from '../errors/app-error.js';
 import {canWrite,personalize} from '../utils/invitation.js';
 import {mediaUrls} from './media.service.js';
@@ -13,9 +13,9 @@ export async function eventView(tx:Tx,event:Event){
  const revisions=await tx.eventRevision.findMany({where:{eventId:event.id,id:{in:[event.draftRevisionId,event.publishedRevisionId].filter((id):id is string=>!!id)}}});
  return {id:event.id,version:event.version,draftRevisionId:event.draftRevisionId,publishedRevisionId:event.publishedRevisionId,publishedAt:event.publishedAt,rsvpEnabled:event.rsvpEnabled,wishesEnabled:event.wishesEnabled,wallEnabled:event.wallEnabled,draft:revisions.find(r=>r.id===event.draftRevisionId)??null,published:revisions.find(r=>r.id===event.publishedRevisionId)??null};
 }
-export async function invitationView(content:Content,event:Event,guest?:Guest,invitation?:Invitation&{rsvp?:RSVP|null;wish?:Wish|null},preview=false){
+export async function invitationView(content:Content,event:Event,guest?:Guest,invitation?:Invitation&{rsvp?:RSVP|null;wish?:Wish|null},preview=false,tx:Tx|typeof prisma=prisma){
  const displayName=guest?.displayName||guest?.fullName||'Khách xem trước';
  const opening=content.sections.find(s=>s.type==='opening');
  const template=invitation?.personalMessage||content.groupMessages[guest?.groupKey??'']||(opening?.type==='opening'?opening.data.messageTemplate:'');
- return {content,media:await mediaUrls(content,preview),guest:{displayName,fullName:guest?.fullName??displayName,salutation:guest?.salutation??'bạn'},personalMessage:personalize(template,{guestName:displayName,hostName:content.host.fullName,salutation:guest?.salutation??'bạn'}),rsvp:rsvpView(invitation?.rsvp),wish:wishView(invitation?.wish),canRsvp:!preview&&canWrite(event.rsvpEnabled,content.rsvpDeadline),canCreateOrEditWish:!preview&&canWrite(event.wishesEnabled,content.wishDeadline),canWithdrawWish:!preview&&!!invitation?.wish&&!invitation.wish.deletedAt,eventId:event.id,...(preview?{preview:true}:{})};
+ return {content,media:await mediaUrls(content,preview,tx),guest:{displayName,fullName:guest?.fullName??displayName,salutation:guest?.salutation??'bạn'},personalMessage:personalize(template,{guestName:displayName,hostName:content.host.fullName,salutation:guest?.salutation??'bạn'}),rsvp:rsvpView(invitation?.rsvp),wish:wishView(invitation?.wish),canRsvp:!preview&&canWrite(event.rsvpEnabled,content.rsvpDeadline),canCreateOrEditWish:!preview&&canWrite(event.wishesEnabled,content.wishDeadline),canWithdrawWish:!preview&&!!invitation?.wish&&!invitation.wish.deletedAt,eventId:event.id,...(preview?{preview:true}:{})};
 }

@@ -8,8 +8,8 @@ export const variants=(asset:{variants:unknown})=>asset.variants as Record<strin
 export async function mediaView(asset:any,admin:boolean):Promise<MediaView>{
  const all=Object.values(variants(asset));return {id:asset.id,alt:asset.alt,type:asset.type,width:asset.width,height:asset.height,url:await storageUrl(asset.storageKey,admin),...(asset.type==='IMAGE'?{srcSet:(await Promise.all(all.map(async v=>`${await storageUrl(v.key,admin)} ${v.width}w`))).join(', ')}:{})};
 }
-export async function mediaUrls(content:Content,admin:boolean):Promise<Record<string,MediaView>>{
- const ids=assetIds(content),assets=await prisma.mediaAsset.findMany({where:{id:{in:ids},status:'READY',...(!admin?{publicReady:true}:{})}});
+export async function mediaUrls(content:Content,admin:boolean,tx:Tx|typeof prisma=prisma):Promise<Record<string,MediaView>>{
+ const ids=assetIds(content),assets=await tx.mediaAsset.findMany({where:{id:{in:ids},status:'READY',...(!admin?{publicReady:true}:{})}});
  return Object.fromEntries(await Promise.all(assets.map(async a=>[a.id,await mediaView(a,admin)])));
 }
 export async function preparePublishedMedia(eventId:string,content:Content,tx:Tx|typeof prisma=prisma){

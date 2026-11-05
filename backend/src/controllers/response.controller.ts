@@ -16,7 +16,7 @@ export const cursorSchema=z.object({p:z.boolean(),a:z.string().datetime(),id:z.s
 export const wishInclude={invitation:{include:{guest:true}}} as const;
 export function adminWishView(wish:Prisma.WishGetPayload<{include:typeof wishInclude}>){const {invitation,...fields}=wish;return {...fields,invitation:{id:invitation.id,version:invitation.version,revokedAt:invitation.revokedAt,guest:invitation.guest}};}
 export async function ownedWish(tx:Tx,req:Request,id:string){const w=await tx.wish.findUnique({where:{id},include:wishInclude});if(!w)throw new AppError(404,'NOT_FOUND','Không tìm thấy lời chúc');await ownedEvent(req,w.invitation.eventId,tx);return w;}
-export const getGuestInvitation:RequestHandler=async(req,res)=>{ok(res,await withTransaction(async tx=>{const inv=await active(tx,req);return invitationView(await publishedContent(tx,inv),inv.event,inv.guest,inv);}));};
+export const getGuestInvitation:RequestHandler=async(req,res)=>{ok(res,await withTransaction(async tx=>{const inv=await active(tx,req);return invitationView(await publishedContent(tx,inv),inv.event,inv.guest,inv,false,tx);}));};
 export const postGuestOpened:RequestHandler=async(req,res)=>{ok(res,await withTransaction(async tx=>{const inv=await active(tx,req,true),now=new Date();const updated=await tx.invitation.update({where:{id:inv.id},data:{openedAt:inv.openedAt??now,lastOpenedAt:now},select:{openedAt:true,lastOpenedAt:true}});return updated;}));};
 export const putGuestRsvp:RequestHandler=async(req,res)=>{
  const body=rsvpSchema.parse(req.body);

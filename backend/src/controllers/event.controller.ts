@@ -47,7 +47,7 @@ export const getAdminEventsPreview:RequestHandler=async(req,res)=>{
   if(!revision)throw new AppError(404,'DRAFT_REQUIRED','Chưa có bản nháp');
   const guestId=z.string().uuid().optional().parse(req.query.guestId),guest=guestId?await tx.guest.findFirst({where:{id:guestId,eventId:event.id},include:{invitation:{include:{rsvp:true,wish:true}}}}):null;
   if(guestId&&!guest)throw new AppError(404,'NOT_FOUND','Không tìm thấy khách');
-  return invitationView(contentSchema.parse(revision.contentJson),event,guest??undefined,guest?.invitation??undefined,true);
+  return invitationView(contentSchema.parse(revision.contentJson),event,guest??undefined,guest?.invitation??undefined,true,tx);
  }));
 };
 export const getAdminEventsDashboard:RequestHandler=async(req,res)=>{
