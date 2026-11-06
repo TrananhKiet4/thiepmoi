@@ -48,6 +48,7 @@ model Event {
  imports ImportBatch[]
  temporaryObjects TemporaryObject[]
  @@unique([id,ownerId])
+ @@index([ownerId,createdAt(sort:Desc)])
 }
 model EventRevision {
  id String @id @default(uuid()) @db.Uuid
@@ -158,6 +159,7 @@ model MediaAsset {
  variants Json @default("{}")
  publicReady Boolean @default(false)
  createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@index([eventId,createdAt(sort:Desc)])
 }
 model ImportBatch {
  id String @id @default(uuid()) @db.Uuid
@@ -197,6 +199,7 @@ model IdempotencyRecord {
  expiresAt DateTime @db.Timestamptz(3)
  createdAt DateTime @default(now()) @db.Timestamptz(3)
  @@unique([scope,actorKeyHash,key])
+ @@index([expiresAt])
 }
 model TemporaryObject {
  id String @id @default(uuid()) @db.Uuid

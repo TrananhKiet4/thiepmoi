@@ -54,7 +54,17 @@ function GuestData({token}:{token:string}) {
     }finally{controllers.current.delete(c);}
   }
   if(query.isPending&&!blocked)return <Loading/>;
-  if(blocked||query.error&&(!query.data||query.error instanceof ApiError&&[401,404].includes(query.error.status)))return <main className="invitation-error"><GraduationCap size={42}/><h1>Chưa thể mở thiệp</h1><p>Đường dẫn có thể đã hết hiệu lực hoặc thiệp chưa được công bố. Hãy liên hệ người gửi để nhận lời mời mới.</p><ErrorBox error={blocked||query.error}/></main>;
+  if(blocked||query.error&&(!query.data||query.error instanceof ApiError&&[401,404].includes(query.error.status))){
+    const error=blocked||query.error;
+    const retryable=error instanceof ApiError&&error.status>=500;
+    return <main className="invitation-error">
+      <GraduationCap size={42}/>
+      <h1>Chưa thể mở thiệp</h1>
+      {!retryable&&<p>Đường dẫn có thể đã hết hiệu lực hoặc thiệp chưa được công bố. Hãy liên hệ người gửi để nhận lời mời mới.</p>}
+      <ErrorBox error={error}/>
+      {retryable&&<button type="button" className="button" disabled={query.isFetching} onClick={()=>void query.refetch()}>Thử lại</button>}
+    </main>;
+  }
   return <><ErrorBox error={query.error}/><Invitation view={query.data!} token={token} save={save}/></>;
 }
 export function Invitation({view,token,save}: {view:InvitationView;token?:string;save?:(path:string,method:string,body?:unknown)=>Promise<any>}) {

@@ -5,6 +5,7 @@ import {resetTestDatabase,setupTestData,credentialFromLink} from './helpers.js';
 import {prisma} from '../src/config/database.js';
 import {config} from '../src/config/env.js';
 import {hash} from '@node-rs/argon2';
+import {hashToken} from '../src/utils/token.js';
 
 const app=createApp();let f:Awaited<ReturnType<typeof setupTestData>>;
 beforeEach(async()=>{await resetTestDatabase();f=await setupTestData();});
@@ -19,6 +20,32 @@ describe('admin trust boundaries',()=>{
    for(let i=0;i<5;i++)expect((await request(limited).get('/api/v1/guest/invitation').set('X-Forwarded-For',`192.0.2.${i+40}`).set('Authorization','Bearer '+wrong)).status).toBe(401);
    expect((await request(limited).get('/api/v1/guest/invitation').set('X-Forwarded-For','192.0.2.50').set('Authorization','Bearer '+wrong)).status).toBe(429);
   }finally{process.env.NODE_ENV='test';}
+ });
+ it('returns a retryable response when the short-link lock is held',async()=>{
+  const link=await request(app).get(`/api/v1/admin/invitations/${f.invitation.id}/link`).set('Cookie',f.cookie);
+  expect(link.status).toBe(200);
+  const credential=credentialFromLink(link.body.data.url),slug=credential.split('.')[1];
+  const acquired=Promise.withResolvers<void>(),release=Promise.withResolvers<void>();
+  const holding=prisma.$transaction(async tx=>{
+   await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${'short-link-failures:'+hashToken(slug)},0))::text`;
+   acquired.resolve();
+   await release.promise;
+  },{timeout:10000}).catch(error=>{acquired.reject(error);throw error;});
+  process.env.NODE_ENV='development';
+  const open=()=>request(app).get('/api/v1/guest/invitation').set('Authorization','Bearer '+credential);
+  try{
+   await acquired.promise;
+   const blocked=await open().timeout({deadline:6000});
+   expect(blocked.status).toBe(503);
+   expect(blocked.body.error.code).toBe('DATABASE_BUSY');
+   expect(blocked.headers['retry-after']).toBe('2');
+  }finally{
+   release.resolve();
+   process.env.NODE_ENV='test';
+   await holding;
+  }
+  process.env.NODE_ENV='development';
+  try{expect((await open()).status).toBe(200);}finally{process.env.NODE_ENV='test';}
  });
  it('logs in as admin using the configured account and its stored password hash',async()=>{
   const previous=config.adminBootstrapEmail;config.adminBootstrapEmail=f.admin.email;

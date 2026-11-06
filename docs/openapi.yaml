@@ -779,6 +779,7 @@ paths:
         "404": {"$ref":"#/components/responses/Error404"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/guest/opened":
     post:
       operationId: "post_guest_opened"
@@ -809,6 +810,7 @@ paths:
         "404": {"$ref":"#/components/responses/Error404"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/guest/rsvp":
     put:
       operationId: "put_guest_rsvp"
@@ -849,6 +851,7 @@ paths:
         "422": {"$ref":"#/components/responses/Error422"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/guest/wish":
     put:
       operationId: "put_guest_wish"
@@ -889,6 +892,7 @@ paths:
         "422": {"$ref":"#/components/responses/Error422"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
     delete:
       operationId: "delete_guest_wish"
       tags: ["Guest"]
@@ -910,6 +914,7 @@ paths:
         "409": {"$ref":"#/components/responses/Error409"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/guest/wish/visibility":
     patch:
       operationId: "patch_guest_wish_visibility"
@@ -947,6 +952,7 @@ paths:
         "409": {"$ref":"#/components/responses/Error409"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/guest/wishes":
     get:
       operationId: "get_guest_wishes"
@@ -993,6 +999,7 @@ paths:
         "404": {"$ref":"#/components/responses/Error404"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/guest/calendar.ics":
     get:
       operationId: "get_guest_calendar_ics"
@@ -1022,6 +1029,7 @@ paths:
         "404": {"$ref":"#/components/responses/Error404"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/admin/events/{id}/wishes":
     get:
       operationId: "get_admin_events_id_wishes"
@@ -1834,7 +1842,7 @@ components:
       type: "http"
       scheme: "bearer"
       bearerFormat: "Legacy 43-character token, or five-character code followed by a dot and recipient slug"
-      description: "For /i/{code}/{guestSlug}, send Authorization: Bearer {code}.{guestSlug}. The five-character code is bound to the issued name and current invitation token. Legacy /i/{token} credentials remain valid. Short-code authentication failures are limited to five per15minutes per name across IPs; successful credentials do not consume that failure budget. Every call checks publication, revocation and archive; writes/replays recheck inside the transaction. Never send credentials in query/body."
+      description: "For /i/{code}/{guestSlug}, send Authorization: Bearer {code}.{guestSlug}. The five-character code is bound to the issued name and current invitation token. Legacy /i/{token} credentials remain valid. Short-code authentication failures are limited to five per 15 minutes per name across IPs. Successful credentials do not consume that failure budget. A busy database can return 503 DATABASE_BUSY with Retry-After. Every call checks publication, revocation and archive. Writes and replays recheck inside the transaction. Never send credentials in query/body."
     AdminCsrf:
       type: "apiKey"
       in: "header"
@@ -2058,8 +2066,11 @@ components:
           example:
             error: {"code":"INTERNAL_ERROR","message":"Dữ liệu không hợp lệ","requestId":"b63b9230-17a7-4dc5-80e8-d441f0ca7688"}
     Error503:
-      description: "Dependency not ready or audio decoder unavailable."
+      description: "Dependency not ready, database busy, or audio decoder unavailable."
       headers:
+        Retry-After:
+          schema: {"type":"integer","minimum":1}
+          description: "Seconds to wait before retrying when the database is busy."
         Cache-Control:
           schema: {"type":"string"}
           description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."

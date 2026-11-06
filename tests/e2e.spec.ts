@@ -237,7 +237,18 @@ test('real Excel invitations, private responses, moderation, link rotation and e
   await guestPage.goto(firstLink.replace(/\/[^/]+$/,'/khach-khac'));
   await expect(guestPage.getByRole('heading',{name:'Chưa thể mở thiệp',exact:true})).toBeVisible();
   await expect(guestPage.getByText(guestName,{exact:true})).toHaveCount(0);
+  let databaseBusy = true;
+  await guestPage.route('**/api/v1/guest/invitation', route => databaseBusy ? route.fulfill({
+    status: 503,
+    headers: { 'Retry-After': '2' },
+    json: { error: { code: 'DATABASE_BUSY', message: 'Hệ thống đang bận, vui lòng thử lại sau ít giây' } },
+  }) : route.continue());
   await guestPage.goto(firstLink);
+  await expect(guestPage.getByText('Hệ thống đang bận, vui lòng thử lại sau ít giây')).toBeVisible();
+  const retry = guestPage.getByRole('button', { name: 'Thử lại', exact: true });
+  await expect(retry).toBeVisible();
+  databaseBusy = false;
+  await retry.click();
   await expect(guestPage.getByRole('heading', { name: guestName, exact: true })).toBeVisible();
   const originalViewport=guestPage.viewportSize()!;
   for(const width of [320,375,390]){
