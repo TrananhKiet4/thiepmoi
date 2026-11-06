@@ -12,15 +12,28 @@ export async function mediaUrls(content:Content,admin:boolean,tx:Tx|typeof prism
  const ids=assetIds(content),assets=await tx.mediaAsset.findMany({where:{id:{in:ids},status:'READY',...(!admin?{publicReady:true}:{})}});
  return Object.fromEntries(await Promise.all(assets.map(async a=>[a.id,await mediaView(a,admin)])));
 }
-export async function preparePublishedMedia(eventId:string,content:Content,tx:Tx|typeof prisma=prisma){
- const ids=assetIds(content),assets=await tx.mediaAsset.findMany({where:{id:{in:ids},eventId,status:'READY'}});
+export async function copyPublishedMedia(eventId:string,content:Content){
+ const ids=assetIds(content),assets=await prisma.mediaAsset.findMany({where:{id:{in:ids},eventId,status:'READY'}});
  if(assets.length!==ids.length)throw new AppError(422,'INVALID_MEDIA','Media thiếu hoặc không thuộc sự kiện');
  const music=content.music.assetId;if(music&&assets.find(a=>a.id===music)?.type!=='AUDIO')throw new AppError(422,'INVALID_MEDIA','Nhạc phải là file âm thanh');
  const imageIds=assetIds({...content,music:{...content.music,assetId:null}});
+ const copies:Variant[]=[];
  for(const asset of assets){
   if(imageIds.includes(asset.id)&&asset.type!=='IMAGE')throw new AppError(422,'INVALID_MEDIA','Vị trí ảnh phải dùng ảnh');
   const files=Object.values(variants(asset));if(!files.length||!files.some(file=>file.key===asset.storageKey))throw new AppError(422,'INVALID_MEDIA','Media chưa có bản phân phối hợp lệ');
-  for(const variant of files)await copyPublic(variant.key,variant.mimeType);
-  await tx.mediaAsset.update({where:{id:asset.id},data:{publicReady:true}});
+  if(!asset.publicReady)copies.push(...files);
  }
+ try{
+  for(let index=0;index<copies.length;index+=4){
+   await Promise.all(copies.slice(index,index+4).map(variant=>copyPublic(variant.key,variant.mimeType)));
+  }
+ }catch(error){
+  console.error(JSON.stringify({code:'MEDIA_DISTRIBUTION_FAILED',cause:error instanceof Error?error.name:'Unknown'}));
+  throw new AppError(503,'MEDIA_DISTRIBUTION_FAILED','Chưa thể đưa ảnh lên thiệp. Vui lòng thử lại.');
+ }
+ return ids;
+}
+export async function preparePublishedMedia(eventId:string,content:Content){
+ const ids=await copyPublishedMedia(eventId,content);
+ await prisma.mediaAsset.updateMany({where:{id:{in:ids},eventId,status:'READY'},data:{publicReady:true}});
 }

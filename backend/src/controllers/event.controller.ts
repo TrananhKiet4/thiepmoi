@@ -1,10 +1,10 @@
 import type {Prisma} from '@prisma/client';
 import {z} from 'zod';
 import {assetIds,contentSchema,publicationErrors,versionSchema} from '../../../packages/contracts/src/index.js';
-import {withTransaction} from '../config/database.js';
+import {prisma,withTransaction} from '../config/database.js';
 import {AppError} from '../errors/app-error.js';
 import {audit,ok,ownedEvent} from '../utils/http.js';
-import {preparePublishedMedia} from '../services/media.service.js';
+import {copyPublishedMedia} from '../services/media.service.js';
 import type {RequestHandler} from 'express';
 import {conflict,lockEvent,eventView,invitationView} from '../services/event.service.js';
 
@@ -25,15 +25,26 @@ export const patchAdminEventsDraft:RequestHandler=async(req,res)=>{
 };
 export function postAdminEventsAction(action:'publish'|'unpublish'):RequestHandler{return async(req,res)=>{
  const id=z.string().uuid().parse(req.params.id),{expectedVersion}=versionSchema.parse(req.body);
+ let prepared: {revisionId:string;mediaIds:string[]}|undefined;
+ if(action==='publish'){
+  const event=await ownedEvent(req,id);
+  if(event.version!==expectedVersion)throw conflict();
+  const revision=await prisma.eventRevision.findFirst({where:{id:event.draftRevisionId??'00000000-0000-0000-0000-000000000000',eventId:id}});
+  if(!revision)throw new AppError(422,'DRAFT_REQUIRED','Vui lòng lưu bản nháp');
+  const content=contentSchema.parse(revision.contentJson);
+  const fields=publicationErrors(content);
+  if(Object.keys(fields).length)throw new AppError(422,'PUBLICATION_INVALID','Vui lòng hoàn thiện nội dung',fields);
+  // Storage I/O can outlive a database transaction, especially with a large gallery.
+  prepared={revisionId:revision.id,mediaIds:await copyPublishedMedia(id,content)};
+ }
  ok(res,await withTransaction(async tx=>{
   await lockEvent(tx,id);const event=await ownedEvent(req,id,tx);if(event.version!==expectedVersion)throw conflict();
-  if(action==='publish'){
-   const revision=await tx.eventRevision.findFirst({where:{id:event.draftRevisionId??'00000000-0000-0000-0000-000000000000',eventId:id}});
-   if(!revision)throw new AppError(422,'DRAFT_REQUIRED','Vui lòng lưu bản nháp');
-   const content=contentSchema.parse(revision.contentJson),fields=publicationErrors(content);if(Object.keys(fields).length)throw new AppError(422,'PUBLICATION_INVALID','Vui lòng hoàn thiện nội dung',fields);
-   await preparePublishedMedia(id,content,tx);
+  if(prepared){
+   if(event.draftRevisionId!==prepared.revisionId)throw conflict();
+   const ready=await tx.mediaAsset.updateMany({where:{id:{in:prepared.mediaIds},eventId:id,status:'READY'},data:{publicReady:true}});
+   if(ready.count!==prepared.mediaIds.length)throw new AppError(422,'INVALID_MEDIA','Media thiếu hoặc không thuộc sự kiện');
   }
-  const updated=await tx.event.update({where:{id,version:expectedVersion},data:{publishedRevisionId:action==='publish'?event.draftRevisionId:null,publishedAt:action==='publish'?new Date():null,version:{increment:1}}});
+  const updated=await tx.event.update({where:{id,version:expectedVersion},data:{publishedRevisionId:prepared?.revisionId??null,publishedAt:prepared?new Date():null,version:{increment:1}}});
   await audit(tx,req,action.toUpperCase(),id,'Event',id);return eventView(tx,updated);
  }));
 };}

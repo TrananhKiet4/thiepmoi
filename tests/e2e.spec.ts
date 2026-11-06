@@ -131,6 +131,44 @@ test('admin can sign in and navigate all management areas', async ({ page }) => 
   }
 });
 
+test('published guest links receive updates and open feedback without losing typed replies or conflict checks',async({page,context})=>{
+ test.setTimeout(180000);
+ await page.goto('/admin');await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.',exact:true})).toBeVisible();
+ const before=(await (await page.request.get('/api/v1/admin/events/current')).json()).data,me=(await (await page.request.get('/api/v1/admin/auth/me')).json()).data,headers={Origin:process.env.APP_ORIGIN!,'X-CSRF-Token':me.csrfToken};
+ const guestPage=await context.newPage(),suffix=Date.now().toString(36),marker='Thông tin cập nhật '+suffix;
+ try{
+  expect((await page.request.patch(`/api/v1/admin/events/${before.id}/controls`,{headers,data:{expectedVersion:before.version,rsvpEnabled:false,wishesEnabled:false}})).ok()).toBe(true);
+  const created=(await (await page.request.post(`/api/v1/admin/events/${before.id}/guests`,{headers,data:{guestCode:'LIVE'+suffix.toUpperCase(),fullName:'Khách cập nhật '+suffix}})).json()).data;
+  const link=(await (await page.request.get(`/api/v1/admin/invitations/${created.invitation.id}/link`)).json()).data.url;
+  await guestPage.clock.install();await guestPage.goto(link);await guestPage.getByRole('button',{name:'Mở thiệp',exact:true}).click();
+  await expect(guestPage.getByRole('button',{name:'Gửi xác nhận',exact:true})).toBeDisabled();await expect(guestPage.getByRole('button',{name:'Gửi lời chúc',exact:true})).toBeDisabled();
+  await page.reload();await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.',exact:true})).toBeVisible();await navigate(page,'Nội dung');await page.getByLabel('Ngành học',{exact:true}).fill(marker);
+  const publish=page.getByRole('button',{name:'Lưu & cập nhật thiệp',exact:true});await expect(publish).toBeVisible();await publish.click();
+  await expect(page.locator('.editor-status')).toContainText('Đã cập nhật thiệp đang gửi');
+  await page.getByRole('button',{name:'Công bố & tiếp nhận',exact:true}).click();
+  for(const label of ['Nhận xác nhận tham dự','Nhận lời chúc']){const row=page.locator('.control-line').filter({hasText:label});await row.getByRole('button',{name:'Bật',exact:true}).click();await expect(row.getByRole('button',{name:'Tắt',exact:true})).toBeVisible();}
+  await guestPage.bringToFront();await guestPage.clock.fastForward(31000);
+  await expect(guestPage.getByText(marker,{exact:false})).toBeVisible();await expect(guestPage.getByRole('button',{name:'Gửi xác nhận',exact:true})).toBeEnabled();await expect(guestPage.getByRole('button',{name:'Gửi lời chúc',exact:true})).toBeEnabled();
+  const note=guestPage.getByLabel('Nhắn mình một chút (không bắt buộc)',{exact:true}),wish=guestPage.getByLabel('Lời chúc của bạn',{exact:true});
+  await note.fill('Ghi chú đang soạn');await wish.fill('Lời chúc đang soạn');
+  const external=await page.request.put('/api/v1/guest/rsvp',{headers:{Authorization:'Bearer '+credentialFromLink(link),'Idempotency-Key':crypto.randomUUID()},data:{status:'DECLINED',note:'Từ thiết bị khác',expectedVersion:0}});expect(external.ok()).toBe(true);
+  const externalWish=await page.request.put('/api/v1/guest/wish',{headers:{Authorization:'Bearer '+credentialFromLink(link),'Idempotency-Key':crypto.randomUUID()},data:{body:'Lời chúc từ thiết bị khác',consentPublic:false,expectedVersion:0}});expect(externalWish.ok()).toBe(true);
+  await guestPage.clock.fastForward(31000);await expect(note).toHaveValue('Ghi chú đang soạn');await expect(wish).toHaveValue('Lời chúc đang soạn');
+  await guestPage.getByRole('button',{name:'Gửi xác nhận',exact:true}).click();await expect(guestPage.locator('.guest-form').first().getByRole('alert')).toContainText('Dữ liệu đã thay đổi');
+  await expect(note).toHaveValue('Ghi chú đang soạn');await guestPage.getByRole('button',{name:'Gửi xác nhận',exact:true}).click();await expect(guestPage.locator('.guest-form').first().getByRole('status')).toContainText('Đã lưu');
+  await guestPage.getByRole('button',{name:'Gửi lời chúc',exact:true}).click();await expect(guestPage.locator('.guest-form').nth(1).getByRole('alert')).toContainText('Dữ liệu đã thay đổi');
+  await expect(wish).toHaveValue('Lời chúc đang soạn');await guestPage.getByRole('button',{name:'Gửi lời chúc',exact:true}).click();await expect(guestPage.getByText('Lời chúc đã được lưu. Cảm ơn bạn!',{exact:true})).toBeVisible();
+ }finally{
+  await guestPage.close();let current=(await (await page.request.get('/api/v1/admin/events/current')).json()).data;
+  const published=before.published?.contentJson??before.draft.contentJson;
+  current=(await (await page.request.patch(`/api/v1/admin/events/${before.id}/draft`,{headers:{...headers,'If-Match':String(current.version)},data:{content:published}})).json()).data;
+  if(before.publishedRevisionId)current=(await (await page.request.post(`/api/v1/admin/events/${before.id}/publish`,{headers,data:{expectedVersion:current.version}})).json()).data;
+  if(before.draftRevisionId!==before.publishedRevisionId)current=(await (await page.request.patch(`/api/v1/admin/events/${before.id}/draft`,{headers:{...headers,'If-Match':String(current.version)},data:{content:before.draft.contentJson}})).json()).data;
+  expect((await page.request.patch(`/api/v1/admin/events/${before.id}/controls`,{headers,data:{expectedVersion:current.version,rsvpEnabled:before.rsvpEnabled,wishesEnabled:before.wishesEnabled}})).ok()).toBe(true);
+ }
+});
+
 test('invalid invitation does not expose cached personal details', async ({ page }) => {
   await page.goto('/i/not-a-valid-token');
   await expect(page.getByRole('heading', { name: 'Chưa thể mở thiệp' })).toBeVisible();

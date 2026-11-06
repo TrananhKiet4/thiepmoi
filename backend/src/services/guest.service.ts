@@ -23,7 +23,10 @@ export async function adminInvitation(tx:Tx,req:Request,id:string){const invitat
 export async function invitationLink(tx:Tx,invitation:Invitation,fullName:string){
  const slug=normalizeGroupKey(fullName).replace(/[_-]+/g,'-').replace(/^-+|-+$/g,'')||'khach-moi';
  const where={invitationId:invitation.id,tokenHash:invitation.tokenHash,slug};
- let link=await tx.invitationLink.findFirst({where});
+ let link=await tx.invitationLink.findFirst({
+  where:{invitationId:invitation.id,slug,OR:[{tokenHash:invitation.tokenHash},{restoredTokenHash:invitation.tokenHash}]},
+  orderBy:[{createdAt:'asc'},{codeHash:'asc'}],
+ });
  if(!link){
   for(let attempt=0;attempt<10;attempt++){
    const code=createInvitationLinkCode();

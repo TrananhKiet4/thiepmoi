@@ -107,6 +107,7 @@ model InvitationLink {
  invitationId String @db.Uuid
  invitation Invitation @relation(fields:[invitationId],references:[id])
  tokenHash String
+ restoredTokenHash String?
  slug String
  codeCiphertext String
  keyVersion String

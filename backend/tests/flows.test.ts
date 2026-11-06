@@ -195,6 +195,21 @@ describe('admin guest lifecycle and summary',()=>{
  });
 });
 describe('short invitation link allocation',()=>{
+ it('restores the selected old alias alongside the current link until the next rotation',async()=>{
+  const oldUrl=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url;
+  const oldAlias=await prisma.invitationLink.findFirstOrThrow({where:{invitationId:f.invitation.id}});
+  expect((await admin('post',`invitations/${f.invitation.id}/rotate`).send({expectedVersion:1})).status).toBe(200);
+  const currentUrl=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url;
+  const current=await prisma.invitation.findUniqueOrThrow({where:{id:f.invitation.id}});
+  expect((await guest('get','invitation',credentialFromLink(oldUrl))).status).toBe(401);
+  await prisma.invitationLink.update({where:{codeHash:oldAlias.codeHash},data:{restoredTokenHash:current.tokenHash}});
+  expect((await guest('get','invitation',credentialFromLink(oldUrl))).status).toBe(200);
+  expect((await guest('get','invitation',credentialFromLink(currentUrl))).status).toBe(200);
+  expect((await guest('get','invitation',f.token)).status).toBe(401);
+  expect((await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url).toBe(oldUrl);
+  expect((await admin('post',`invitations/${f.invitation.id}/rotate`).send({expectedVersion:2})).status).toBe(200);
+  expect((await guest('get','invitation',credentialFromLink(oldUrl))).status).toBe(401);
+ });
  it('shares one stable alias between simultaneous requests',async()=>{
   const responses=await Promise.all([1,2,3].map(()=>admin('get',`invitations/${f.invitation.id}/link`)));
   expect(responses.map(r=>r.status)).toEqual([200,200,200]);expect(new Set(responses.map(r=>r.body.data.url)).size).toBe(1);

@@ -1,6 +1,6 @@
-import {mkdir,readFile,writeFile,copyFile,unlink,stat} from 'node:fs/promises';
+import {mkdir,readFile,writeFile,copyFile,rename,unlink,stat} from 'node:fs/promises';
 import {resolve,dirname,sep} from 'node:path';
-import {createHmac,timingSafeEqual} from 'node:crypto';
+import {createHmac,randomUUID,timingSafeEqual} from 'node:crypto';
 import {Readable} from 'node:stream';
 import {S3Client,PutObjectCommand,CopyObjectCommand,DeleteObjectCommand,GetObjectCommand,HeadObjectCommand} from '@aws-sdk/client-s3';
 import {getSignedUrl} from '@aws-sdk/s3-request-presigner';
@@ -19,7 +19,10 @@ export async function putPrivate(key:string,bytes:Buffer,mimeType:string){
 }
 export async function copyPublic(key:string,mimeType:string){
  if(config.storageDriver==='s3'){await s3().send(new CopyObjectCommand({Bucket:config.storageBucketPublic,Key:key,CopySource:encodeURIComponent(config.storageBucketPrivate+'/'+key),ContentType:mimeType,MetadataDirective:'REPLACE',CacheControl:'public, max-age=31536000, immutable'}));return;}
- const destination=localPath(key,true);await mkdir(dirname(destination),{recursive:true});await copyFile(localPath(key),destination);
+ const destination=localPath(key,true),temporary=`${destination}.${randomUUID()}.tmp`;
+ await mkdir(dirname(destination),{recursive:true});
+ try{await copyFile(localPath(key),temporary);await rename(temporary,destination);}
+ finally{await unlink(temporary).catch(()=>{});}
 }
 export async function deleteStored(key:string,isPublic=false){
  if(config.storageDriver==='s3'){await s3().send(new DeleteObjectCommand({Bucket:isPublic?config.storageBucketPublic:config.storageBucketPrivate,Key:key}));return;}

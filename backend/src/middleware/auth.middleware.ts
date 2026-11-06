@@ -32,7 +32,8 @@ export const requireGuest:RequestHandler=async(req,res,next)=>{
    const now=new Date(),bucket=limited?await tx.rateLimitBucket.findUnique({where:{key}}):null,unexpired=bucket&&bucket.expiresAt>now;
    if(unexpired&&bucket.hits>=5)return {inv:null,retryAfter:Math.max(1,Math.ceil((bucket.expiresAt.getTime()-now.getTime())/1000))};
    const links=await tx.invitationLink.findMany({where:{codeHash:{in:invitationLinkHashes(short[1],short[2])}},include:{invitation:{include}},take:2});
-   const candidate=links.length===1&&links[0].tokenHash===links[0].invitation.tokenHash?links[0].invitation:null;
+   const link=links.length===1?links[0]:null;
+   const candidate=link&&(link.tokenHash===link.invitation.tokenHash||link.restoredTokenHash===link.invitation.tokenHash)?link.invitation:null;
    if(!candidate&&limited){const expiresAt=unexpired?bucket.expiresAt:new Date(now.getTime()+900000),hits=unexpired?bucket.hits+1:1;await tx.rateLimitBucket.upsert({where:{key},create:{key,hits,expiresAt},update:{hits,expiresAt}});}
    return {inv:candidate,retryAfter:0};
   },{isolationLevel:'ReadCommitted',maxWait:10000,timeout:30000});

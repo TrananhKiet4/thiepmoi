@@ -1,4 +1,4 @@
-import {beforeEach,describe,expect,it} from 'vitest';
+import {beforeEach,describe,expect,it,vi} from 'vitest';
 import sharp from 'sharp';
 import {processMedia} from '../src/services/media-processing.service.js';
 import request from 'supertest';
@@ -7,6 +7,7 @@ import {prisma} from '../src/config/database.js';
 import {setupTestData,resetTestDatabase} from './helpers.js';
 import {preparePublishedMedia,mediaUrls} from '../src/services/media.service.js';
 import {copyPublic} from '../src/services/storage.service.js';
+import * as storage from '../src/services/storage.service.js';
 import {config} from '../src/config/env.js';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
@@ -67,6 +68,25 @@ describe('private staging and retained revision protection',()=>{
  const admin=(method:'get'|'post'|'patch'|'delete',path:string)=>request(app)[method](`/api/v1/admin/${path}`).set('Cookie',f.cookie).set('Origin','http://localhost:5173').set('X-CSRF-Token',f.csrf);
  const image=()=>sharp({create:{width:100,height:150,channels:3,background:'green'}}).jpeg().toBuffer();
  beforeEach(async()=>{await resetTestDatabase();f=await setupTestData();});
+ it('allows controls to change while media is copying and leaves the old revision live on conflict',async()=>{
+  const uploaded=await admin('post',`events/${f.event.id}/media`).attach('file',await image(),'new-hero.jpg');expect(uploaded.status).toBe(201);
+  const assetId=uploaded.body.data.id;
+  const content={...f.content,sections:f.content.sections.map(section=>section.type==='hero'?{...section,data:{...section.data,heroAssetId:assetId}}:section)};
+  const draft=await admin('patch',`events/${f.event.id}/draft`).set('If-Match',String(f.event.version)).send({content});expect(draft.status).toBe(200);
+  let reached!:()=>void,release!:()=>void;
+  const entered=new Promise<void>(resolve=>reached=resolve),hold=new Promise<void>(resolve=>release=resolve);
+  const copyPublicOriginal=storage.copyPublic;
+  const copy=vi.spyOn(storage,'copyPublic').mockImplementation(async (key,type)=>{reached();await hold;await copyPublicOriginal(key,type);});
+  const pending=admin('post',`events/${f.event.id}/publish`).send({expectedVersion:draft.body.data.version}).then(response=>response);
+  try{
+   await entered;
+   const changed=await admin('patch',`events/${f.event.id}/controls`).send({expectedVersion:draft.body.data.version,rsvpEnabled:false}).timeout({deadline:2000});
+   expect(changed.status).toBe(200);
+   release();expect((await pending).status).toBe(409);
+   expect((await prisma.event.findUniqueOrThrow({where:{id:f.event.id}})).publishedRevisionId).toBe(f.event.publishedRevisionId);
+   expect((await prisma.mediaAsset.findUniqueOrThrow({where:{id:assetId}})).publicReady).toBe(false);
+  }finally{release();await pending;copy.mockRestore();}
+ });
  it('renames media metadata without changing its stored files or revision references',async()=>{
   const asset=await prisma.mediaAsset.findFirstOrThrow({where:{eventId:f.event.id}});
   const response=await admin('patch',`media/${asset.id}`).send({originalName:'Ảnh lễ tốt nghiệp.webp',alt:'Khoảnh khắc nhận bằng'});

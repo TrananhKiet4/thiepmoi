@@ -11,18 +11,41 @@ import {date} from '../../../utils/date';
 export default function Guest(){const {token='',guestName}=useParams(),credential=token.length===5&&guestName?token+'.'+encodeURIComponent(guestName):token;return <GuestData key={credential} token={credential}/>;}
 function GuestData({token}:{token:string}) {
   const cache=useQueryClient(), controllers=useRef(new Set<AbortController>()),operations=useRef(new Map<string,{body:string;key:string}>()),[blocked,setBlocked]=useState<unknown>(null);
-  const query=useQuery({queryKey:['invitation',token],queryFn:({signal})=>request('/guest/invitation',{signal},token) as Promise<InvitationView>,retry:false,gcTime:0});
+  const responseToRefresh=useRef<'rsvp'|'wish'|null>(null);
+  const queryKey=['invitation',token];
+  const refreshAllowed=(error:unknown)=>!(error instanceof ApiError&&error.status===401);
+  const query=useQuery<InvitationView>({
+    queryKey,enabled:!blocked,retry:false,gcTime:0,
+    refetchOnWindowFocus:({state})=>refreshAllowed(state.error),
+    refetchOnReconnect:({state})=>refreshAllowed(state.error),
+    refetchInterval:({state})=>refreshAllowed(state.error)?30000:false,
+    queryFn:async({signal})=>{
+      const refresh=responseToRefresh.current;
+      const fresh=await request('/guest/invitation',{signal},token) as InvitationView;
+      const previous=cache.getQueryData<InvitationView>(queryKey);
+      if(!previous)return fresh;
+      // Keep the other form's version so an unseen response change still causes a conflict.
+      const rsvp=refresh==='rsvp'?fresh.rsvp:previous.rsvp;
+      const wish=refresh==='wish'?fresh.wish:previous.wish;
+      return {...fresh,rsvp,wish,canWithdrawWish:!!wish&&!wish.deletedAt};
+    },
+  });
+  async function refetchResponse(kind:'rsvp'|'wish'){
+    responseToRefresh.current=kind;
+    try{await query.refetch();}finally{if(responseToRefresh.current===kind)responseToRefresh.current=null;}
+  }
   useEffect(()=>()=>{controllers.current.forEach(c=>c.abort());void cache.cancelQueries({queryKey:['invitation',token]});cache.removeQueries({queryKey:['invitation',token]});cache.removeQueries({queryKey:['wall',token]});},[token,cache]);
   async function save(path:string,method:string,body?:unknown){
+    const kind=path==='/guest/rsvp'?'rsvp':'wish';
     const c=new AbortController(),scope=method+' '+path,serialized=JSON.stringify(body),previous=operations.current.get(scope);
     // Keep the key after a lost response so a retry can replay a committed write.
     const operation=previous?.body===serialized?previous:{body:serialized,key:crypto.randomUUID()};operations.current.set(scope,operation);controllers.current.add(c);
     try{const result=await request(path,{method,body:serialized,signal:c.signal,headers:{'Idempotency-Key':operation.key}},token);operations.current.delete(scope);
       if(method==='PUT'&&(path==='/guest/rsvp'||path==='/guest/wish'))cache.setQueryData(['invitation',token],(old:InvitationView|undefined)=>old?{...old,[path.endsWith('rsvp')?'rsvp':'wish']:result}:old);
-      await query.refetch();return result;
+      await refetchResponse(kind);return result;
     }catch(error){
       if(error instanceof ApiError&&[401,404].includes(error.status)){setBlocked(error);cache.removeQueries({queryKey:['invitation',token]});controllers.current.forEach(controller=>controller.abort());}
-      else if(error instanceof ApiError&&error.status===409){operations.current.delete(scope);await query.refetch();}
+      else if(error instanceof ApiError&&error.status===409){operations.current.delete(scope);await refetchResponse(kind);}
       throw error;
     }finally{controllers.current.delete(c);}
   }
