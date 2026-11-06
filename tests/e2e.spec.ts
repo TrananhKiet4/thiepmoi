@@ -303,6 +303,11 @@ test('real Excel invitations, private responses, moderation, link rotation and e
   await guestPage.goto(thirdLink);
   await guestPage.getByRole('button', { name: 'Mở thiệp', exact: true }).click();
   const strip = guestPage.getByRole('region', { name: 'Lời chúc của khách mời' });
+  const samples = strip.locator('.wish-card').filter({
+    has: guestPage.locator('cite', { hasText: /^(Bạn bè|Đồng nghiệp|Gia đình|Thầy cô|Bạn cùng lớp)$/ }),
+  });
+  await expect(samples.locator('cite')).toHaveText(['Bạn bè', 'Đồng nghiệp', 'Gia đình', 'Thầy cô', 'Bạn cùng lớp']);
+  await expect(samples.locator('.wish-attendance')).toHaveCount(0);
   await guestPage.setViewportSize({ width: 320, height: 800 });
   await expect(strip.getByText(secondWish, { exact: true })).toBeVisible();
   await expect(strip.getByText(wishText, { exact: true })).toBeAttached();

@@ -180,6 +180,14 @@ function WishForm({view,save}:{view:InvitationView;save?:any}) {
  </form>;
 }
 
+const sampleWishes=[
+ {displayName:'Bạn bè',body:'Chúc mừng cậu tốt nghiệp! Mong chặng đường mới đầy niềm vui và tụi mình còn nhiều dịp để ăn mừng cùng nhau.'},
+ {displayName:'Đồng nghiệp',body:'Chúc mừng cột mốc mới! Chúc bạn luôn giữ được sự nhiệt tình và gặp nhiều cơ hội để làm điều mình yêu thích.'},
+ {displayName:'Gia đình',body:'Cả nhà tự hào về con. Chúc con vững vàng, bình an và luôn vui trên con đường mình chọn.'},
+ {displayName:'Thầy cô',body:'Chúc mừng em đã hoàn thành chặng đường đại học. Mong em luôn ham học hỏi và tự tin đón nhận những thử thách mới.'},
+ {displayName:'Bạn cùng lớp',body:'Sau bao buổi học và những lần chạy deadline cùng nhau, cuối cùng cũng tới ngày tốt nghiệp. Chúc cậu có một khởi đầu thật đẹp!'},
+].map(wish=>({...wish,id:'sample-'+wish.displayName,isPinned:false,attendanceStatus:null}));
+
 function Wall({token,previewItems}:{token?:string;previewItems?:PublicWish[]}) {
  const wall=useInfiniteQuery({
   queryKey:['wall',token],enabled:!!token,gcTime:0,retry:false,
@@ -199,11 +207,12 @@ function Wall({token,previewItems}:{token?:string;previewItems?:PublicWish[]}) {
   return ()=>window.removeEventListener('pageshow',restore);
  },[token,refetch]);
  const items=wall.data?.pages.flatMap(page=>page.items)??[];
- const cards=previewItems??[...new Map(items.map(item=>[item.id,item])).values()];
+ const publicWishes=previewItems??[...new Map(items.map(item=>[item.id,item])).values()];
+ const cards=[...publicWishes,...sampleWishes];
  return <div className="wish-wall">
   <h3>Lưu bút & lời chúc</h3>
-  {cards.length>1&&<p className="muted small">Vuốt hoặc cuộn ngang để xem thêm</p>}
-  {cards.length>0&&<div className="wish-strip" role="region" tabIndex={0} aria-label="Lời chúc của khách mời">
+  <p className="muted small">Vuốt hoặc cuộn ngang để xem thêm</p>
+  <div className="wish-strip" role="region" tabIndex={0} aria-label="Lời chúc của khách mời">
    {cards.map(w=><blockquote className="wish-card" key={w.id}>
     <p>{w.body}</p>
     {w.isPinned&&<span className="small muted wish-pin">Lời chúc được ghim</span>}
@@ -212,9 +221,8 @@ function Wall({token,previewItems}:{token?:string;previewItems?:PublicWish[]}) {
      <cite>{w.displayName}</cite>
     </footer>
    </blockquote>)}
-  </div>}
+  </div>
   {wall.isLoading&&<p className="muted" role="status">Đang tải lời chúc…</p>}
-  {!wall.isLoading&&!wall.error&&cards.length===0&&<p className="muted">Chưa có lời chúc công khai từ khách khác.</p>}
   <ErrorBox error={wall.error}/>
   {token&&(wall.hasNextPage||wall.isError)&&<button className="button secondary" disabled={wall.isFetching} onClick={()=>void (wall.isError&&!wall.isFetchNextPageError?refetch():wall.fetchNextPage())}>{wall.isError?'Thử tải lại':'Xem thêm lời chúc'}</button>}
  </div>;
