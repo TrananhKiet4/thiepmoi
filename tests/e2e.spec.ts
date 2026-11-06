@@ -28,6 +28,54 @@ test('simplified event editor loads legacy drafts clean and exposes Maps instead
  await expect(page.locator('.editor-status')).toContainText('Tất cả thay đổi đã được lưu');
 });
 
+test('blue invitation preview renders both new Vietnamese fonts',async({page},testInfo)=>{
+ await page.goto('/admin');
+ await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);
+ await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);
+ await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.'})).toBeVisible();
+ const before=(await (await page.request.get('/api/v1/admin/events/current')).json()).data;
+ const me=(await (await page.request.get('/api/v1/admin/auth/me')).json()).data;
+ const cdp=await page.context().newCDPSession(page);
+ await cdp.send('DOM.enable');await cdp.send('CSS.enable');
+ try{
+  await navigate(page,'Nội dung');
+  await page.getByRole('button',{name:'Giao diện & nhạc',exact:true}).click();
+  await page.getByLabel('Bảng màu',{exact:true}).selectOption('blue',{timeout:5000});
+  for(const [value,family] of [['lora','Lora'],['be-vietnam-pro','Be Vietnam Pro']]){
+   await page.getByLabel('Kiểu chữ',{exact:true}).selectOption(value);
+   await page.getByRole('button',{name:'Lưu bản nháp',exact:true}).click();
+   await expect(page.locator('.editor-status')).toContainText('Đã lưu bản nháp');
+   await page.getByRole('button',{name:'Xem trước',exact:true}).click();
+   const dialog=page.getByRole('dialog');
+   await expect(dialog.locator('.invitation')).toHaveCSS('background-color','rgb(241, 246, 252)');
+   await expect(dialog.locator('.envelope h1')).toHaveCSS('color','rgb(35, 76, 124)');
+   await expect.poll(async()=>{
+    const {root}=await cdp.send('DOM.getDocument');
+    const {nodeId}=await cdp.send('DOM.querySelector',{nodeId:root.nodeId,selector:'.envelope h1'});
+    const {fonts}=await cdp.send('CSS.getPlatformFontsForNode',{nodeId});
+    return [...new Set(fonts.filter(font=>font.glyphCount>0).map(font=>font.familyName))];
+   }).toEqual([family]);
+   if(value==='lora'){
+    await dialog.screenshot({path:`.data/qa/blue-envelope-${testInfo.project.name}.png`});
+    await dialog.getByRole('button',{name:'Mở thiệp',exact:true}).click();
+    await expect(dialog.locator('.invite-hero')).toBeVisible();
+    await dialog.screenshot({path:`.data/qa/blue-invitation-${testInfo.project.name}.png`,animations:'disabled'});
+   }
+   await dialog.getByRole('button',{name:'Đóng',exact:true}).click();
+  }
+ }finally{
+  const current=(await (await page.request.get('/api/v1/admin/events/current')).json()).data;
+  if(current.draftRevisionId!==before.draftRevisionId){
+   const restored=await page.request.patch(`/api/v1/admin/events/${before.id}/draft`,{
+    headers:{Origin:process.env.APP_ORIGIN!,'X-CSRF-Token':me.csrfToken,'If-Match':String(current.version)},
+    data:{content:before.draft.contentJson},
+   });
+   expect(restored.ok()).toBe(true);
+  }
+ }
+});
+
 test('campus map upload preserves concurrent address edits and survives draft save/preview',async({page},testInfo)=>{
  test.setTimeout(120000);
  await page.goto('/admin');await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();

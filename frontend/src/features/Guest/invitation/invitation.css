@@ -1,3 +1,5 @@
+@import "./invitation-fonts.css";
+
 .invitation {
   --invite-accent: #8e3042;
   --invite-blue: #a9c8e8;
@@ -7,8 +9,11 @@
   overflow: clip;
   font-family: "Segoe UI", Arial, sans-serif;
 }
-.invitation.palette-sage { background-color: #f3f5ef; }
-.invitation.palette-rose { background-color: #fbf2f0; }
+.invitation.palette-sage { --invite-accent: #496255; --invite-blue: #adc5b7; background-color: #f3f5ef; }
+.invitation.palette-rose { --invite-blue: #deb9c7; background-color: #fbf2f0; }
+.invitation.font-sans { --invite-heading: Arial, sans-serif; }
+.invitation.font-lora { --invite-heading: "Lora", "Times New Roman", serif; }
+.invitation.font-be-vietnam-pro { --invite-heading: "Be Vietnam Pro", Arial, sans-serif; }
 .invitation h1, .invitation h2, .invitation h3, .invitation .signature { font-family: var(--invite-heading); }
 .invitation h2, .invitation h3 { color: var(--invite-accent); }
 .invitation h1, .invitation h2, .invitation h3, .invitation p, .invitation strong, .invitation span { overflow-wrap: anywhere; }
@@ -212,6 +217,45 @@
 .invitation .invite-footer span { color: #fff9ef; font-size: 12px; letter-spacing: 0; }
 .invitation .invite-footer small { margin-top: 15px; font-size: 11px; color: #f2dfe2; }
 .invitation .quick-rsvp { font-size: 12px; background: var(--invite-accent); border: 1px solid #ffffff6b; box-shadow: 0 5px 20px #58222b26; }
+
+.invitation.palette-blue {
+  --invite-accent: #234c7c;
+  --invite-blue: #416f9f;
+  --blue-paper: #fafdff;
+  --blue-line: #b9cde2;
+  --blue-tint: #e5eff9;
+  background-color: #f1f6fc;
+  color: #243e59;
+}
+.invitation.palette-blue .paper-butterfly { color: #a7c2df; }
+.invitation.palette-blue .envelope-heading em { color: var(--invite-accent); }
+.invitation.palette-blue .paper-envelope { background: #d8e6f3; border-color: var(--blue-line); }
+.invitation.palette-blue .envelope-fold {
+  background: linear-gradient(25deg, #d7e5f2 48%, #eaf2fb 50%);
+  border-color: var(--blue-line);
+}
+.invitation.palette-blue .wax-seal {
+  color: #183f6a;
+  border-color: #92b1d2;
+  background: radial-gradient(circle at 35% 28%, #e1efff, #95b5d8 85%);
+  box-shadow: 2px 4px 7px #234c7c33, inset 0 0 0 3px #c5d9ef;
+}
+.invitation.palette-blue .invite-nav { background: #f4f9fff5; border-color: var(--blue-line); }
+.invitation.palette-blue .invite-nav-links a:not(:last-child) { color: #385777; }
+.invitation.palette-blue :is(.section-invitation, .section-response, .admission-ticket) { background: var(--blue-tint); }
+.invitation.palette-blue :is(.invite-section, .admission-ticket, .admission-ticket strong, .event-card, .response-recipient, .wish-card footer, .invite-nav .icon-button) {
+  border-color: var(--blue-line);
+}
+.invitation.palette-blue .admission-ticket { color: #385777; }
+.invitation.palette-blue :is(.envelope-letter, .hero-photo, .story-image, .story-letter, .gallery figure, .invitation-letter, .campus-map-image, .guest-form, .wish-card) {
+  background: var(--blue-paper);
+  border-color: var(--blue-line);
+  outline-color: var(--blue-line);
+}
+.invitation.palette-blue .guest-form .field :is(input, textarea) { background: var(--blue-paper); border-color: var(--blue-line); }
+.invitation.palette-blue .wish-card::before { background: #bfd6ee; }
+.invitation.palette-blue .button.secondary:hover:not(:disabled) { background: var(--blue-tint); }
+.invitation.palette-blue .invite-footer small { color: #d8e8fa; }
 
 @keyframes invite-unfold { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 767px) {

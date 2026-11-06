@@ -2292,11 +2292,11 @@ components:
           properties:
             palette:
               type: "string"
-              enum: ["cream","sage","rose"]
+              enum: ["cream","sage","rose","blue"]
               default: "cream"
             font:
               type: "string"
-              enum: ["serif","sans"]
+              enum: ["serif","sans","lora","be-vietnam-pro"]
               default: "serif"
           required: []
         music:

@@ -30,7 +30,7 @@ export const contentSchema=z.object({
  schemaVersion:z.literal(1),host:z.object({fullName:text(120),university:text(200),major:text(200),cohort:text(80).default('')}),
  ceremony:locationSchema,meetup:locationSchema.nullable().default(null),rsvpDeadline:draftDate.nullable().default(null),wishDeadline:date.nullable().default(null),
  timezone:z.literal('Asia/Ho_Chi_Minh').default('Asia/Ho_Chi_Minh'),
- theme:z.object({palette:z.enum(['cream','sage','rose']).default('cream'),font:z.enum(['serif','sans']).default('serif')}),
+ theme:z.object({palette:z.enum(['cream','sage','rose','blue']).default('cream'),font:z.enum(['serif','sans','lora','be-vietnam-pro']).default('serif')}),
  music:z.object({enabled:z.boolean(),assetId:optionalId,volume:z.number().min(0).max(1).default(.25),loop:z.boolean().default(true)}),
  groupMessages:z.record(z.string().max(60),text(1000)).refine(v=>Object.keys(v).length<=100,'Tối đa 100 mẫu nhóm').default({}),
  sections:z.array(sectionSchema).min(1).max(16)

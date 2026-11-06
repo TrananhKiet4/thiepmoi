@@ -1,5 +1,5 @@
 import {googleMapsLink} from '@invite/contracts';
-import {useEffect,useRef,useState,type CSSProperties} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {useParams} from 'react-router-dom';
 import {useInfiniteQuery,useQuery,useQueryClient} from '@tanstack/react-query';
 import {ArrowDown,ArrowUpRight,CalendarDays,Check,Heart,Music2,VolumeX,GraduationCap,Send} from 'lucide-react';
@@ -85,8 +85,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
  const message=view.personalMessage||(opening?.type==='opening'?opening.data.messageTemplate:'Mời bạn cùng mình lưu giữ khoảnh khắc đáng nhớ.').replaceAll('{{guestName}}',name).replaceAll('{{hostName}}',c.host.fullName).replaceAll('{{salutation}}',view.guest.salutation||'');
  async function music(){if(!audio.current)return;setAudioError('');if(playing){audio.current.pause();setPlaying(false);}else try{await audio.current.play();setPlaying(true);}catch{setAudioError('Chạm nút nhạc để thử phát lại.');}}
  async function open(withMusic:boolean){setOpened(true);if(withMusic)await music();if(token)void request('/guest/opened',{method:'POST'},token).catch(()=>{});}
- const style={'--invite-accent':c.theme.palette==='sage'?'#496255':'#8e3042','--invite-blue':c.theme.palette==='sage'?'#adc5b7':c.theme.palette==='rose'?'#deb9c7':'#a9c8e8','--invite-heading':c.theme.font==='sans'?'Arial, sans-serif':'"Times New Roman", serif'} as CSSProperties;
- return <main ref={root} className={'invitation palette-'+c.theme.palette} style={style}>
+ return <main ref={root} className={`invitation palette-${c.theme.palette} font-${c.theme.font}`}>
   {view.preview&&<div className="preview-banner">BẢN XEM TRƯỚC · Phản hồi không được lưu</div>}
   {hasMusic&&<audio ref={el=>{audio.current=el;if(el)el.volume=volume;}} src={media(c.music.assetId)!.url} loop={c.music.loop} preload="none"/>}
   {!opened?<section className="envelope" aria-label="Phong bì thiệp mời">
