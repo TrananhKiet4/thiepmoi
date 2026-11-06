@@ -89,16 +89,20 @@ describe('versioned guest responses',()=>{
   expect(await prisma.rSVP.count()).toBe(1);
  });
  it('removes edited, withdrawn and deleted wishes from the wall, including after writes close',async()=>{
+  const viewer=await admin('post',`events/${f.event.id}/guests`).send({guestCode:'WALL-VIEWER',fullName:'Wall viewer'});
+  expect(viewer.status).toBe(201);
+  const link=await admin('get',`invitations/${viewer.body.data.invitation.id}/link`);
+  const token=credentialFromLink(link.body.data.url);
   const saved=await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'Congratulations',consentPublic:true,expectedVersion:0});
   expect(saved.status).toBe(200);
   const wish=saved.body.data;
   expect(wish).not.toHaveProperty('invitationId');
   expect(wish).not.toHaveProperty('approvedBy');
   expect((await admin('patch',`wishes/${wish.id}/moderation`).send({action:'APPROVE',expectedVersion:1})).status).toBe(200);
-  expect((await guest('get','wishes')).body.data.items).toHaveLength(1);
+  expect((await guest('get','wishes',token)).body.data.items).toHaveLength(1);
   const edited=await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'A new message',consentPublic:true,expectedVersion:2});
   expect(edited.body.data.moderationStatus).toBe('PENDING');
-  expect((await guest('get','wishes')).body.data.items).toHaveLength(0);
+  expect((await guest('get','wishes',token)).body.data.items).toHaveLength(0);
   expect((await admin('patch',`wishes/${wish.id}/moderation`).send({action:'APPROVE',expectedVersion:2})).status).toBe(409);
   await admin('patch',`events/${f.event.id}/controls`).send({expectedVersion:f.event.version,wishesEnabled:false});
   expect((await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'Blocked',consentPublic:true,expectedVersion:3})).status).toBe(422);
@@ -131,7 +135,7 @@ describe('versioned guest responses',()=>{
   expect(first.status).toBe(200);
   expect(first.body.data.items).toHaveLength(6);
   expect(first.body.data.items[0].body).toBe('Message 0');
-  expect(Object.keys(first.body.data.items[0]).sort()).toEqual(['approvedAt','body','displayName','id','isPinned']);
+  expect(Object.keys(first.body.data.items[0]).sort()).toEqual(['approvedAt','attendanceStatus','body','displayName','id','isPinned']);
   expect(first.body.data.nextCursor).toBeTruthy();
   const second=await guest('get',`wishes?cursor=${encodeURIComponent(first.body.data.nextCursor)}`);
   expect(second.body.data.items).toHaveLength(1);
@@ -139,6 +143,30 @@ describe('versioned guest responses',()=>{
   expect(new Set([...first.body.data.items,...second.body.data.items].map((w:any)=>w.id)).size).toBe(7);
   expect((await guest('get','wishes?cursor=invalid')).status).toBe(400);
   expect((await guest('get','wishes?limit=21')).status).toBe(400);
+ });
+ it('shows approved wishes from other guests and shares attendance only with separate consent',async()=>{
+  const writer=await admin('post',`events/${f.event.id}/guests`).send({guestCode:'WISH-WRITER',fullName:'Người gửi lời chúc'});
+  expect(writer.status).toBe(201);
+  const link=await admin('get',`invitations/${writer.body.data.invitation.id}/link`);
+  const token=credentialFromLink(link.body.data.url);
+  expect((await guest('put','rsvp',token).set('Idempotency-Key',randomUUID()).send({status:'ATTENDING',note:'Private note',expectedVersion:0})).status).toBe(200);
+  const own=await prisma.wish.create({data:{invitationId:f.invitation.id,body:'Own message',consentPublic:true,moderationStatus:'APPROVED',approvedAt:new Date()}});
+  const wish=await guest('put','wish',token).set('Idempotency-Key',randomUUID()).send({body:'Lời chúc đã đồng ý',consentPublic:true,consentAttendancePublic:true,expectedVersion:0});
+  expect(wish.status).toBe(200);
+  expect((await guest('get','wishes')).body.data.items).toEqual([]);
+  expect((await admin('patch',`wishes/${wish.body.data.id}/moderation`).send({action:'APPROVE',expectedVersion:1})).status).toBe(200);
+  const wall=(await guest('get','wishes')).body.data.items;
+  expect(wall).toHaveLength(1);
+  expect(wall[0]).toMatchObject({body:'Lời chúc đã đồng ý',displayName:'Người gửi lời chúc',attendanceStatus:'ATTENDING'});
+  expect(wall[0].id).not.toBe(own.id);
+  expect(JSON.stringify(wall)).not.toContain('Private note');
+  const preview=await admin('get',`events/${f.event.id}/preview?guestId=${f.guest.id}`);
+  expect(preview.status).toBe(200);
+  expect(preview.body.data.previewWishes).toEqual(wall);
+  const updated=await guest('put','wish',token).set('Idempotency-Key',randomUUID()).send({body:'Chỉ chia sẻ lời chúc',consentPublic:true,expectedVersion:2});
+  expect(updated.status).toBe(200);
+  expect((await admin('patch',`wishes/${wish.body.data.id}/moderation`).send({action:'APPROVE',expectedVersion:3})).status).toBe(200);
+  expect((await guest('get','wishes')).body.data.items[0]).toMatchObject({body:'Chỉ chia sẻ lời chúc',attendanceStatus:null});
  });
 });
 describe('admin guest lifecycle and summary',()=>{

@@ -52,7 +52,7 @@ export function googleMapsLink(location:Pick<Content['ceremony'],'googleMapsUrl'
 export type Section=Content['sections'][number];
 export const guestSchema=z.object({guestCode:z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9_-]+$/).transform(s=>s.toUpperCase()),fullName:text(120).min(1),displayName:text(80).default(''),groupKey:text(60).transform(normalizeGroupKey).default(''),salutation:text(40).default(''),email:z.union([z.string().trim().email().max(254),z.literal('')]).default(''),phone:text(30).default(''),personalMessage:text(1000).default('')}).strict();
 export const rsvpSchema=z.object({status:z.enum(['ATTENDING','DECLINED']),note:text(500).default(''),expectedVersion:z.number().int().min(0)}).strict();
-export const wishSchema=z.object({body:text(1000).min(1),consentPublic:z.boolean(),expectedVersion:z.number().int().min(0)}).strict();
+export const wishSchema=z.object({body:text(1000).min(1),consentPublic:z.boolean(),consentAttendancePublic:z.boolean().optional(),expectedVersion:z.number().int().min(0)}).strict();
 export const versionSchema=z.object({expectedVersion:z.number().int().min(1)}).strict();
 export function assetIds(content:Content):string[]{
  const ids=new Set<string>();if(content.music.assetId)ids.add(content.music.assetId);
@@ -73,4 +73,5 @@ export function publicationErrors(content:Content):Record<string,string>{
  return errors;
 }
 export type MediaView={id:string;url:string;alt:string;type:string;width?:number|null;height?:number|null;srcSet?:string};
-export type InvitationView={content:Content;media:Record<string,MediaView>;guest:{displayName:string;fullName?:string;salutation?:string};personalMessage:string;rsvp:any;wish:any;canRsvp:boolean;canCreateOrEditWish:boolean;canWithdrawWish:boolean;eventId:string;preview?:boolean};
+export type PublicWish={id:string;displayName:string;body:string;approvedAt:string;attendanceStatus:'ATTENDING'|'DECLINED'|null;isPinned:boolean};
+export type InvitationView={content:Content;media:Record<string,MediaView>;guest:{displayName:string;fullName?:string;salutation?:string};personalMessage:string;rsvp:any;wish:any;canRsvp:boolean;canCreateOrEditWish:boolean;canWithdrawWish:boolean;eventId:string;wallEnabled?:boolean;preview?:boolean;previewWishes?:PublicWish[]};

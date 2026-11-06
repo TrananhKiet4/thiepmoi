@@ -1,9 +1,10 @@
 import {googleMapsLink} from '@invite/contracts';
 import {useEffect,useRef,useState,type CSSProperties} from 'react';
 import {useParams} from 'react-router-dom';
-import {useQuery,useQueryClient} from '@tanstack/react-query';
+import {useInfiniteQuery,useQuery,useQueryClient} from '@tanstack/react-query';
 import {ArrowDown,ArrowUpRight,CalendarDays,Check,Heart,Music2,VolumeX,GraduationCap,Send} from 'lucide-react';
-import type {Content,InvitationView,MediaView,Section} from '@invite/contracts';
+import type {Content,InvitationView,MediaView,PublicWish,Section} from '@invite/contracts';
+import {statusName} from '../../../constants/status';
 import {ApiError,download,request} from '../../../lib/api';
 import {Action,ErrorBox,Field,Loading} from '../../../components/ui/index';
 import {date} from '../../../utils/date';
@@ -117,7 +118,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
   case 'gallery':return <><h2>Cảm ơn vì đã<br/><em>ở trong thanh xuân của mình.</em></h2><div className="gallery">{s.data.items.map((item,i)=><figure key={item.assetId+'-'+i}>{img(item.assetId)}<figcaption>{item.caption}</figcaption></figure>)}</div></>;
   case 'invitation':return <div className="invitation-letter"><Butterfly className="letter-butterfly"/><p className="eyebrow">TRÂN TRỌNG MỜI</p><h2>{s.data.title}</h2><p className="guest-recipient"><span>Kính gửi</span><strong>{name}</strong></p><p className="invite-prose">{s.data.message}</p><div className="event-card"><p className="eyebrow">SAVE THE DATE</p><CalendarDays size={28} strokeWidth={1}/><h3>{date(c.ceremony.startAt)}</h3><p>{c.ceremony.venueName}<br/>{c.ceremony.address}</p><p className="muted">Giờ Việt Nam · GMT+7</p>{token&&<Action run={()=>download('/guest/calendar.ics','loi-moi-tot-nghiep.ics',token)}><CalendarDays size={16}/> Thêm vào lịch</Action>}</div><p className="signature">{c.host.fullName}</p></div>;
   case 'map': {const location=s.data.locationSource==='MEETUP'&&c.meetup?c.meetup:c.ceremony;return <><h2>{s.data.title}</h2><MapView location={location} image={media(location.mapImageAssetId)}/><p className="invite-prose">{s.data.instructions}<br/>{location.entranceNote}</p></>;}
-  case 'response':return <><h2>{s.data.title}</h2><p className="invite-prose">{s.data.rsvpIntro}</p><Response view={view} save={save}/><p className="invite-prose">{s.data.wishIntro}</p><WishForm view={view} save={save}/>{token&&<Wall token={token}/>}</>;
+  case 'response':return <><h2>{s.data.title}</h2><p className="invite-prose">{s.data.rsvpIntro}</p><Response view={view} save={save}/><p className="invite-prose">{s.data.wishIntro}</p><WishForm view={view} save={save}/>{(token&&view.wallEnabled!==false||view.previewWishes!==undefined)&&<Wall key={token} token={token} previewItems={view.previewWishes}/>}</>;
   case 'closing':return <div className="closing"><span className="large-star" aria-hidden="true">✧</span><h2>{s.data.message}</h2><p>{view.rsvp?.status==='ATTENDING'?s.data.attendingMessage:view.rsvp?.status==='DECLINED'?s.data.declinedMessage:''}</p><p className="signature">{c.host.fullName}</p></div>;
   default:return null;
  }}
@@ -138,5 +139,83 @@ function Response({view,save}: {view:InvitationView;save?:any}) {
   <Field label="Nhắn mình một chút (không bắt buộc)"><textarea maxLength={500} value={note} onChange={e=>setNote(e.target.value)}/></Field><button className="button" disabled={busy}><Send size={16}/>{busy?'Đang gửi…':'Gửi xác nhận'}</button>
  </fieldset>{!view.canRsvp&&<p className="muted">Hiện đã ngừng nhận xác nhận.</p>}<ErrorBox error={error}/>{done&&<p role="status" className="success">Đã lưu lời hồi đáp của bạn. Cảm ơn bạn!</p>}</form>;
 }
-function WishForm({view,save}: {view:InvitationView;save?:any}){const [body,setBody]=useState(view.wish?.deletedAt?'':view.wish?.body||''),[consent,setConsent]=useState(view.wish?.consentPublic||false),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[done,setDone]=useState(false);return <form className="guest-form" onSubmit={async e=>{e.preventDefault();if(!save)return;setBusy(true);setError(null);setDone(false);try{await save('/guest/wish','PUT',{body,consentPublic:consent,expectedVersion:view.wish?.version||0});setDone(true);}catch(e){setError(e);}finally{setBusy(false);}}}><fieldset disabled={!view.canCreateOrEditWish||view.preview||busy}><legend>Một lời chúc dành cho mình</legend><Field label="Lời chúc của bạn"><textarea value={body} required maxLength={1000} rows={5} onChange={e=>setBody(e.target.value)} placeholder="Viết một điều bạn muốn gửi gắm…"/></Field><label className="check-label"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/> Tôi đồng ý hiển thị tên và lời chúc trên thiệp sau khi được duyệt.</label><button className="button" disabled={busy}><Heart size={16}/>{busy?'Đang gửi…':'Gửi lời chúc'}</button></fieldset><ErrorBox error={error}/>{done&&<p role="status" className="success">Lời chúc đã được lưu{consent?' và đang chờ duyệt':''}. Cảm ơn bạn!</p>}{!view.canCreateOrEditWish&&<p className="muted">Hiện đã ngừng nhận lời chúc mới.</p>}{view.canWithdrawWish&&!view.preview&&<div className="row wrap">{view.wish?.consentPublic&&<Action run={async()=>{await save('/guest/wish/visibility','PATCH',{consentPublic:false,expectedVersion:view.wish.version});setConsent(false);}}>Rút đồng ý công khai</Action>}<Action confirm="Bạn muốn xóa lời chúc này?" run={async()=>{await save('/guest/wish','DELETE',{expectedVersion:view.wish.version});setBody('');setConsent(false);}}>Xóa lời chúc</Action></div>}</form>;}
-function Wall({token}:{token:string}){const controller=useRef<AbortController|null>(null);const [items,setItems]=useState<any[]>([]),[cursor,setCursor]=useState<string|null>(null),[error,setError]=useState<unknown>(null),[busy,setBusy]=useState(false);async function load(next?:string){const signal=controller.current?.signal;setBusy(true);setError(null);try{const data=await request('/guest/wishes'+(next?'?cursor='+encodeURIComponent(next):''),{signal},token);if(signal?.aborted)return;setError(null);setItems(old=>{const all=next?[...old,...data.items]:data.items;return all.filter((x:any,i:number)=>all.findIndex((v:any)=>v.id===x.id)===i);});setCursor(data.nextCursor);}catch(e){if(!signal?.aborted)setError(e);}finally{if(!signal?.aborted)setBusy(false);}}useEffect(()=>{const c=new AbortController();controller.current=c;void load();const id=setInterval(()=>void load(),30000);return()=>{c.abort();clearInterval(id);};},[token]);return <div className="wish-wall"><h3>Gửi lại những điều thương mến</h3><div className="wish-grid">{items.map(w=><blockquote key={w.id}><Heart size={18}/><p>{w.body}</p><cite>{w.displayName||w.guest?.displayName||w.guestName}</cite>{w.isPinned&&<span className="small muted"> · Lời chúc được ghim</span>}</blockquote>)}</div><ErrorBox error={error}/>{cursor&&<button className="button secondary" disabled={busy} onClick={()=>void load(cursor)}>Xem thêm lời chúc</button>}</div>;}
+function WishForm({view,save}:{view:InvitationView;save?:any}) {
+ const wish=view.wish?.deletedAt?null:view.wish;
+ const [body,setBody]=useState(wish?.body??'');
+ const [consent,setConsent]=useState(!!wish?.consentPublic);
+ const [attendanceConsent,setAttendanceConsent]=useState(!!wish?.consentAttendancePublic);
+ const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[done,setDone]=useState(false);
+ function changeConsent(checked:boolean){
+  setConsent(checked);
+  if(!checked)setAttendanceConsent(false);
+ }
+ return <form className="guest-form" onSubmit={async e=>{
+  e.preventDefault();
+  if(!save)return;
+  setBusy(true);
+  setError(null);
+  setDone(false);
+  try{
+   await save('/guest/wish','PUT',{body,consentPublic:consent,consentAttendancePublic:consent&&attendanceConsent,expectedVersion:view.wish?.version??0});
+   setDone(true);
+  }catch(e){
+   if(e instanceof ApiError&&e.status===409)changeConsent(false);
+   setError(e);
+  }finally{setBusy(false);}
+ }}>
+  <fieldset disabled={!view.canCreateOrEditWish||view.preview||busy}>
+   <legend>Một lời chúc dành cho mình</legend>
+   <Field label="Lời chúc của bạn"><textarea value={body} required maxLength={1000} rows={5} onChange={e=>setBody(e.target.value)} placeholder="Viết một điều bạn muốn gửi gắm…"/></Field>
+   <label className="check-label"><input type="checkbox" checked={consent} onChange={e=>changeConsent(e.target.checked)}/> Tôi đồng ý hiển thị tên và lời chúc trên thiệp sau khi được duyệt.</label>
+   {consent&&<label className="check-label"><input type="checkbox" checked={attendanceConsent} onChange={e=>setAttendanceConsent(e.target.checked)}/> Hiển thị trạng thái tham dự cùng lời chúc</label>}
+   <button className="button" disabled={busy}><Heart size={16}/>{busy?'Đang gửi…':'Gửi lời chúc'}</button>
+  </fieldset>
+  <ErrorBox error={error}/>
+  {done&&<p role="status" className="success">Lời chúc đã được lưu{consent?' và đang chờ duyệt':''}. Cảm ơn bạn!</p>}
+  {!view.preview&&!view.canCreateOrEditWish&&<p className="muted">Hiện đã ngừng nhận lời chúc mới.</p>}
+  {view.canWithdrawWish&&!view.preview&&<div className="row wrap">
+   {wish?.consentPublic&&<Action run={async()=>{await save('/guest/wish/visibility','PATCH',{consentPublic:false,expectedVersion:wish.version});changeConsent(false);}}>Rút đồng ý công khai</Action>}
+   <Action confirm="Bạn muốn xóa lời chúc này?" run={async()=>{await save('/guest/wish','DELETE',{expectedVersion:view.wish.version});setBody('');changeConsent(false);}}>Xóa lời chúc</Action>
+  </div>}
+ </form>;
+}
+
+function Wall({token,previewItems}:{token?:string;previewItems?:PublicWish[]}) {
+ const wall=useInfiniteQuery({
+  queryKey:['wall',token],enabled:!!token,gcTime:0,retry:false,
+  initialPageParam:null as string|null,
+  queryFn:async({signal,pageParam}):Promise<{items:PublicWish[];nextCursor:string|null}>=>{
+   const query=pageParam?'?'+new URLSearchParams({cursor:pageParam}):'';
+   return request('/guest/wishes'+query,{signal},token);
+  },
+  getNextPageParam:last=>last.nextCursor,
+  refetchInterval:30000,refetchOnWindowFocus:true,
+ });
+ const {refetch}=wall;
+ useEffect(()=>{
+  if(!token)return;
+  function restore(event:PageTransitionEvent){if(event.persisted)void refetch();}
+  window.addEventListener('pageshow',restore);
+  return ()=>window.removeEventListener('pageshow',restore);
+ },[token,refetch]);
+ const items=wall.data?.pages.flatMap(page=>page.items)??[];
+ const cards=previewItems??[...new Map(items.map(item=>[item.id,item])).values()];
+ return <div className="wish-wall">
+  <h3>Lưu bút & lời chúc</h3>
+  {cards.length>1&&<p className="muted small">Vuốt hoặc cuộn ngang để xem thêm</p>}
+  {cards.length>0&&<div className="wish-strip" role="region" tabIndex={0} aria-label="Lời chúc của khách mời">
+   {cards.map(w=><blockquote className="wish-card" key={w.id}>
+    <p>{w.body}</p>
+    {w.isPinned&&<span className="small muted wish-pin">Lời chúc được ghim</span>}
+    <footer>
+     {w.attendanceStatus&&<span className="wish-attendance" data-status={w.attendanceStatus}>{statusName[w.attendanceStatus]}</span>}
+     <cite>{w.displayName}</cite>
+    </footer>
+   </blockquote>)}
+  </div>}
+  {wall.isLoading&&<p className="muted" role="status">Đang tải lời chúc…</p>}
+  {!wall.isLoading&&!wall.error&&cards.length===0&&<p className="muted">Chưa có lời chúc công khai từ khách khác.</p>}
+  <ErrorBox error={wall.error}/>
+  {token&&(wall.hasNextPage||wall.isError)&&<button className="button secondary" disabled={wall.isFetching} onClick={()=>void (wall.isError&&!wall.isFetchNextPageError?refetch():wall.fetchNextPage())}>{wall.isError?'Thử tải lại':'Xem thêm lời chúc'}</button>}
+ </div>;
+}

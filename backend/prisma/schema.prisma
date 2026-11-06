@@ -131,6 +131,7 @@ model Wish {
  invitation Invitation @relation(fields:[invitationId],references:[id])
  body String
  consentPublic Boolean @default(false)
+ consentAttendancePublic Boolean @default(false)
  moderationStatus String @default("NONE")
  isPinned Boolean @default(false)
  approvedAt DateTime? @db.Timestamptz(3)

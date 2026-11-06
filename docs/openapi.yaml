@@ -952,7 +952,7 @@ paths:
       operationId: "get_guest_wishes"
       tags: ["Guest"]
       summary: "Bức tường lời chúc theo cursor"
-      description: "Only this event, consenting + APPROVED + undeleted wishes with unarchived guests and unrevoked links. wallEnabled=false returns empty items and null cursor. Sort: isPinned DESC, approvedAt DESC, id DESC. Returns only id/displayName/body/approvedAt/isPinned."
+      description: "Approved public wishes from other guests in this event. Archived guests, revoked invitations and deleted wishes are excluded. Attendance status requires separate consent. wallEnabled=false returns empty items and null cursor. Sort order is isPinned DESC, approvedAt DESC, id DESC."
       security:
         -
           GuestBearer: []
@@ -2474,6 +2474,7 @@ components:
       properties:
         body: {"type":"string","maxLength":1000,"minLength":1}
         consentPublic: {"type":"boolean"}
+        consentAttendancePublic: {"type":"boolean","default":false,"description":"Share RSVP status alongside a public wish."}
         expectedVersion: {"type":"integer","minimum":0}
       required: ["body","consentPublic","expectedVersion"]
       additionalProperties: false
@@ -2502,6 +2503,7 @@ components:
         id: {"type":"string","format":"uuid"}
         body: {"type":"string","maxLength":1000}
         consentPublic: {"type":"boolean"}
+        consentAttendancePublic: {"type":"boolean"}
         moderationStatus:
           type: "string"
           enum: ["NONE","PENDING","APPROVED","HIDDEN"]
@@ -2736,7 +2738,12 @@ components:
         canCreateOrEditWish: {"type":"boolean"}
         canWithdrawWish: {"type":"boolean"}
         eventId: {"type":"string","format":"uuid"}
+        wallEnabled: {"type":"boolean"}
         preview: {"type":"boolean"}
+        previewWishes:
+          type: "array"
+          maxItems: 6
+          items: {"$ref":"#/components/schemas/PublicWish"}
       required: ["content","media","guest","personalMessage","rsvp","wish","canRsvp","canCreateOrEditWish","canWithdrawWish","eventId"]
       description: "Only this invitation's responses. Guest RSVP/Wish DTOs never contain invitationId, approvedBy, tokenHash, ciphertext, contacts or another guest's private information. A soft-deleted own Wish remains present with deletedAt and version."
     Revision:
@@ -2796,7 +2803,8 @@ components:
         body: {"type":"string","maxLength":1000}
         approvedAt: {"type":"string","format":"date-time"}
         isPinned: {"type":"boolean"}
-      required: ["id","displayName","body","approvedAt","isPinned"]
+        attendanceStatus: {"enum":["ATTENDING","DECLINED",null]}
+      required: ["id","displayName","body","approvedAt","isPinned","attendanceStatus"]
     Wall:
       type: "object"
       properties:

@@ -7,7 +7,7 @@ import {AppError} from '../errors/app-error.js';
 import {assertGuestActive,audit,idempotent,ok,ownedEvent,pagination} from '../utils/http.js';
 import {hashToken} from '../utils/token.js';
 import {canWrite,createCalendar,publicWish} from '../utils/invitation.js';
-import {conflict,invitationView,lockEvent,rsvpView,wishView} from '../services/event.service.js';
+import {conflict,invitationView,lockEvent,readPublicWishes,rsvpView,wishView} from '../services/event.service.js';
 import type {RequestHandler} from 'express';
 
 export async function active(tx:Tx,req:Request,write=false){if(write){await lockEvent(tx,req.invitation!.eventId);await tx.$queryRaw`SELECT id FROM "Invitation" WHERE id=${req.invitation!.id}::uuid FOR UPDATE`;}return assertGuestActive(tx,req.invitation!.id,req.invitation!.tokenHash);}
@@ -31,13 +31,13 @@ export const putGuestWish:RequestHandler=async(req,res)=>{
  ok(res,await idempotent(req,'guest.wish',hashToken(req.invitation!.id),body,async tx=>{
   const inv=await active(tx,req),content=await publishedContent(tx,inv);if(!canWrite(inv.event.wishesEnabled,content.wishDeadline))throw new AppError(422,'WISHES_CLOSED','Đã đóng nhận lời chúc');
   const {expectedVersion,...fields}=body;if((inv.wish?.version??0)!==expectedVersion)throw conflict();
-  const data={...fields,moderationStatus:fields.consentPublic?'PENDING':'NONE',isPinned:false,approvedAt:null,approvedBy:null,deletedAt:null};
+  const data={...fields,consentAttendancePublic:fields.consentPublic&&fields.consentAttendancePublic===true,moderationStatus:fields.consentPublic?'PENDING':'NONE',isPinned:false,approvedAt:null,approvedBy:null,deletedAt:null};
   return wishView(await(inv.wish?tx.wish.update({where:{invitationId:inv.id,version:expectedVersion},data:{...data,version:{increment:1}}}):tx.wish.create({data:{invitationId:inv.id,...data}})));
  }));
 };
 export const patchGuestWishVisibility:RequestHandler=async(req,res)=>{
  const {expectedVersion}=versionSchema.extend({consentPublic:z.literal(false)}).parse(req.body);
- ok(res,await withTransaction(async tx=>{const inv=await active(tx,req,true);if(!inv.wish)throw new AppError(404,'NOT_FOUND','Chưa có lời chúc');if(inv.wish.version!==expectedVersion)throw conflict();return wishView(await tx.wish.update({where:{id:inv.wish.id,version:expectedVersion},data:{consentPublic:false,moderationStatus:'NONE',isPinned:false,approvedAt:null,approvedBy:null,version:{increment:1}}}));}));
+ ok(res,await withTransaction(async tx=>{const inv=await active(tx,req,true);if(!inv.wish)throw new AppError(404,'NOT_FOUND','Chưa có lời chúc');if(inv.wish.version!==expectedVersion)throw conflict();return wishView(await tx.wish.update({where:{id:inv.wish.id,version:expectedVersion},data:{consentPublic:false,consentAttendancePublic:false,moderationStatus:'NONE',isPinned:false,approvedAt:null,approvedBy:null,version:{increment:1}}}));}));
 };
 export const deleteGuestWish:RequestHandler=async(req,res)=>{
  const {expectedVersion}=versionSchema.parse(req.body);
@@ -49,11 +49,7 @@ export const getGuestWishes:RequestHandler=async(req,res)=>{
  if(cursor){try{after=cursorSchema.parse(JSON.parse(Buffer.from(cursor,'base64url').toString('utf8')));}catch{throw new AppError(400,'CURSOR_INVALID','Phân trang không hợp lệ');}}
  ok(res,await withTransaction(async tx=>{
   const inv=await active(tx,req);if(!inv.event.wallEnabled)return {items:[],nextCursor:null};
-  const where:Prisma.WishWhereInput={consentPublic:true,moderationStatus:'APPROVED',deletedAt:null,approvedAt:{not:null},invitation:{eventId:inv.eventId,revokedAt:null,guest:{archivedAt:null}}};
-  if(after){const date=new Date(after.a);where.AND=[{OR:[...(after.p?[{isPinned:false}]:[]),{isPinned:after.p,approvedAt:{lt:date}},{isPinned:after.p,approvedAt:date,id:{lt:after.id}}]}];}
-  const rows=await tx.wish.findMany({where,include:{invitation:{include:{guest:true}}},orderBy:[{isPinned:'desc'},{approvedAt:'desc'},{id:'desc'}],take:limit+1});
-  const items=rows.slice(0,limit).map(w=>({id:w.id,displayName:w.invitation.guest.displayName||w.invitation.guest.fullName,body:w.body,approvedAt:w.approvedAt,isPinned:w.isPinned})),last=items.at(-1);
-  return {items,nextCursor:rows.length>limit&&last?Buffer.from(JSON.stringify({p:last.isPinned,a:last.approvedAt!.toISOString(),id:last.id})).toString('base64url'):null};
+  return readPublicWishes(tx,inv.eventId,limit,after,inv.id);
  }));
 };
 export const getGuestCalendarIcs:RequestHandler=async(req,res)=>{const calendar=await withTransaction(async tx=>{const inv=await active(tx,req);return createCalendar(inv.eventId,await publishedContent(tx,inv));});res.set('Content-Disposition','attachment; filename="graduation.ics"').type('text/calendar; charset=utf-8').send(calendar);};

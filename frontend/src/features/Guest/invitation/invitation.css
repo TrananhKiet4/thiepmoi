@@ -125,11 +125,85 @@
 .invitation .guest-form .field>label { color: #625c5a; }
 .invitation .guest-form .field input, .invitation .guest-form .field textarea { font-size: 15px; border-color: #ddd1c0; background: #fffdfa; }
 .invitation .guest-form .check-label { font-size: 12px; color: #625c5a; }
-.invitation .wish-wall { max-width: 1050px; margin: 60px auto 0; }
-.invitation .wish-wall>h3 { font-size: 30px; }
-.invitation .wish-grid blockquote { background: #fffdf8; border-color: #ddd1c0; border-top: 3px solid var(--invite-blue); box-shadow: 2px 5px 12px #67533808; }
-.invitation .wish-grid p { font-family: var(--invite-heading); color: #625c5a; font-size: 21px; }
-.invitation .wish-grid cite { font-size: 13px; }
+.invitation .wish-wall { max-width: 1050px; min-width: 0; margin: 36px auto 0; }
+.invitation .wish-wall > h3 { font-size: 30px; }
+.invitation .wish-strip {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 4px;
+  padding: 18px 4px 14px;
+  margin-bottom: 12px;
+}
+.invitation .wish-card {
+  position: relative;
+  display: flex;
+  flex: 0 0 min(82%, 320px);
+  flex-direction: column;
+  scroll-snap-align: start;
+  min-width: 0;
+  margin: 0;
+  padding: 24px 18px 16px;
+  text-align: left;
+  background: #fffdf8;
+  border: 1px solid #ddd1c0;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px #67533817;
+}
+.invitation .wish-card::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  width: 58px;
+  height: 14px;
+  transform: translateX(-50%) rotate(-3deg);
+  background: #f3e4b8b8;
+}
+.invitation .wish-card > p {
+  margin: 0 0 18px;
+  font-family: var(--invite-heading);
+  font-size: 20px;
+  font-style: italic;
+  line-height: 1.5;
+  color: #463b3f;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.invitation .wish-card .wish-pin { margin-bottom: 8px; }
+.invitation .wish-card footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding: 12px 0 0;
+  border-top: 1px solid #e8ded1;
+  background: transparent;
+}
+.invitation .wish-card cite {
+  margin-left: auto;
+  color: #463b3f;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.invitation .wish-attendance {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #285339;
+  background: #e8f0e5;
+}
+.invitation .wish-attendance[data-status="DECLINED"] {
+  color: #912e45;
+  background: #f9e8eb;
+}
 .invitation .closing .large-star { font-size: 80px; color: var(--invite-blue); margin-bottom: 15px; }
 .invitation .closing h2 { font-size: clamp(30px, 3.4vw, 42px); }
 .invitation .closing>p:not(.signature) { color: #625c5a; }
@@ -203,7 +277,6 @@
   .invitation .guest-form .field input, .invitation .guest-form .field textarea { font-size: 16px; }
   .invitation .radio-cards label { font-size: 13px; padding: 13px; }
   .invitation .radio-cards svg { display: block; width: 18px; }
-  .invitation .wish-grid { grid-template-columns: minmax(0, 1fr); }
   .invitation .campus-map-image { padding: 7px; }
   .invitation .map-card h3 { font-size: 24px; }
   .invitation .map-actions { flex-direction: column; gap: 10px; }
