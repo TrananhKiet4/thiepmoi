@@ -159,6 +159,18 @@ test('published guest links receive updates and open feedback without losing typ
   await expect(note).toHaveValue('Ghi chú đang soạn');await guestPage.getByRole('button',{name:'Gửi xác nhận',exact:true}).click();await expect(guestPage.locator('.guest-form').first().getByRole('status')).toContainText('Đã lưu');
   await guestPage.getByRole('button',{name:'Gửi lời chúc',exact:true}).click();await expect(guestPage.locator('.guest-form').nth(1).getByRole('alert')).toContainText('Dữ liệu đã thay đổi');
   await expect(wish).toHaveValue('Lời chúc đang soạn');await guestPage.getByRole('button',{name:'Gửi lời chúc',exact:true}).click();await expect(guestPage.getByText('Lời chúc đã được lưu. Cảm ơn bạn!',{exact:true})).toBeVisible();
+  let release!:()=>void,started!:()=>void,first=true;
+  const held=new Promise<void>(resolve=>release=resolve),refreshStarted=new Promise<void>(resolve=>started=resolve);
+  const pattern='**/api/v1/guest/invitation';
+  await guestPage.route(pattern,async route=>{if(first){first=false;started();await held;}await route.continue().catch(()=>{});});
+  try{
+   guestPage.once('dialog',dialog=>dialog.accept());
+   await guestPage.getByRole('button',{name:'Xóa lời chúc',exact:true}).click();await refreshStarted;
+   await note.fill('Cập nhật trong lúc tải lại lời chúc');
+   await guestPage.getByRole('button',{name:'Gửi xác nhận',exact:true}).click();
+   await expect(guestPage.locator('.guest-form').first().getByRole('status')).toContainText('Đã lưu');
+   await expect(guestPage.getByRole('button',{name:'Xóa lời chúc',exact:true})).toHaveCount(0);
+  }finally{release();await guestPage.unrouteAll({behavior:'wait'});}
  }finally{
   await guestPage.close();let current=(await (await page.request.get('/api/v1/admin/events/current')).json()).data;
   const published=before.published?.contentJson??before.draft.contentJson;

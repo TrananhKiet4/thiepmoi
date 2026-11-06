@@ -11,7 +11,8 @@ import {date} from '../../../utils/date';
 export default function Guest(){const {token='',guestName}=useParams(),credential=token.length===5&&guestName?token+'.'+encodeURIComponent(guestName):token;return <GuestData key={credential} token={credential}/>;}
 function GuestData({token}:{token:string}) {
   const cache=useQueryClient(), controllers=useRef(new Set<AbortController>()),operations=useRef(new Map<string,{body:string;key:string}>()),[blocked,setBlocked]=useState<unknown>(null);
-  const responseToRefresh=useRef<'rsvp'|'wish'|null>(null);
+  const responsesToRefresh=useRef(new Set<'rsvp'|'wish'>());
+  const refreshSequence=useRef(0);
   const queryKey=['invitation',token];
   const refreshAllowed=(error:unknown)=>!(error instanceof ApiError&&error.status===401);
   const query=useQuery<InvitationView>({
@@ -20,19 +21,21 @@ function GuestData({token}:{token:string}) {
     refetchOnReconnect:({state})=>refreshAllowed(state.error),
     refetchInterval:({state})=>refreshAllowed(state.error)?30000:false,
     queryFn:async({signal})=>{
-      const refresh=responseToRefresh.current;
+      const refresh=new Set(responsesToRefresh.current);
       const fresh=await request('/guest/invitation',{signal},token) as InvitationView;
       const previous=cache.getQueryData<InvitationView>(queryKey);
       if(!previous)return fresh;
       // Keep the other form's version so an unseen response change still causes a conflict.
-      const rsvp=refresh==='rsvp'?fresh.rsvp:previous.rsvp;
-      const wish=refresh==='wish'?fresh.wish:previous.wish;
+      const rsvp=refresh.has('rsvp')?fresh.rsvp:previous.rsvp;
+      const wish=refresh.has('wish')?fresh.wish:previous.wish;
       return {...fresh,rsvp,wish,canWithdrawWish:!!wish&&!wish.deletedAt};
     },
   });
   async function refetchResponse(kind:'rsvp'|'wish'){
-    responseToRefresh.current=kind;
-    try{await query.refetch();}finally{if(responseToRefresh.current===kind)responseToRefresh.current=null;}
+    responsesToRefresh.current.add(kind);
+    const sequence=++refreshSequence.current;
+    // A newer refetch can cancel the current one, so it also carries its pending scope.
+    try{await query.refetch();}finally{if(sequence===refreshSequence.current)responsesToRefresh.current.clear();}
   }
   useEffect(()=>()=>{controllers.current.forEach(c=>c.abort());void cache.cancelQueries({queryKey:['invitation',token]});cache.removeQueries({queryKey:['invitation',token]});cache.removeQueries({queryKey:['wall',token]});},[token,cache]);
   async function save(path:string,method:string,body?:unknown){
