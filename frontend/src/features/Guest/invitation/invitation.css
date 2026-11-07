@@ -65,6 +65,7 @@
 .invitation .ceremony-heading { width: min(1100px, 100%); font-family: var(--invite-heading); text-transform: uppercase; font-size: clamp(52px, 11.6vw, 160px); line-height: .88; letter-spacing: -5px; position: relative; z-index: 1; }
 .invitation .ceremony-heading span { display: block; color: var(--invite-blue); overflow-wrap: normal; }
 .invitation .ceremony-heading span:last-child { color: transparent; -webkit-text-stroke: 1px var(--invite-accent); font-size: .8em; margin-top: 8px; letter-spacing: 1px; }
+.invitation .hero-art { display: contents; }
 .invitation .hero-photo { width: min(370px, 66%); max-width: 100%; max-height: none; aspect-ratio: auto; margin: -13px 0 28px; padding: 19px 19px 23px; background: #fffdf8; border: 8px solid #f0e9db; outline: 2px dotted #c7bba6; outline-offset: -14px; transform: rotate(-3deg); box-shadow: 5px 16px 30px #5b51461c; z-index: 2; }
 .invitation .hero-photo>img { height: auto; aspect-ratio: 4/5; object-fit: cover; }
 .invitation .photo-caption { position: static; display: block; font-family: var(--invite-heading); font-style: italic; font-size: 32px; color: var(--invite-accent); line-height: 1.2; margin-top: 18px; }
@@ -259,9 +260,11 @@
 
 @keyframes invite-unfold { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 767px) {
-  .invitation .envelope { padding: 45px 23px 30px; }
+  .invitation :is(.envelope, .invite-hero) { container-type: inline-size; }
+  .invitation :is(h1, h2, h3, .photo-caption, .hero-subtitle) { text-wrap: balance; }
+  .invitation .envelope { padding: 38px 20px 28px; }
   .invitation .envelope-heading { margin-bottom: 24px; }
-  .invitation .envelope-heading span { font-size: clamp(46px, 15.5vw, 66px); letter-spacing: -2px; white-space: nowrap; }
+  .invitation .envelope-heading span { font-size: clamp(42px, 14vw, 66px); font-size: clamp(37px, 16.5cqi, 66px); letter-spacing: -2px; white-space: nowrap; }
   .invitation .envelope-school { font-size: 8px; margin-bottom: 24px; }
   .invitation .paper-envelope { padding: 15px 15px 118px; }
   .invitation .envelope-letter { padding: 24px 15px; min-height: 170px; }
@@ -272,30 +275,38 @@
   .invitation .butterfly-one { width: 80px; left: -13px; top: 17%; }
   .invitation .butterfly-two { width: 70px; right: -12px; top: 53%; }
   .invitation .butterfly-three { width: 55px; left: 1%; bottom: 7%; }
-  .invitation .invite-nav { padding: 10px 18px 0; gap: 5px 14px; flex-wrap: wrap; }
-  .invitation .invite-brand { flex: 1; max-width: calc(100% - 57px); }
-  .invitation .invite-brand span { font-size: 17px; }
+  .invitation .invite-nav {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "brand music" "links links";
+    padding: 6px clamp(12px, 4vw, 20px);
+    gap: 3px 10px;
+  }
+  .invitation .invite-brand { grid-area: brand; max-width: none; min-height: 44px; gap: 8px; }
+  .invitation .invite-brand span { font-size: clamp(15px, 4.2vw, 18px); text-wrap: balance; }
   .invitation .invite-brand small { font-size: 7px; margin-top: 4px; }
   .invitation .invite-brand>svg { width: 21px; height: 21px; padding: 7px; }
-  .invitation .invite-nav-links { order: 3; width: 100%; justify-content: space-between; gap: 10px; margin: 3px 0 5px; }
-  .invitation .invite-nav-links a { font-size: 11px; min-height: 40px; }
-  .invitation .invite-nav-links a:last-child { padding: 0 16px; min-height: 36px; }
-  .invitation .invite-music { margin-left: auto; }
-  .invitation .music-volume { width: 50px; }
-  .invitation .invite-hero { padding: 35px 20px 55px; }
-  .invitation .ceremony-heading { font-size: clamp(43px, 12.3vw, 92px); letter-spacing: -1.8px; }
+  .invitation .invite-nav-links { grid-area: links; min-width: 0; justify-content: space-between; gap: 5px; margin: 0; }
+  .invitation .invite-nav-links a { font-size: clamp(10px, 3vw, 13px); min-height: 44px; padding-inline: 3px; }
+  .invitation .invite-nav-links a:last-child { padding-inline: clamp(10px, 3.5vw, 18px); }
+  .invitation .invite-music { grid-area: music; gap: 6px; }
+  .invitation .music-volume { width: clamp(40px, 12vw, 58px); }
+  .invitation .invite-hero { padding: 30px 18px 52px; scroll-margin-top: 145px; }
+  .invitation .ceremony-heading { font-size: clamp(36px, 11vw, 84px); font-size: clamp(33px, 14.25cqi, 84px); letter-spacing: -1.8px; }
+  .invitation .ceremony-heading span { white-space: nowrap; }
   .invitation .ceremony-heading span:last-child { letter-spacing: 0; -webkit-text-stroke-width: .7px; }
-  .invitation .hero-photo { width: 66%; margin: 0 0 28px; padding: 12px 12px 18px; border-width: 6px; outline-offset: -9px; }
-  .invitation .photo-caption { font-size: 25px; margin-top: 14px; }
+  .invitation .hero-art { position: relative; display: grid; width: 100%; place-items: center; isolation: isolate; margin: 10px 0 25px; }
+  .invitation .hero-photo { width: min(68%, 330px); margin: 0; padding: 10px 10px 14px; border-width: 6px; outline-offset: -9px; }
+  .invitation .photo-caption { font-size: clamp(19px, 6vw, 26px); margin-top: 12px; }
   .invitation .hero-photo .photo-placeholder { min-height: 190px; }
-  .invitation .invite-hero .butterfly-one { width: 90px; left: 0; top: 29%; }
-  .invitation .invite-hero .butterfly-two { width: 70px; right: 1%; top: 43%; }
-  .invitation .admission-ticket { top: 22%; right: 2%; width: 98px; padding: 12px 8px; gap: 8px; z-index: 3; }
-  .invitation .admission-ticket>span { font-size: 7px; letter-spacing: .3px; }
-  .invitation .admission-ticket strong { font-size: 12px; padding-top: 8px; }
+  .invitation .invite-hero .butterfly-one { width: 78px; left: 0; top: 25%; }
+  .invitation .invite-hero .butterfly-two { width: 66px; right: 0; top: 65%; }
+  .invitation .admission-ticket { top: 10%; right: 3%; width: clamp(94px, 28%, 116px); padding: 10px 6px; gap: 6px; transform: rotate(8deg); z-index: 3; }
+  .invitation .admission-ticket>span { font-size: 8px; letter-spacing: .1px; text-wrap: balance; }
+  .invitation .admission-ticket strong { font-size: 10px; padding-top: 7px; white-space: nowrap; }
   .invitation .admission-ticket>svg { width: 18px; height: 18px; }
   .invitation .hero-text .eyebrow { font-size: 8px; letter-spacing: 1.3px; }
-  .invitation .invite-hero h1 { font-size: 31px; }
+  .invitation .invite-hero h1 { font-size: clamp(26px, 7.4vw, 34px); font-size: clamp(26px, 8cqi, 34px); line-height: 1.2; letter-spacing: -.65px; max-width: 24ch; margin-inline: auto; }
   .invitation .hero-subtitle { font-size: 18px; }
   .invitation .hero-text>p:not(.eyebrow):not(.hero-subtitle) { font-size: 12px; }
   .invitation .invite-section { padding: 55px 23px; scroll-margin-top: 145px; }
@@ -324,7 +335,7 @@
   .invitation .campus-map-image { padding: 7px; }
   .invitation .map-card h3 { font-size: 24px; }
   .invitation .map-actions { flex-direction: column; gap: 10px; }
-  .invitation .quick-rsvp { bottom: 14px; right: 14px; font-size: 11px; }
+  .invitation .quick-rsvp { position: static; width: fit-content; margin: 0 auto 26px; font-size: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .invitation *, .invitation *::before, .invitation *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

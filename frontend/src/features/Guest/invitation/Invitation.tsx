@@ -83,11 +83,30 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
  const year=c.ceremony.startAt?new Intl.DateTimeFormat('vi-VN',{year:'numeric',timeZone:c.timezone}).format(new Date(c.ceremony.startAt)):'…';
  const hasMusic=c.music.enabled&&!!media(c.music.assetId);
  const message=view.personalMessage||(opening?.type==='opening'?opening.data.messageTemplate:'Mời bạn cùng mình lưu giữ khoảnh khắc đáng nhớ.').replaceAll('{{guestName}}',name).replaceAll('{{hostName}}',c.host.fullName).replaceAll('{{salutation}}',view.guest.salutation||'');
- async function music(){if(!audio.current)return;setAudioError('');if(playing){audio.current.pause();setPlaying(false);}else try{await audio.current.play();setPlaying(true);}catch{setAudioError('Chạm nút nhạc để thử phát lại.');}}
- async function open(withMusic:boolean){setOpened(true);if(withMusic)await music();if(token)void request('/guest/opened',{method:'POST'},token).catch(()=>{});}
+ async function startMusic(){
+  const player=audio.current;
+  if(!player)return;
+  setAudioError('');
+  try{await player.play();}
+  catch(error){
+   if(audio.current===player&&!(error instanceof DOMException&&error.name==='AbortError'))setAudioError('Chạm nút nhạc để thử phát lại.');
+  }
+ }
+ function toggleMusic(){
+  const player=audio.current;
+  if(player?.paused)void startMusic();
+  else player?.pause();
+ }
+ function open(){
+  // Start playback while the tap still grants media activation on mobile.
+  void startMusic();
+  setOpened(true);
+  if(token)void request('/guest/opened',{method:'POST'},token).catch(()=>{});
+ }
  return <main ref={root} className={`invitation palette-${c.theme.palette} font-${c.theme.font}`}>
   {view.preview&&<div className="preview-banner">BẢN XEM TRƯỚC · Phản hồi không được lưu</div>}
-  {hasMusic&&<audio ref={el=>{audio.current=el;if(el)el.volume=volume;}} src={media(c.music.assetId)!.url} loop={c.music.loop} preload="none"/>}
+  {hasMusic&&<audio ref={el=>{audio.current=el;if(el)el.volume=volume;}} src={media(c.music.assetId)!.url} loop={c.music.loop} preload="metadata"
+    onPlay={()=>setPlaying(true)} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)} onError={()=>setPlaying(false)}/>}
   {!opened?<section className="envelope" aria-label="Phong bì thiệp mời">
    <Butterfly className="butterfly-one"/><Butterfly className="butterfly-two"/><Butterfly className="butterfly-three"/>
    <p className="envelope-heading" aria-hidden="true"><span>Graduation</span><em>Invitation</em></p>
@@ -95,29 +114,31 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    <div className="paper-envelope">
     <div className="envelope-letter"><p className="eyebrow">{opening?.type==='opening'?opening.data.title:'MỘT LỜI MỜI DÀNH RIÊNG CHO'}</p><h1>{name}</h1><p className="signature">{c.host.fullName}</p></div>
     <div className="envelope-fold" aria-hidden="true"/>
-    <button className="wax-seal" aria-label="Mở thiệp" onClick={()=>void open(false)}><GraduationCap size={30} strokeWidth={1}/><span>Mở thiệp</span></button>
+    <button className="wax-seal" aria-label="Mở thiệp" onClick={open}><GraduationCap size={30} strokeWidth={1}/><span>Mở thiệp</span></button>
    </div>
    <p className="envelope-hint">CHẠM VÀO CON DẤU ĐỂ MỞ THIỆP</p>
    <p className="envelope-message">{message}</p>
    {opening?.type==='opening'&&opening.data.coverAssetId&&<div className="envelope-cover">{img(opening.data.coverAssetId,true)}</div>}
-   {hasMusic&&<button className="text-button" onClick={()=>void open(true)}><Music2 size={16}/> Mở thiệp cùng âm nhạc</button>}
    <span className="envelope-year">CLASS OF {year}</span>
   </section>:<>
    <nav className="invite-nav" aria-label="Các phần của thiệp">
     <a className="invite-brand" href="#invitation-top"><GraduationCap size={25} strokeWidth={1.2}/><span>{c.host.fullName}<small>GRADUATION · {year}</small></span></a>
     <div className="invite-nav-links">{sections.some(s=>s.type==='story')&&<a href="#story">Câu chuyện</a>}<a href="#invitation-event">Lời mời</a><a href="#location">Địa điểm</a><a href="#response">Tham dự</a></div>
-    {hasMusic&&<div className="invite-music"><button className="icon-button" aria-label={playing?'Tắt nhạc':'Phát nhạc'} aria-pressed={playing} onClick={()=>void music()}>{playing?<Music2 size={18}/>:<VolumeX size={18}/>}</button><label className="music-volume"><span className="sr-only">Âm lượng nhạc nền</span><input type="range" min="0" max="1" step="0.05" value={volume} onChange={e=>{const v=Number(e.target.value);setVolume(v);if(audio.current)audio.current.volume=v;try{localStorage.setItem('graduation.music.volume',String(v));}catch{}}}/></label></div>}
+    {hasMusic&&<div className="invite-music"><button className="icon-button" aria-label={playing?'Tắt nhạc':'Phát nhạc'} onClick={toggleMusic}>{playing?<Music2 size={18}/>:<VolumeX size={18}/>}</button><label className="music-volume"><span className="sr-only">Âm lượng nhạc nền</span><input type="range" min="0" max="1" step="0.05" value={volume} onChange={e=>{const v=Number(e.target.value);setVolume(v);if(audio.current)audio.current.volume=v;try{localStorage.setItem('graduation.music.volume',String(v));}catch{}}}/></label></div>}
    </nav>
    {audioError&&<p className="music-error" role="status">{audioError}</p>}
    <section className="invite-hero" id="invitation-top">
     <div className="ceremony-heading" aria-hidden="true"><span>Graduation</span><span>Ceremony</span></div>
-    <Butterfly className="butterfly-one"/><Butterfly className="butterfly-two"/>
-    <div className="admission-ticket"><span>YOU'RE INVITED</span><GraduationCap size={24} strokeWidth={1}/><strong>CLASS OF {year}</strong><span>{date(c.ceremony.startAt)}</span></div>
-    <figure className="hero-photo">{img(hero?.type==='hero'?hero.data.heroAssetId:null,true)}<figcaption className="photo-caption">{c.host.fullName}</figcaption></figure>
+    <div className="hero-art">
+     <Butterfly className="butterfly-one"/><Butterfly className="butterfly-two"/>
+     <div className="admission-ticket"><span>YOU'RE INVITED</span><GraduationCap size={24} strokeWidth={1}/><strong>CLASS OF {year}</strong><span>{date(c.ceremony.startAt)}</span></div>
+     <figure className="hero-photo">{img(hero?.type==='hero'?hero.data.heroAssetId:null,true)}<figcaption className="photo-caption">{c.host.fullName}</figcaption></figure>
+    </div>
     <div className="hero-text"><p className="eyebrow">MỘT CHẶNG ĐƯỜNG · MỘT KHỞI ĐẦU MỚI</p><h1 tabIndex={-1}>{hero?.type==='hero'?hero.data.title:'Ngày mình tốt nghiệp.'}</h1><p className="hero-subtitle">{hero?.type==='hero'?hero.data.subtitle:''}</p><p>{c.host.university}<br/>{c.host.major}{c.host.cohort&&' · '+c.host.cohort}</p><a href="#invitation-event" className="text-button">Một lời mời dành riêng cho bạn <ArrowDown size={17}/></a></div>
    </section>
+   <a href="#response" className="quick-rsvp"><Heart size={16}/> Gửi lời hồi đáp</a>
    {sections.filter(s=>!['opening','hero'].includes(s.type)).map((s,index)=><section key={s.id} className={'invite-section section-'+s.type} id={s.type==='invitation'?'invitation-event':s.type==='map'?'location':s.type}><p className="eyebrow section-number">{String(index+1).padStart(2,'0')} / {sectionLabel[s.type]}</p>{renderSection(s)}</section>)}
-   <footer className="invite-footer"><GraduationCap size={26}/><p>{c.host.fullName}</p><span>{c.host.university}</span><small>Mong gặp bạn ở một ngày thật đẹp. ✧</small></footer><a href="#response" className="quick-rsvp"><Heart size={16}/> Gửi lời hồi đáp</a>
+   <footer className="invite-footer"><GraduationCap size={26}/><p>{c.host.fullName}</p><span>{c.host.university}</span><small>Mong gặp bạn ở một ngày thật đẹp. ✧</small></footer>
   </>}
  </main>;
  function renderSection(s:Section){switch(s.type){

@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import ExcelJS from 'exceljs';
 import type { Page } from '@playwright/test';
 import sharp from 'sharp';
+import {fileURLToPath} from 'node:url';
+import {demoContent} from '../backend/prisma/data/demo.js';
 function credentialFromLink(url:string){const [,,code,slug]=new URL(url).pathname.split('/');return code.length===5?code+'.'+slug:code;}
 
 test('configured admin alias signs in through the username field',async({page})=>{
@@ -72,6 +74,67 @@ test('blue invitation preview renders both new Vietnamese fonts',async({page},te
     data:{content:before.draft.contentJson},
    });
    expect(restored.ok()).toBe(true);
+  }
+ }
+});
+
+test('mobile invitation balances headings and plays music on open',async({page},testInfo)=>{
+ const content=demoContent(null);
+ content.host.fullName='Nguyễn Minh Anh';
+ content.theme={palette:'blue',font:'be-vietnam-pro'};
+ content.music={enabled:true,assetId:'test-music',volume:.25,loop:true};
+ const clip=fileURLToPath(new URL('./fixtures/silent-invitation.mp3',import.meta.url)).replaceAll('\\','/');
+ const audioUrl='/@fs/'+clip;
+ await page.route('**/api/v1/guest/invitation',route=>route.fulfill({json:{data:{
+  content,media:{'test-music':{url:audioUrl}},guest:{displayName:'Khách thử nghiệm'},
+  personalMessage:'Thân mời bạn dự lễ tốt nghiệp.',canRsvp:true,canCreateOrEditWish:true,wallEnabled:false,
+ }}}));
+ await page.route('**/api/v1/guest/opened',route=>route.fulfill({json:{data:{}}}));
+ for(const font of ['be-vietnam-pro','lora'] as const){
+  content.theme.font=font;
+  await page.setViewportSize({width:320,height:760});
+  await page.goto('/i/'+'x'.repeat(43));
+  const audio=page.locator('audio');
+  await expect(audio).toHaveJSProperty('paused',true);
+  const open=page.getByRole('button',{name:'Mở thiệp',exact:true});
+  if(testInfo.project.use.hasTouch)await open.tap();
+  else await open.click();
+  await expect(page.getByRole('button',{name:'Tắt nhạc',exact:true})).toBeVisible();
+  await expect.poll(()=>audio.evaluate((player:HTMLAudioElement)=>player.currentTime)).toBeGreaterThan(.05);
+  await expect(page.getByRole('link',{name:'Gửi lời hồi đáp',exact:true})).toHaveCSS('position','static');
+  await page.evaluate(async()=>{await document.fonts.ready;});
+  for(const width of [320,375,390,430]){
+   await page.setViewportSize({width,height:760});
+   const metrics=await page.locator('.invitation').evaluate(root=>{
+    const outer=root.getBoundingClientRect();
+    const selectors=['.ceremony-heading span:first-child','.admission-ticket strong','.invite-nav-links'];
+    const fits=selectors.every(selector=>{
+     const range=document.createRange();
+     range.selectNodeContents(root.querySelector(selector)!);
+     return Array.from(range.getClientRects()).every(rect=>rect.left>=outer.left-1&&rect.right<=outer.right+1);
+    });
+    const heading=root.querySelector('.hero-text h1')!.firstChild!;
+    const lines=new Map<number,number>();
+    for(const word of heading.textContent!.matchAll(/\S+/g)){
+     const range=document.createRange();
+     range.setStart(heading,word.index!);
+     range.setEnd(heading,word.index!+word[0].length);
+     const top=Math.round(range.getBoundingClientRect().top);
+     lines.set(top,(lines.get(top)??0)+1);
+    }
+    return {fits,lineCount:lines.size,lastLineWords:[...lines.values()].at(-1)};
+   });
+   expect(metrics.fits,`${font} at ${width}px`).toBe(true);
+   expect(metrics.lineCount,`${font} at ${width}px`).toBeLessThanOrEqual(2);
+   expect(metrics.lastLineWords,`${font} at ${width}px`).toBeGreaterThan(1);
+  }
+  await page.getByRole('button',{name:'Tắt nhạc',exact:true}).click();
+  await expect(audio).toHaveJSProperty('paused',true);
+  await page.getByRole('button',{name:'Phát nhạc',exact:true}).click();
+  await expect(audio).toHaveJSProperty('paused',false);
+  if(font==='be-vietnam-pro'){
+   await page.setViewportSize({width:390,height:844});
+   await page.screenshot({path:`.data/qa/mobile-invitation-polish-${testInfo.project.name}.png`,animations:'disabled'});
   }
  }
 });
