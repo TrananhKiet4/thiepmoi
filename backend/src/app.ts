@@ -4,7 +4,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import {randomUUID} from 'node:crypto';
 import {resolve} from 'node:path';
-import {staticMedia} from '../../packages/contracts/src/index.js';
+import {companionPhotoPath,companionPhotos,staticMedia} from '../../packages/contracts/src/index.js';
 import {config} from './config/env.js';
 import {prisma} from './config/database.js';
 import {AppError} from './errors/app-error.js';
@@ -21,7 +21,11 @@ import {privateDownloadUrl} from './services/storage.service.js';
 const assetPaths=new Set(Object.values(staticMedia).flatMap(asset=>[
  asset.url,...(asset.srcSet?.split(', ').map(source=>source.split(' ')[0])??[]),
 ]));
-const companionPath=/^\/invitation-assets\/photos\/companions\/(?:0[1-9]|[12]\d|30)(?:-small)?\.webp$/;
+for(const {id} of companionPhotos){
+ const path=companionPhotoPath(id);
+ assetPaths.add(path+'.webp');
+ assetPaths.add(path+'-small.webp');
+}
 
 export function createApp(){
  const app=express();app.disable('x-powered-by');app.set('trust proxy',config.trustProxy);
@@ -41,7 +45,7 @@ export function createApp(){
   const web=resolve('frontend/dist');
   app.use(express.static(web,{index:false}));
   app.get('/invitation-assets/{*key}',async(req,res,next)=>{
-   if(!assetPaths.has(req.path)&&!companionPath.test(req.path))return next();
+   if(!assetPaths.has(req.path))return next();
    res.set('Cache-Control','private, no-store').redirect(await privateDownloadUrl(req.path.slice(1)));
   });
   app.get(['/','/admin','/admin/*path','/i/:token','/i/:token/:guestName'],(_req,res)=>res.sendFile(resolve(web,'index.html')));

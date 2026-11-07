@@ -74,5 +74,7 @@ export function publicationErrors(content:Content):Record<string,string>{
 }
 export type MediaView={id:string;url:string;alt:string;type:string;width?:number|null;height?:number|null;srcSet?:string};
 export {demoMediaId,staticMedia} from './static-media.js';
+export {companionPhotos} from './companion-photos.js';
+export const companionPhotoPath=(id:string)=>'/invitation-assets/photos/companions/'+id;
 export type PublicWish={id:string;displayName:string;body:string;approvedAt:string;attendanceStatus:'ATTENDING'|'DECLINED'|null;isPinned:boolean};
 export type InvitationView={content:Content;media:Record<string,MediaView>;guest:{displayName:string;fullName?:string;salutation?:string};personalMessage:string;rsvp:any;wish:any;canRsvp:boolean;canCreateOrEditWish:boolean;canWithdrawWish:boolean;eventId:string;wallEnabled?:boolean;preview?:boolean;previewWishes?:PublicWish[]};
