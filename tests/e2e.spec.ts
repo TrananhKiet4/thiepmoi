@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import ExcelJS from 'exceljs';
 import type { Page } from '@playwright/test';
-import {demoMediaId} from '@invite/contracts';
+import {companionPhotoPath,companionPhotos,demoMediaId} from '@invite/contracts';
 import {fileURLToPath} from 'node:url';
 import {demoContent} from '../backend/prisma/data/demo.js';
 function credentialFromLink(url:string){const [,,code,slug]=new URL(url).pathname.split('/');return code.length===5?code+'.'+slug:code;}
@@ -214,15 +214,15 @@ test('published guest links receive updates and open feedback without losing typ
   const link=(await (await page.request.get(`/api/v1/admin/invitations/${created.invitation.id}/link`)).json()).data.url;
   await guestPage.clock.install();await guestPage.goto(link);await guestPage.getByRole('button',{name:'Mở thiệp',exact:true}).click();
   const gallery=guestPage.locator('#gallery'),photos=gallery.locator('.film-strip:not([aria-hidden="true"]) figure > a');
-  const numberedPhotos=Array.from({length:30},(_,index)=>`/invitation-assets/photos/companions/${String(index+1).padStart(2,'0')}.webp`);
+  const numberedPhotos=companionPhotos.map(photo=>companionPhotoPath(photo.file)+'.webp');
   const photoPaths=Array.from({length:4},(_,row)=>numberedPhotos.filter((_,index)=>index%4===row)).flat();
   await expect(gallery.getByText('04 / NGƯỜI ĐỒNG HÀNH',{exact:true})).toBeVisible();
   const filmRows=gallery.locator('.film-row');
   await expect(filmRows).toHaveCount(4);
-  await expect(photos).toHaveCount(30);
+  await expect(photos).toHaveCount(companionPhotos.length);
   expect(await photos.evaluateAll(links=>links.map(link=>link.getAttribute('href')))).toEqual(photoPaths);
   const images=photos.locator('img');
-  await expect(images).toHaveCount(30);
+  await expect(images).toHaveCount(companionPhotos.length);
   expect(await images.evaluateAll(nodes=>nodes.map(image=>image.getAttribute('src')))).toEqual(photoPaths);
   expect(await images.evaluateAll(nodes=>nodes.every(image=>getComputedStyle(image).objectFit==='contain'&&image.getAttribute('loading')==='lazy'))).toBe(true);
   const tracks=gallery.locator('.film-track');

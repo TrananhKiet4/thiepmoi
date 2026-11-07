@@ -8,8 +8,8 @@ export function CompanionFilm(){
   {filmRows.map((photos,index)=><div className="film-row" key={photos[0].id} role="region" aria-label={`Dải ảnh ${index+1} trên ${rowCount}`}>
    <div className="film-track">
     {[false,true].map(copy=><div className="film-strip" key={Number(copy)} aria-hidden={copy||undefined}>
-     {photos.map(({id,width,height,smallWidth})=>{
-     const path=companionPhotoPath(id);
+     {photos.map(({id,file,width,height,smallWidth})=>{
+      const path=companionPhotoPath(file);
       const ratio=width/height;
       return <figure key={id}>
        <a href={path+'.webp'} target="_blank" rel="noopener noreferrer" tabIndex={copy?-1:undefined}

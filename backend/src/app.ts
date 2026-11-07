@@ -21,8 +21,8 @@ import {privateDownloadUrl} from './services/storage.service.js';
 const assetPaths=new Set(Object.values(staticMedia).flatMap(asset=>[
  asset.url,...(asset.srcSet?.split(', ').map(source=>source.split(' ')[0])??[]),
 ]));
-for(const {id} of companionPhotos){
- const path=companionPhotoPath(id);
+for(const {file} of companionPhotos){
+ const path=companionPhotoPath(file);
  assetPaths.add(path+'.webp');
  assetPaths.add(path+'-small.webp');
 }
