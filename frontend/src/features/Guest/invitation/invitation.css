@@ -100,6 +100,28 @@
 .invitation .gallery { display: flex; flex-wrap: wrap; justify-content: center; max-width: 1100px; margin: 40px auto 0; gap: 30px; }
 .invitation .gallery figure { flex: 1 1 240px; min-width: 0; max-width: 320px; background: #fffdf8; border-color: #d9cfbf; padding: 12px 12px 20px; box-shadow: 3px 8px 14px #67533810; }
 .invitation .gallery figcaption { color: #6b5b55; font-size: 15px; font-family: var(--invite-heading); }
+.invitation .companion-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 18px;
+}
+.invitation .companion-gallery figure {
+  display: flex;
+  align-items: center;
+  max-width: none;
+  margin: 0;
+  padding: 7px;
+  transform: none;
+  border-radius: 8px;
+}
+.invitation .companion-gallery figure:first-child {
+  grid-column: 1 / -1;
+  width: min(100%, 660px);
+  justify-self: center;
+}
+.invitation .companion-gallery a { display: block; width: 100%; }
+.invitation .companion-gallery img { display: block; width: 100%; height: auto; aspect-ratio: auto; object-fit: contain; border-radius: 4px; }
 .invitation .section-invitation { background: #e6edf180; }
 .invitation .invitation-letter { position: relative; max-width: 780px; padding: 55px 45px 30px; margin: auto; background: #fffdf8; border: 1px solid #dbceba; outline: 1px dashed #d3c4ad; outline-offset: -12px; box-shadow: 5px 10px 25px #67533810; }
 .invitation .letter-butterfly { width: 130px; right: -45px; top: -32px; transform: rotate(15deg); }
@@ -321,6 +343,9 @@
   .invitation .gallery { gap: 16px; }
   .invitation .gallery figure { flex-basis: calc(50% - 8px); padding: 7px 7px 14px; }
   .invitation .gallery figcaption { font-size: 13px; }
+  .invitation .companion-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .invitation .companion-gallery figure { padding: 5px; }
+  .invitation .companion-gallery figure:last-child { grid-column: 1 / -1; width: calc((100% - 12px) / 2); justify-self: center; }
   .invitation .invitation-letter { padding: 37px 23px 23px; outline-offset: -8px; }
   .invitation .letter-butterfly { width: 80px; right: -20px; top: -20px; }
   .invitation .guest-recipient strong { font-size: 27px; }

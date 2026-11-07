@@ -4,6 +4,7 @@ import {useParams} from 'react-router-dom';
 import {useInfiniteQuery,useQuery,useQueryClient} from '@tanstack/react-query';
 import {ArrowDown,ArrowUpRight,CalendarDays,Check,Heart,Music2,VolumeX,GraduationCap,Send} from 'lucide-react';
 import type {Content,InvitationView,MediaView,PublicWish,Section} from '@invite/contracts';
+import {companionPhotos} from './companion-photos';
 import {statusName} from '../../../constants/status';
 import {ApiError,download,request} from '../../../lib/api';
 import {Action,ErrorBox,Field,Loading} from '../../../components/ui/index';
@@ -137,7 +138,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
     <div className="hero-text"><p className="eyebrow">MỘT CHẶNG ĐƯỜNG · MỘT KHỞI ĐẦU MỚI</p><h1 tabIndex={-1}>{hero?.type==='hero'?hero.data.title:'Ngày mình tốt nghiệp.'}</h1><p className="hero-subtitle">{hero?.type==='hero'?hero.data.subtitle:''}</p><p>{c.host.university}<br/>{c.host.major}{c.host.cohort&&' · '+c.host.cohort}</p><a href="#invitation-event" className="text-button">Một lời mời dành riêng cho bạn <ArrowDown size={17}/></a></div>
    </section>
    <a href="#response" className="quick-rsvp"><Heart size={16}/> Gửi lời hồi đáp</a>
-   {sections.filter(s=>!['opening','hero'].includes(s.type)).map((s,index)=><section key={s.id} className={'invite-section section-'+s.type} id={s.type==='invitation'?'invitation-event':s.type==='map'?'location':s.type}><p className="eyebrow section-number">{String(index+1).padStart(2,'0')} / {sectionLabel[s.type]}</p>{renderSection(s)}</section>)}
+   {sections.filter(s=>!['opening','hero'].includes(s.type)).map(s=><section key={s.id} className={'invite-section section-'+s.type} id={s.type==='invitation'?'invitation-event':s.type==='map'?'location':s.type}><p className="eyebrow section-number">{String(s.order+1).padStart(2,'0')} / {sectionLabel[s.type]}</p>{renderSection(s)}</section>)}
    <footer className="invite-footer"><GraduationCap size={26}/><p>{c.host.fullName}</p><span>{c.host.university}</span><small>Mong gặp bạn ở một ngày thật đẹp. ✧</small></footer>
   </>}
  </main>;
@@ -145,7 +146,21 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
   case 'story':return <><h2>Mỗi chặng đường,<br/><em>một điều để nhớ.</em></h2><div className="story-list">{s.data.items.map((item,i)=><article key={item.id} className={'story-item'+(item.imageAssetId?'':' story-letter')}>
    {item.imageAssetId&&<div className="story-image">{img(item.imageAssetId)}</div>}<div><p className="eyebrow">{item.label||`CHƯƠNG ${i+1}`}</p><h3>{item.title}</h3><p>{item.body}</p></div>
   </article>)}</div></>;
-  case 'gallery':return <><h2>Cảm ơn vì đã<br/><em>ở trong thanh xuân của mình.</em></h2><div className="gallery">{s.data.items.map((item,i)=><figure key={item.assetId+'-'+i}>{img(item.assetId)}<figcaption>{item.caption}</figcaption></figure>)}</div></>;
+  case 'gallery':return <>
+   <h2>Cảm ơn vì đã<br/><em>ở trong thanh xuân của mình.</em></h2>
+   <div className="gallery companion-gallery">
+    {companionPhotos.map(({id,width,height,smallWidth},index)=>{
+     const path='/invitation-assets/photos/companions/'+id;
+     const sizes=index===0?'(max-width: 767px) calc(100vw - 56px), 660px':'(max-width: 767px) calc(50vw - 34px), 340px';
+     return <figure key={id}>
+      <a href={path+'.webp'} target="_blank" rel="noopener noreferrer" aria-label={`Xem ảnh ${id} đầy đủ`}>
+       <img src={path+'.webp'} srcSet={`${path}-small.webp ${smallWidth}w, ${path}.webp ${width}w`} sizes={sizes}
+        width={width} height={height} alt={`Ảnh kỷ niệm cùng người đồng hành ${id}`} loading="lazy" decoding="async"/>
+      </a>
+     </figure>;
+    })}
+   </div>
+  </>;
   case 'invitation':return <div className="invitation-letter"><Butterfly className="letter-butterfly"/><p className="eyebrow">TRÂN TRỌNG MỜI</p><h2>{s.data.title}</h2><p className="guest-recipient"><span>Kính gửi</span><strong>{name}</strong></p><p className="invite-prose">{s.data.message}</p><div className="event-card"><p className="eyebrow">SAVE THE DATE</p><CalendarDays size={28} strokeWidth={1}/><h3>{date(c.ceremony.startAt)}</h3><p>{c.ceremony.venueName}<br/>{c.ceremony.address}</p><p className="muted">Giờ Việt Nam · GMT+7</p>{token&&<Action run={()=>download('/guest/calendar.ics','loi-moi-tot-nghiep.ics',token)}><CalendarDays size={16}/> Thêm vào lịch</Action>}</div><p className="signature">{c.host.fullName}</p></div>;
   case 'map': {const location=s.data.locationSource==='MEETUP'&&c.meetup?c.meetup:c.ceremony;return <><h2>{s.data.title}</h2><MapView location={location} image={media(location.mapImageAssetId)}/><p className="invite-prose">{s.data.instructions}<br/>{location.entranceNote}</p></>;}
   case 'response':return <><h2>{s.data.title}</h2><p className="invite-prose">{s.data.rsvpIntro}</p><Response view={view} save={save}/><p className="invite-prose">{s.data.wishIntro}</p><WishForm view={view} save={save}/>{(token&&view.wallEnabled!==false||view.previewWishes!==undefined)&&<Wall key={token} token={token} previewItems={view.previewWishes}/>}</>;

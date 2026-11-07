@@ -1,6 +1,6 @@
 # Deploy một container web + API lên Vercel
 
-Repo: `TrananhKiet4/thiepmoi`. Root Directory: **`.`**. Framework Preset: **Container**. Không chọn `frontend` hoặc `backend` làm root. Vercel đọc `Dockerfile.vercel`, chạy Node 24 + FFmpeg và phục vụ React/Express cùng domain.
+Repo `TrananhKiet4/thiepmoi` dùng Root Directory **`.`** và Framework Preset **Container**. Vercel đọc `Dockerfile.vercel` và phục vụ React, Express và các tệp thiệp cùng tên miền.
 
 Project đã tạo trong team `trananhkiet4s-projects`: [thiepmoi](https://vercel.com/trananhkiet4s-projects/thiepmoi), ID `prj_8BdA2pnWHjvoJBQRW8Y6Jz9m1Wft`, Container preset/Node 24. Production hoạt động tại `https://thiepmoi-murex.vercel.app`, deployment `dpl_4yGsMJtj5cZge537YfqZxyUMLPUy`, mã ứng dụng commit `5725bcd` trên nhánh `codex/vercel-container`. Profile local đã cập nhật đúng origin; file import 22 biến Production là `.data/vercel-production.env`, ngoài Git, đã loại bootstrap password và DIRECT_URL. Các biến chỉ áp dụng Production, dùng `APP_STORAGE_DRIVER` để tránh trùng tên biến riêng của Buildah.
 
@@ -38,8 +38,7 @@ Các biến cần lấy từ profile local hiện có:
 - `DATABASE_URL`: Supabase Transaction pooler 6543, bật SSL theo URL Supabase cung cấp. Với Prisma 6 trên server tự scale, đặt `pgbouncer=true`, `connection_limit=1`, `pool_timeout=10` nếu URL chưa có các tham số này.
 - `SESSION_SECRET`, `INVITATION_KEY`, `INVITATION_KEY_VERSION`; giữ nguyên giá trị đã dùng để tạo dữ liệu. Nếu đã xoay khóa, giữ cả `INVITATION_OLD_KEYS`.
 - `APP_STORAGE_DRIVER=s3`, `STORAGE_ENDPOINT`, `STORAGE_REGION`. Dùng tên `APP_STORAGE_DRIVER` trên Vercel vì `STORAGE_DRIVER` là biến riêng của Buildah; tên cũ vẫn được hỗ trợ cho môi trường local.
-- `STORAGE_BUCKET_PRIVATE=invitation-private`, `STORAGE_BUCKET_PUBLIC=invitation-public`.
-- `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`, `PUBLIC_MEDIA_BASE_URL`.
+- `STORAGE_BUCKET_PRIVATE=invitation-private`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` cho nhập và xuất Excel.
 - `CRON_SECRET`: ít nhất 32 ký tự ngẫu nhiên, dùng để Vercel gọi cron có xác thực.
 
 Các giá trị vận hành:
@@ -52,18 +51,17 @@ APP_ORIGIN=https://DOMAIN_DA_XAC_MINH
 CORS_ORIGINS=https://DOMAIN_DA_XAC_MINH
 TRUST_PROXY=true
 STORAGE_LOCAL_PATH=/tmp/invitation-media
-FFMPEG_PATH=ffmpeg
 ```
 
 Không đưa `ADMIN_BOOTSTRAP_PASSWORD` lên Vercel. Admin đã được tạo trước đó. `DIRECT_URL` giữ ở máy dùng migration/backup; container runtime không cần thông tin bootstrap hoặc kết nối migration. Không thêm prefix `VITE_` vào database/S3/session secrets.
 
-Giữ Data API Supabase đã tắt. Backend dùng Prisma; trình duyệt chỉ nhận URL S3 có chữ ký ngắn hạn. Không tạo policy public cho bucket private hoặc các bảng tạm.
+Giữ Data API Supabase đã tắt. Backend dùng Prisma và cấp URL S3 có chữ ký cho file Excel cùng ảnh và nhạc của thiệp. Xem [hướng dẫn quản lý file cố định](static-media.md).
 
 Preview deployment không dùng credentials/database production. Chưa có môi trường preview riêng thì chưa cấp các biến production cho Preview; một preview không có đủ cấu hình sẽ từ chối startup.
 
 ## 4. Backup và migration trước traffic
 
-Xác nhận có bản backup phù hợp của database và giữ bản sao khóa mã hóa. Migration mới chỉ thêm `TemporaryObject`, `RateLimitBucket`, index/FK và bật RLS trên hai bảng; không xóa hoặc chuyển dữ liệu hiện có.
+Xác nhận bản sao lưu database và khóa mã hóa. Khi chuyển hệ thống cũ sang file cố định, phát hành mã nguồn có đầy đủ ảnh và nhạc trước. Xác minh thiệp trên tên miền chính rồi mới áp dụng migration gỡ bảng `MediaAsset`.
 
 Sau khi đã duyệt phát hành, chạy đúng một lần tại root:
 
@@ -76,21 +74,21 @@ node --env-file=.env.production.local node_modules/prisma/build/index.js migrate
 
 ## 5. Deploy và kiểm tra
 
-Sau khi image, biến môi trường và migration đã qua kiểm tra, chạy Git deployment hoặc Vercel deploy theo project đã link. Không cần đặt lại Build Command/Output Directory như một project Vite tĩnh.
+Sau khi kiểm tra image và biến môi trường, chạy Git deployment hoặc Vercel deploy theo project đã link. Giữ cấu hình Container cho cả web và API.
 
 Kiểm tra trên domain đã xác minh:
 
 1. `/health/live` và `/health/ready` trả 200; `/api/khong-ton-tai` trả JSON 404, không trả HTML SPA.
 2. Mở trực tiếp `/admin` và link `/i/...`; đăng nhập, refresh, đăng xuất. Cookie có Secure/HttpOnly và Origin khớp domain.
-3. Upload một ảnh hợp lệ lớn hơn 4,5 MB qua giao diện. Request chứa file phải đi thẳng tới Storage; API chỉ nhận metadata/uploadId. Thử cả MP3/M4A để xác minh FFmpeg trong image.
+3. Mở thiệp và kiểm tra ảnh chính, sơ đồ, nhạc nền và chặng Người đồng hành dùng đường dẫn `/invitation-assets/`.
 4. Nhập Excel, đổi trang preview, kiểm tra có lỗi ở trang khác vẫn chặn commit; tải report/export hoàn chỉnh.
-5. Xem media ở bản nháp qua URL private có chữ ký; URL không có chữ ký phải bị chặn. Chỉ media đã publish mới có URL public.
+5. Mở bản xem trước trong quản trị và kiểm tra danh sách ảnh, nhạc cố định trong mục Nội dung.
 6. `/api/maintenance` không có Bearer phải trả 401 khi đã cấu hình. Vercel Cron chạy `0 0 * * *` UTC, tương đương 07:00 giờ Việt Nam/Thái Lan; Vercel gửi `CRON_SECRET` trong Authorization.
 
 File tạm hết hạn không còn được xử lý/tải bằng URL đã cấp, nhưng object vật lý có thể tồn tại đến lượt cron kế tiếp. Mỗi lượt cron dọn tối đa 100 object, có giới hạn thời gian; lỗi xóa giữ metadata để retry. Mỗi nhóm database dọn tối đa 1.000 dòng, bỏ qua dòng đang khóa, với lock timeout 250 ms và statement timeout 2 giây; `failedTasks` ghi nhóm cần thử lại. Dọn object chạy trước các nhóm này. Theo dõi số dọn lỗi và lượng tồn đọng; với lượng file lớn hơn khả năng một lượt/ngày, tăng lịch tần suất phù hợp plan trước khi mở rộng sử dụng.
 
 ## 6. Rollback
 
-Giữ deployment/code trước để rollback. Không xóa hai bảng mới trong lúc rollback; dữ liệu cũ vẫn tương thích. Bản code cũ dùng multipart nên không đáp ứng đầy đủ file 10 MB trên Vercel; cần ngừng upload lớn trong thời gian xử lý hoặc trở về hạ tầng trước đó. Không đổi khóa invitation/session khi rollback.
+Giữ deployment và khóa invitation/session để rollback. Nếu đã gỡ `MediaAsset`, phục hồi bảng đó từ bản sao lưu trước khi chuyển về bản ứng dụng còn dùng Thư viện.
 
 Nguồn: [Vercel Container Runtime](https://vercel.com/docs/functions/runtimes/container), [Functions limits](https://vercel.com/docs/functions/limitations), [Supabase S3 compatibility](https://supabase.com/docs/guides/storage/s3/compatibility).

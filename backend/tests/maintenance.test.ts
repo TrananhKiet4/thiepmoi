@@ -28,7 +28,6 @@ it('deletes expired temporary objects, retains failed deletions and leaves live 
  expect(response.status).toBe(200);expect(response.body.data.temporaryObjects).toEqual({deleted:1,failed:1});
  expect(await prisma.temporaryObject.findUnique({where:{id:stale.id}})).toBeNull();
  expect(await prisma.temporaryObject.count({where:{id:{in:[failed.id,active.id]}}})).toBe(2);
- expect(await prisma.mediaAsset.count({where:{eventId:f.event.id}})).toBe(1);
 });
 it('limits each database cleanup batch instead of deleting an entire backlog',async()=>{
  process.env.CRON_SECRET='s'.repeat(40);

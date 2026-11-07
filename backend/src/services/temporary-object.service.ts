@@ -7,11 +7,8 @@ import {AppError} from '../errors/app-error.js';
 import {ownedEvent} from '../utils/http.js';
 import {deleteStored,readStored,storedSize,uploadUrl,putPrivate,privateDownloadUrl} from './storage.service.js';
 
-const inputSchema=z.object({purpose:z.enum(['MEDIA','IMPORT']),name:z.string().min(1).max(255),bytes:z.number().int().positive()}).strict().superRefine((value,ctx)=>{
- const max=value.purpose==='MEDIA'?10:5;
- if(value.bytes>max*1024*1024)ctx.addIssue({code:'custom',path:['bytes'],message:`File tối đa ${max} MB`});
- if(!(value.purpose==='MEDIA'?/\.(jpe?g|png|webp|mp3|m4a)$/i:/\.xlsx$/i).test(value.name))ctx.addIssue({code:'custom',path:['name'],message:'Định dạng file không hợp lệ'});
-});
+const importMaxBytes=5*1024*1024;
+const inputSchema=z.object({purpose:z.literal('IMPORT'),name:z.string().min(1).max(255).regex(/\.xlsx$/i,'Định dạng file không hợp lệ'),bytes:z.number().int().positive().max(importMaxBytes,'File tối đa 5 MB')}).strict();
 export async function createUpload(req:Request,eventId:string,input:unknown){
  await ownedEvent(req,eventId);const value=inputSchema.parse(input);
  if(config.storageDriver==='local')return {mode:'multipart' as const};
@@ -22,18 +19,17 @@ export async function createUpload(req:Request,eventId:string,input:unknown){
  });
  return {mode:'direct' as const,uploadId:id,url:await uploadUrl(storageKey,value.bytes),headers:{'Content-Type':'application/octet-stream'}};
 }
-export async function readUpload(req:Request,eventId:string,id:string,purpose:'MEDIA'|'IMPORT',claim=false){
- const object=await prisma.temporaryObject.findFirst({where:{id:z.string().uuid().parse(id),adminId:req.admin!.id,eventId,purpose}});
+export async function readUpload(req:Request,eventId:string,id:string,claim=false){
+ const object=await prisma.temporaryObject.findFirst({where:{id:z.string().uuid().parse(id),adminId:req.admin!.id,eventId,purpose:'IMPORT'}});
  if(!object)throw new AppError(404,'UPLOAD_NOT_FOUND','Không tìm thấy file tải lên');
  if(object.expiresAt<=new Date()||object.claimedAt)throw new AppError(409,'UPLOAD_EXPIRED','File đã xử lý hoặc hết hạn; vui lòng tải lại');
- const maxBytes=(purpose==='MEDIA'?10:5)*1024*1024;
- if(object.bytes<=0||object.bytes>maxBytes)throw new AppError(413,'UPLOAD_LIMIT','File vượt giới hạn');
+ if(object.bytes<=0||object.bytes>importMaxBytes)throw new AppError(413,'UPLOAD_LIMIT','File vượt giới hạn');
  if(claim){const changed=await prisma.temporaryObject.updateMany({where:{id:object.id,claimedAt:null,expiresAt:{gt:new Date()}},data:{claimedAt:new Date()}});if(!changed.count)throw new AppError(409,'UPLOAD_EXPIRED','File đã xử lý hoặc hết hạn; vui lòng tải lại');}
  try{
   if(await storedSize(object.storageKey)!==object.bytes)throw new AppError(413,'UPLOAD_SIZE','Kích thước file không khớp; vui lòng tải lại');
-  const bytes=await readStored(object.storageKey,false,object.bytes);
+  const bytes=await readStored(object.storageKey,object.bytes);
   if(bytes.length!==object.bytes)throw new AppError(413,'UPLOAD_SIZE','Kích thước file không khớp; vui lòng tải lại');
-  return {bytes,name:object.originalName,uploadId:object.id};
+  return bytes;
  }catch(error){
   if(claim)await deleteStored(object.storageKey).catch(()=>{});
   if(error instanceof AppError)throw error;

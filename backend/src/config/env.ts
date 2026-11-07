@@ -20,11 +20,9 @@ export const config={
  invitationKey,invitationKeyVersion:process.env.INVITATION_KEY_VERSION??'1',invitationOldKeys:oldKeys,
  storageDriver:storageDriver as 'local'|'s3',storageRoot:resolve(process.env.STORAGE_LOCAL_PATH??(production?resolve(tmpdir(),'invitation-media'):'.data/media')),
  storageEndpoint:process.env.STORAGE_ENDPOINT??'',storageRegion:process.env.STORAGE_REGION??'auto',
- storageBucketPrivate:process.env.STORAGE_BUCKET_PRIVATE??'',storageBucketPublic:process.env.STORAGE_BUCKET_PUBLIC??'',
+ storageBucketPrivate:process.env.STORAGE_BUCKET_PRIVATE??'',
  storageAccessKey:process.env.STORAGE_ACCESS_KEY??'',storageSecretKey:process.env.STORAGE_SECRET_KEY??'',
- publicMediaBaseUrl:process.env.PUBLIC_MEDIA_BASE_URL??'',ffmpegPath:process.env.FFMPEG_PATH??'ffmpeg',
  corsOrigins:(process.env.CORS_ORIGINS??origin.origin).split(',').map(s=>s.trim()),
  trustProxy:process.env.TRUST_PROXY==='true'?1:false as false|number
 };
-if(storageDriver==='s3')for(const name of ['storageBucketPrivate','storageBucketPublic','storageAccessKey','storageSecretKey','publicMediaBaseUrl'] as const)if(!config[name])throw new Error(`Missing ${name} for S3`);
-if(config.publicMediaBaseUrl){const url=new URL(config.publicMediaBaseUrl);if(url.protocol!=='https:')throw new Error('Public media base must use HTTPS');}
+if(storageDriver==='s3')for(const name of ['storageBucketPrivate','storageAccessKey','storageSecretKey'] as const)if(!config[name])throw new Error(`Missing ${name} for S3`);

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import ExcelJS from 'exceljs';
 import type { Page } from '@playwright/test';
-import sharp from 'sharp';
+import {demoMediaId} from '@invite/contracts';
 import {fileURLToPath} from 'node:url';
 import {demoContent} from '../backend/prisma/data/demo.js';
 function credentialFromLink(url:string){const [,,code,slug]=new URL(url).pathname.split('/');return code.length===5?code+'.'+slug:code;}
@@ -26,7 +26,7 @@ test('simplified event editor loads legacy drafts clean and exposes Maps instead
  await expect(page.getByLabel('Link Google Maps',{exact:true})).toBeVisible();
  for(const label of ['Vĩ độ','Kinh độ'])await expect(page.getByLabel(label,{exact:true})).toHaveCount(0);
  for(const title of ['Hẹn gặp & chụp ảnh','Hạn tiếp nhận','Lời mở theo nhóm khách'])await expect(page.getByRole('heading',{name:title,exact:true})).toHaveCount(0);
- await expect(page.getByLabel('Tải ảnh sơ đồ trường',{exact:true})).toBeVisible();
+ await expect(page.getByLabel('Chọn ảnh sơ đồ trường',{exact:true})).toBeVisible();
  await expect(page.locator('.editor-status')).toContainText('Tất cả thay đổi đã được lưu');
 });
 
@@ -139,34 +139,31 @@ test('mobile invitation balances headings and plays music on open',async({page},
  }
 });
 
-test('campus map upload preserves concurrent address edits and survives draft save/preview',async({page},testInfo)=>{
- test.setTimeout(120000);
+test('campus map selection survives draft save and renders in preview',async({page},testInfo)=>{
  await page.goto('/admin');await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.'})).toBeVisible();
  const before=(await (await page.request.get('/api/v1/admin/events/current')).json()).data,me=(await (await page.request.get('/api/v1/admin/auth/me')).json()).data;
- let release!:()=>void,reached=false;const hold=new Promise<void>(r=>release=r),pattern='**/api/v1/admin/events/*/media';
- await page.route(pattern,async route=>{if(route.request().method()!=='POST'){await route.continue();return;}const response=await route.fetch();reached=true;await hold;await route.fulfill({response});});
  try{
   await navigate(page,'Nội dung');await page.getByLabel('Link Google Maps',{exact:true}).fill('https://maps.app.goo.gl/School123');
-  await page.getByLabel('Tải ảnh sơ đồ trường',{exact:true}).setInputFiles({name:'campus.png',mimeType:'image/png',buffer:await sharp({create:{width:1200,height:800,channels:3,background:'#d6ddc7'}}).png().toBuffer()});
-  await expect.poll(()=>reached,{timeout:30000}).toBe(true);
-  await page.getByRole('button',{name:'Giao diện & nhạc',exact:true}).click();await page.getByRole('button',{name:'Thông tin sự kiện',exact:true}).click();
-  await expect(page.getByLabel('Tải ảnh sơ đồ trường',{exact:true})).toBeDisabled();await expect(page.getByLabel('Chọn ảnh sơ đồ từ thư viện',{exact:true})).toBeDisabled();
-  await page.getByLabel('Địa chỉ',{exact:true}).fill('Địa chỉ được sửa trong lúc tải sơ đồ');
-  await expect(page.getByRole('button',{name:'Lưu bản nháp',exact:true})).toBeDisabled();release();
-  await expect(page.getByRole('img',{name:'Sơ đồ trường đã chọn',exact:true})).toBeVisible();await expect(page.getByLabel('Địa chỉ',{exact:true})).toHaveValue('Địa chỉ được sửa trong lúc tải sơ đồ');
+  const picker=page.getByLabel('Chọn ảnh sơ đồ trường',{exact:true});
+  await picker.selectOption(demoMediaId);
+  await expect(page.getByRole('img',{name:'Sơ đồ trường đã chọn',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Lưu bản nháp',exact:true}).click();await expect(page.locator('.editor-status')).toContainText('Đã lưu bản nháp');
   const saved=(await (await page.request.get('/api/v1/admin/events/current')).json()).data.draft.contentJson;
-  expect(saved.ceremony.googleMapsUrl).toBe('https://maps.app.goo.gl/School123');expect(saved.ceremony.mapImageAssetId).toBeTruthy();expect(saved.meetup).toBeNull();expect(saved.rsvpDeadline).toBeNull();expect(saved.wishDeadline).toBeNull();expect(saved.groupMessages).toEqual({});expect(saved.ceremony.latitude).toBeUndefined();
+  expect(saved.ceremony.googleMapsUrl).toBe('https://maps.app.goo.gl/School123');expect(saved.ceremony.mapImageAssetId).toBe(demoMediaId);expect(saved.meetup).toBeNull();expect(saved.rsvpDeadline).toBeNull();expect(saved.wishDeadline).toBeNull();expect(saved.groupMessages).toEqual({});expect(saved.ceremony.latitude).toBeUndefined();
   await page.screenshot({path:`.data/qa/map-editor-${testInfo.project.name}.png`,fullPage:true});
   await page.getByRole('button',{name:'Xem trước',exact:true}).click();const dialog=page.getByRole('dialog');await dialog.getByRole('button',{name:'Mở thiệp',exact:true}).click();
-  const map=dialog.locator('.campus-map-image img');await map.scrollIntoViewIfNeeded();await expect.poll(()=>map.evaluate((image:HTMLImageElement)=>image.naturalWidth)).toBeGreaterThan(0);
+  const map=dialog.locator('.campus-map-image img');await map.scrollIntoViewIfNeeded();
+  await expect(map).toHaveAttribute('src','/invitation-assets/photos/demo.webp');
+  await expect.poll(()=>map.evaluate((image:HTMLImageElement)=>image.naturalWidth)).toBeGreaterThan(0);
   await expect(dialog.getByRole('link',{name:'Mở Google Maps',exact:true})).toHaveAttribute('href','https://maps.app.goo.gl/School123');await expect(dialog.locator('iframe')).toHaveCount(0);await expect(dialog.getByText('Hạn phản hồi:',{exact:false})).toHaveCount(0);
   await page.screenshot({path:`.data/qa/campus-map-preview-${testInfo.project.name}.png`});await dialog.getByRole('button',{name:'Đóng',exact:true}).click();
-  await page.reload();await expect(page.getByLabel('Link Google Maps',{exact:true})).toHaveValue('https://maps.app.goo.gl/School123');await expect(page.locator('.editor-status')).toContainText('Tất cả thay đổi đã được lưu');
+  await page.reload();await expect(picker).toHaveValue(demoMediaId);await expect(page.getByLabel('Link Google Maps',{exact:true})).toHaveValue('https://maps.app.goo.gl/School123');await expect(page.locator('.editor-status')).toContainText('Tất cả thay đổi đã được lưu');
  }finally{
-  release();await page.unrouteAll({behavior:'wait'});const current=(await (await page.request.get('/api/v1/admin/events/current')).json()).data;
-  const restored=await page.request.patch(`/api/v1/admin/events/${before.id}/draft`,{headers:{Origin:process.env.APP_ORIGIN!,'X-CSRF-Token':me.csrfToken,'If-Match':String(current.version)},data:{content:before.draft.contentJson}});expect(restored.ok()).toBe(true);
+  const current=(await (await page.request.get('/api/v1/admin/events/current')).json()).data;
+  if(current.draftRevisionId!==before.draftRevisionId){
+   const restored=await page.request.patch(`/api/v1/admin/events/${before.id}/draft`,{headers:{Origin:process.env.APP_ORIGIN!,'X-CSRF-Token':me.csrfToken,'If-Match':String(current.version)},data:{content:before.draft.contentJson}});expect(restored.ok()).toBe(true);
+  }
  }
 });
 
@@ -192,51 +189,14 @@ test('paginated import keeps whole-batch errors blocking commit on every page', 
  await expect(navigation.getByRole('button',{name:'Trang sau',exact:true})).toBeDisabled();
 });
 
-test('media upload uses the prepared local transport and displays a private preview',async({page})=>{
- await page.goto('/admin');await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);
- await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.'})).toBeVisible();
- await navigate(page,'Thư viện');const alt='E2E photo '+Date.now();
- await page.getByLabel('Chọn file').setInputFiles({name:'photo.jpg',mimeType:'image/jpeg',buffer:await sharp({create:{width:120,height:80,channels:3,background:'green'}}).jpeg().toBuffer()});
- await page.getByLabel('Mô tả ảnh / tên bản nhạc').fill(alt);await page.getByRole('button',{name:'Tải lên thư viện',exact:true}).click();
- const image=page.getByRole('img',{name:alt,exact:true});await expect(image).toBeVisible();await expect(image).toHaveAttribute('src',/\/admin\/media\/file\?/);
- await expect.poll(()=>image.evaluate((node:HTMLImageElement)=>node.naturalWidth)).toBe(120);
-});
-
-test('batch media upload keeps successful files and retries only failures, then persists a renamed image',async({page},testInfo)=>{
- test.setTimeout(120000);
- await page.goto('/admin');await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);
- await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.'})).toBeVisible();await navigate(page,'Thư viện');
- const suffix=Date.now().toString(36),names=[`batch-a-${suffix}.jpg`,`batch-b-${suffix}.jpg`,`batch-c-${suffix}.jpg`],buffer=await sharp({create:{width:120,height:160,channels:3,background:'#bbccdd'}}).jpeg().toBuffer();
- let fail=true;
- await page.route('**/api/v1/admin/events/*/media',async route=>{
-  if(fail&&route.request().method()==='POST'&&route.request().postDataBuffer()?.includes(Buffer.from(names[1]))){fail=false;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'TEMPORARY_UPLOAD_ERROR',message:'Tạm thời chưa tải được file'}})});}
-  else await route.continue();
- });
- await expect(page.getByLabel('Chọn file')).toHaveJSProperty('multiple',true);
- await page.getByLabel('Chọn file').setInputFiles(names.map(name=>({name,mimeType:'image/jpeg',buffer})));
- await page.getByRole('button',{name:'Tải lên thư viện',exact:true}).click();
- await expect(page.getByRole('status')).toContainText('Đã tải 2/3 file');await expect(page.locator('.upload-errors')).toContainText(names[1]);
- await page.locator('.upload-panel').screenshot({path:`.data/qa/media-batch-errors-${testInfo.project.name}.png`});
- for(const name of [names[0],names[2]])await expect(page.locator('.media-card').filter({hasText:name})).toHaveCount(1);
- await page.getByRole('button',{name:'Thử lại các file lỗi',exact:true}).click();await expect(page.getByRole('status')).toContainText('Đã tải 1/1 file');
- for(const name of names)await expect(page.locator('.media-card').filter({hasText:name})).toHaveCount(1);
- const card=page.locator('.media-card').filter({hasText:names[0]}),newName='Lễ tốt nghiệp '+suffix;
- await card.getByLabel('Tên hiển thị',{exact:true}).fill(newName);await card.getByLabel('Mô tả thay thế',{exact:true}).fill('Mô tả khác với tên ảnh');
- await card.getByRole('button',{name:'Lưu thay đổi',exact:true}).click();await expect(page.locator('.media-card').filter({hasText:newName}).getByLabel('Tên hiển thị',{exact:true})).toHaveValue(newName);
- await page.reload();await expect(page.locator('.media-card').filter({hasText:newName}).getByLabel('Tên hiển thị',{exact:true})).toHaveValue(newName);
- await page.locator('.media-card').filter({hasText:newName}).screenshot({path:`.data/qa/media-renamed-${testInfo.project.name}.png`});
- expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- await navigate(page,'Nội dung');await expect(page.getByLabel('Chọn ảnh sơ đồ từ thư viện').getByRole('option',{name:newName,exact:true})).toHaveCount(1);
- await page.getByRole('button',{name:'Các chặng thiệp',exact:true}).click();await expect(page.getByLabel('Ảnh chính',{exact:true}).getByRole('option',{name:newName,exact:true})).toHaveCount(1);
-});
-
 test('admin can sign in and navigate all management areas', async ({ page }) => {
   await page.goto('/admin');
   await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL || 'admin@example.test');
   await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD || 'Development-only-123!');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Một ngày đáng nhớ.' })).toBeVisible();
-  for (const [name, title] of [['Nội dung', 'Kể câu chuyện của bạn.'], ['Khách mời', 'Những người đồng hành.'], ['Thư viện', 'Lưu giữ từng khoảnh khắc.'], ['Nhập Excel', 'Danh sách, gọn gàng hơn.'], ['Phản hồi', 'Một lời hẹn, thật gần.'], ['Lời chúc', 'Những lời thương mến.']]) {
+  await expect(page.getByRole('link', { name: 'Thư viện', exact: true, includeHidden: true })).toHaveCount(0);
+  for (const [name, title] of [['Nội dung', 'Kể câu chuyện của bạn.'], ['Khách mời', 'Những người đồng hành.'], ['Nhập Excel', 'Danh sách, gọn gàng hơn.'], ['Phản hồi', 'Một lời hẹn, thật gần.'], ['Lời chúc', 'Những lời thương mến.']]) {
     await navigate(page, name);
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
   }
@@ -253,6 +213,15 @@ test('published guest links receive updates and open feedback without losing typ
   const created=(await (await page.request.post(`/api/v1/admin/events/${before.id}/guests`,{headers,data:{guestCode:'LIVE'+suffix.toUpperCase(),fullName:'Khách cập nhật '+suffix}})).json()).data;
   const link=(await (await page.request.get(`/api/v1/admin/invitations/${created.invitation.id}/link`)).json()).data.url;
   await guestPage.clock.install();await guestPage.goto(link);await guestPage.getByRole('button',{name:'Mở thiệp',exact:true}).click();
+  const gallery=guestPage.locator('#gallery'),photos=gallery.locator('.companion-gallery figure > a');
+  const photoPaths=Array.from({length:30},(_,index)=>`/invitation-assets/photos/companions/${String(index+1).padStart(2,'0')}.webp`);
+  await expect(gallery.getByText('04 / NGƯỜI ĐỒNG HÀNH',{exact:true})).toBeVisible();
+  await expect(photos).toHaveCount(30);
+  expect(await photos.evaluateAll(links=>links.map(link=>link.getAttribute('href')))).toEqual(photoPaths);
+  const images=photos.locator('img');
+  await expect(images).toHaveCount(30);
+  expect(await images.evaluateAll(nodes=>nodes.map(image=>image.getAttribute('src')))).toEqual(photoPaths);
+  expect(await images.evaluateAll(nodes=>nodes.every(image=>getComputedStyle(image).objectFit==='contain'&&image.getAttribute('loading')==='lazy'))).toBe(true);
   await expect(guestPage.getByRole('button',{name:'Gửi xác nhận',exact:true})).toBeDisabled();await expect(guestPage.getByRole('button',{name:'Gửi lời chúc',exact:true})).toBeDisabled();
   await page.reload();await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.',exact:true})).toBeVisible();await navigate(page,'Nội dung');await page.getByLabel('Ngành học',{exact:true}).fill(marker);
   const publish=page.getByRole('button',{name:'Lưu & cập nhật thiệp',exact:true});await expect(publish).toBeVisible();await publish.click();
