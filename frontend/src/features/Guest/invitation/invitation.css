@@ -97,25 +97,17 @@
 .invitation .story-image { height: auto; padding: 13px; background: #fffdf8; border-color: #ded2bd; box-shadow: 4px 8px 20px #67533810; }
 .invitation .story-image>img { aspect-ratio: 4/5; height: auto; }
 .invitation .story-letter { display: block; width: min(780px, 100%); margin: auto; padding: 45px; background: #fffdf8; border: 1px solid #d9cfbf; outline: 1px dashed #ddd1c0; outline-offset: -10px; box-shadow: 4px 8px 20px #6753380b; }
-.invitation .companion-film-controls {
-  max-width: 1100px;
-  margin: 26px auto 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 12px;
-}
-.invitation .companion-film-controls button { min-height: 44px; padding-inline: 6px; }
 .invitation .companion-gallery {
   --film-height: 176px;
+  --film-gap: 8px;
+  --film-duration: 48s;
   position: relative;
   max-width: 1100px;
-  margin: 0 auto;
+  margin: 30px auto 0;
   padding-block: 24px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--film-gap);
   background: #151518;
   border-radius: 3px;
   box-shadow: 0 12px 26px #21223829;
@@ -132,16 +124,26 @@
 .invitation .companion-gallery::before { top: 7px; }
 .invitation .companion-gallery::after { bottom: 7px; }
 .invitation .film-row {
-  display: flex;
   min-width: 0;
-  gap: 8px;
-  padding-inline: 8px;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  scrollbar-width: none;
+  overflow: hidden;
+  overflow: clip;
 }
-.invitation .film-row::-webkit-scrollbar { display: none; }
-.invitation .film-row:focus-visible,
+.invitation .film-track {
+  display: flex;
+  width: max-content;
+  animation: companion-film-loop var(--film-duration) linear infinite;
+}
+.invitation .film-row:nth-child(even) .film-track { animation-direction: reverse; }
+.invitation .film-strip {
+  display: flex;
+  flex: none;
+  gap: var(--film-gap);
+  padding-inline-end: var(--film-gap);
+}
+@keyframes companion-film-loop { to { transform: translateX(-50%); } }
+.invitation .film-row:has(:focus-visible) .film-track { width: 100%; animation: none; }
+.invitation .film-row:has(:focus-visible) .film-strip { width: 100%; flex-wrap: wrap; justify-content: center; padding-inline: var(--film-gap); }
+.invitation .film-row:has(:focus-visible) .film-strip[aria-hidden="true"] { display: none; }
 .invitation .film-row a:focus-visible { outline: 2px solid #fff8e8; outline-offset: -2px; }
 .invitation .film-row figure { flex: 0 0 auto; margin: 0; }
 .invitation .film-row a { display: block; }
@@ -364,11 +366,10 @@
   .invitation .story-item h3 { font-size: 27px; }
   .invitation .story-item>div>p:last-child { font-size: 14px; }
   .invitation .story-letter { display: block; padding: 28px 23px; }
-  .invitation .companion-gallery { --film-height: clamp(86px, 24vw, 132px); gap: 6px; margin-inline: -12px; padding-block: 19px; }
+  .invitation .companion-gallery { --film-height: clamp(86px, 24vw, 132px); --film-gap: 6px; --film-duration: 34s; margin-inline: -12px; padding-block: 19px; }
   .invitation .companion-gallery::before, .invitation .companion-gallery::after { height: 6px; }
   .invitation .companion-gallery::before { top: 6px; }
   .invitation .companion-gallery::after { bottom: 6px; }
-  .invitation .film-row { gap: 6px; padding-inline: 6px; }
   .invitation .invitation-letter { padding: 37px 23px 23px; outline-offset: -8px; }
   .invitation .letter-butterfly { width: 80px; right: -20px; top: -20px; }
   .invitation .guest-recipient strong { font-size: 27px; }
@@ -387,4 +388,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .invitation *, .invitation *::before, .invitation *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .invitation .film-track { width: 100%; }
+  .invitation .film-strip { width: 100%; flex-wrap: wrap; justify-content: center; padding-inline: var(--film-gap); }
+  .invitation .film-strip[aria-hidden="true"] { display: none; }
 }
