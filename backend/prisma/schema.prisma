@@ -105,8 +105,8 @@ model Invitation {
 }
 model InvitationLink {
  codeHash String @id
- invitationId String @db.Uuid
- invitation Invitation @relation(fields:[invitationId],references:[id])
+ invitationId String? @db.Uuid
+ invitation Invitation? @relation(fields:[invitationId],references:[id],onDelete:Restrict)
  tokenHash String
  restoredTokenHash String?
  slug String

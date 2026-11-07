@@ -507,6 +507,33 @@ paths:
         "404": {"$ref":"#/components/responses/Error404"}
         "409": {"$ref":"#/components/responses/Error409"}
         "500": {"$ref":"#/components/responses/Error500"}
+    delete:
+      operationId: "delete_admin_guests_id"
+      tags: ["Administration"]
+      summary: "Xóa vĩnh viễn khách mời và vô hiệu hóa các link"
+      description: "Deletes the owned guest, invitation, RSVP, wish and guest response replays in one transaction. All issued short and legacy links stop working. Short-code hashes stay reserved with identifying link fields removed."
+      security:
+        -
+          AdminCookie: []
+          AdminCsrf: []
+      parameters:
+        - {"$ref":"#/components/parameters/Id"}
+        - {"$ref":"#/components/parameters/Origin"}
+        - {"$ref":"#/components/parameters/Csrf"}
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema: {"$ref":"#/components/schemas/VersionInput"}
+      responses:
+        "204": {"description":"Guest deleted"}
+        "400": {"$ref":"#/components/responses/Error400"}
+        "401": {"$ref":"#/components/responses/Error401"}
+        "403": {"$ref":"#/components/responses/Error403"}
+        "404": {"$ref":"#/components/responses/Error404"}
+        "409": {"$ref":"#/components/responses/Error409"}
+        "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/admin/guests/{id}/archive":
     post:
       operationId: "post_admin_guests_id_archive"

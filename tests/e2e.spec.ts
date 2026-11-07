@@ -401,6 +401,18 @@ test('real Excel invitations, private responses, moderation, link rotation and e
   const current = (await (await page.request.get(`/api/v1/admin/events/${event.id}/guests?q=${first}`)).json()).data.items[0];
   expect(current.invitation.rsvp.status).toBe('ATTENDING');
   expect(current.invitation.wish.body).toBe(wishText + ' — đã chỉnh sửa');
+  const currentLink = (await (await page.request.get(`/api/v1/admin/invitations/${current.invitation.id}/link`)).json()).data.url;
+  const remove = page.getByRole('button', { name: 'Xóa khách mời ' + guestName, exact: true });
+  page.once('dialog', dialog => dialog.dismiss());
+  await remove.click();
+  await expect(remove).toBeVisible();
+  page.once('dialog', dialog => dialog.accept());
+  await remove.click();
+  await expect(page.getByText('Chưa có khách phù hợp.', { exact: false })).toBeVisible();
+  await guestPage.goto(currentLink);
+  await expect(guestPage.getByRole('heading', { name: 'Chưa thể mở thiệp' })).toBeVisible();
+  await guestPage.goto(secondLink);
+  await expect(guestPage.getByRole('heading', { name: otherName, exact: true })).toBeVisible();
 });
 
 test('an unfinished date can be saved as a draft and blocks publication', async ({ page }) => {

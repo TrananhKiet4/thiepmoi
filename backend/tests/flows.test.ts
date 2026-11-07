@@ -1,8 +1,9 @@
 import {beforeEach,describe,expect,it} from 'vitest';
 import request from 'supertest';
-import {randomUUID} from 'node:crypto';
+import {randomBytes,randomUUID} from 'node:crypto';
 import {createApp} from '../src/app.js';
 import {prisma} from '../src/config/database.js';
+import {config} from '../src/config/env.js';
 import {resetTestDatabase,setupTestData,credentialFromLink} from './helpers.js';
 import {vi} from 'vitest';
 import * as tokens from '../src/utils/token.js';
@@ -10,7 +11,7 @@ import * as tokens from '../src/utils/token.js';
 const app=createApp();
 let f:Awaited<ReturnType<typeof setupTestData>>;
 const guest=(method:'get'|'post'|'put'|'patch'|'delete',path:string,token?:string)=>request(app)[method](`/api/v1/guest/${path}`).set('Authorization',`Bearer ${token??f.token}`);
-const admin=(method:'get'|'post'|'put'|'patch',path:string)=>request(app)[method](`/api/v1/admin/${path}`).set('Cookie',f.cookie).set('Origin','http://localhost:5173').set('X-CSRF-Token',f.csrf);
+const admin=(method:'get'|'post'|'put'|'patch'|'delete',path:string)=>request(app)[method](`/api/v1/admin/${path}`).set('Cookie',f.cookie).set('Origin','http://localhost:5173').set('X-CSRF-Token',f.csrf);
 beforeEach(async()=>{await resetTestDatabase();f=await setupTestData();});
 
 describe('published invitation and immutable content',()=>{
@@ -170,6 +171,65 @@ describe('versioned guest responses',()=>{
  });
 });
 describe('admin guest lifecycle and summary',()=>{
+ it('deletes the guest and responses, invalidates every link, and reserves used short codes',async()=>{
+  const linkPath=`invitations/${f.invitation.id}/link`,guestPath=`guests/${f.guest.id}`;
+  const original=credentialFromLink((await admin('get',linkPath)).body.data.url);
+  const renamed=await admin('patch',guestPath).send({
+   guestCode:f.guest.guestCode,fullName:'Khách đổi tên',expectedVersion:1,expectedInvitationVersion:1,
+  });
+  expect(renamed.status).toBe(200);
+  const second=credentialFromLink((await admin('get',linkPath)).body.data.url);
+  await expect(prisma.invitationLink.updateMany({where:{invitationId:f.invitation.id},data:{invitationId:null}})).rejects.toThrow();
+  const rsvpKey=randomUUID(),rsvp={status:'ATTENDING',note:'Có mặt',expectedVersion:0};
+  expect((await guest('put','rsvp',original).set('Idempotency-Key',rsvpKey).send(rsvp)).status).toBe(200);
+  const wish=await guest('put','wish',second).set('Idempotency-Key',randomUUID()).send({body:'Chúc mừng tốt nghiệp',consentPublic:true,expectedVersion:0});
+  expect(wish.status).toBe(200);
+  expect((await admin('patch',`wishes/${wish.body.data.id}/moderation`).send({action:'APPROVE',expectedVersion:1})).status).toBe(200);
+  const other=await setupTestData();
+  const currentVersion=renamed.body.data.version;
+  expect((await request(app).delete(`/api/v1/admin/${guestPath}`).set('Origin','http://localhost:5173').set('Cookie',other.cookie).set('X-CSRF-Token',other.csrf).send({expectedVersion:currentVersion})).status).toBe(404);
+  expect((await admin('delete',guestPath).send({expectedVersion:1})).status).toBe(409);
+  expect((await guest('get','invitation',original)).status).toBe(200);
+
+  expect((await admin('delete',guestPath).send({expectedVersion:currentVersion})).status).toBe(204);
+  expect((await admin('get',`events/${f.event.id}/guests?archived=all`)).body.data.total).toBe(0);
+  expect((await admin('get',`events/${f.event.id}/dashboard`)).body.data.total).toBe(0);
+  expect((await admin('get',linkPath)).status).toBe(404);
+  expect((await admin('delete',guestPath).send({expectedVersion:currentVersion})).status).toBe(404);
+  for(const credential of [original,second,f.token])expect((await guest('get','invitation',credential)).status).toBe(401);
+  expect((await guest('put','rsvp',original).set('Idempotency-Key',rsvpKey).send(rsvp)).status).toBe(401);
+  expect((await guest('get','invitation',other.token)).status).toBe(200);
+  expect(await prisma.invitation.count({where:{id:f.invitation.id}})).toBe(0);
+  expect(await prisma.rSVP.count({where:{invitationId:f.invitation.id}})).toBe(0);
+  expect(await prisma.wish.count({where:{invitationId:f.invitation.id}})).toBe(0);
+  expect(await prisma.idempotencyRecord.count({where:{actorKeyHash:tokens.hashToken(f.invitation.id)}})).toBe(0);
+  expect(await prisma.auditLog.count({where:{entityId:f.guest.id,action:'GUEST_DELETED'}})).toBe(1);
+  const retired=await prisma.invitationLink.findMany({where:{invitationId:null}});
+  expect(retired).toHaveLength(2);
+  for(const alias of retired)expect(alias).toMatchObject({tokenHash:'',restoredTokenHash:null,slug:'',codeCiphertext:'',keyVersion:''});
+
+  const oldCode=original.split('.')[0],newCode=oldCode==='Z9q8R'?'N7k6M':'Z9q8R';
+  const random=vi.spyOn(tokens,'createInvitationLinkCode').mockReturnValueOnce(oldCode).mockReturnValueOnce(newCode);
+  const originalKeys={invitationKey:config.invitationKey,invitationKeyVersion:config.invitationKeyVersion,invitationOldKeys:config.invitationOldKeys};
+  try{
+   Object.assign(config,{invitationKey:randomBytes(32).toString('base64'),invitationKeyVersion:'test-rotated',invitationOldKeys:{}});
+   const replacement=await admin('post',`events/${f.event.id}/guests`).send({guestCode:f.guest.guestCode,fullName:f.guest.fullName});
+   expect(replacement.status).toBe(201);
+   const link=await admin('get',`invitations/${replacement.body.data.invitation.id}/link`);
+   expect(link.status).toBe(200);
+   const credential=credentialFromLink(link.body.data.url);
+   expect(credential.split('.')[0]).toBe(newCode);
+   expect((await guest('get','invitation',credential)).status).toBe(200);
+   expect((await guest('get','invitation',original)).status).toBe(401);
+  }finally{random.mockRestore();Object.assign(config,originalKeys);}
+ });
+ it('handles simultaneous deletes without leaving any active invitation',async()=>{
+  const path=`guests/${f.guest.id}`;
+  const results=await Promise.all([1,2].map(()=>admin('delete',path).send({expectedVersion:f.guest.version})));
+  expect(results.map(result=>result.status).sort()).toEqual([204,404]);
+  expect((await guest('get','invitation')).status).toBe(401);
+  expect(await prisma.auditLog.count({where:{entityId:f.guest.id,action:'GUEST_DELETED'}})).toBe(1);
+ });
  it('creates normalized guests atomically, rejects duplicates, and requires reasons for admin responses',async()=>{
   const created=await admin('post',`events/${f.event.id}/guests`).send({guestCode:'test_2',fullName:'Second guest',phone:'0123456',personalMessage:'Hello'});
   expect(created.status).toBe(201);

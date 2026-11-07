@@ -3,8 +3,10 @@ import {z} from 'zod';
 import type {Prisma} from '@prisma/client';
 import {guestSchema,rsvpSchema,versionSchema} from '../../../packages/contracts/src/index.js';
 import {withTransaction} from '../config/database.js';
+import {config} from '../config/env.js';
+import {AppError} from '../errors/app-error.js';
 import {audit,ok,ownedEvent,pagination} from '../utils/http.js';
-import {createInvitationToken} from '../utils/token.js';
+import {createInvitationToken,decryptInvitationToken,hashToken,retiredInvitationLinkHash} from '../utils/token.js';
 import {conflict,lockEvent} from '../services/event.service.js';
 import type {RequestHandler} from 'express';
 import {uuid,include,safeGuest,guestFilter,adminGuest,adminInvitation,invitationLink} from '../services/guest.service.js';
@@ -32,6 +34,42 @@ export function postAdminGuestsAction(action:'archive'|'restore'):RequestHandler
  const id=uuid.parse(req.params.id),{expectedVersion}=versionSchema.parse(req.body);
  ok(res,await withTransaction(async tx=>{const found=await adminGuest(tx,req,id);await lockEvent(tx,found.eventId);const guest=await adminGuest(tx,req,id);if(guest.version!==expectedVersion)throw conflict();const updated=await tx.guest.update({where:{id,version:expectedVersion},data:{archivedAt:action==='archive'?new Date():null,version:{increment:1}},include});await audit(tx,req,`GUEST_${action.toUpperCase()}`,guest.eventId,'Guest',id);return safeGuest(updated);}));
 };}
+export const deleteAdminGuest:RequestHandler=async(req,res)=>{
+ const id=uuid.parse(req.params.id),{expectedVersion}=versionSchema.parse(req.body);
+ await withTransaction(async tx=>{
+  const guest=await adminGuest(tx,req,id);
+  await lockEvent(tx,guest.eventId);
+  if(guest.version!==expectedVersion)throw conflict();
+  await tx.$queryRaw`SELECT id FROM "Guest" WHERE id=${id}::uuid FOR UPDATE`;
+  if(guest.invitation){
+   const invitationId=guest.invitation.id;
+   await tx.$queryRaw`SELECT id FROM "Invitation" WHERE id=${invitationId}::uuid FOR UPDATE`;
+   const links=await tx.invitationLink.findMany({
+    where:{invitationId},
+    select:{slug:true,codeCiphertext:true,keyVersion:true},
+   });
+   if(links.length){
+    // Retired reservations survive key rotation and never contain active credentials.
+    const retired=links.map(link=>{
+     if(link.keyVersion!==config.invitationKeyVersion&&!Object.hasOwn(config.invitationOldKeys,link.keyVersion)){
+      throw new AppError(409,'LINK_KEY_REQUIRED','Cần khóa mã hóa cũ để xóa các link đã cấp cho khách này');
+     }
+     const code=decryptInvitationToken(invitationId,link.codeCiphertext,link.keyVersion);
+     return {codeHash:retiredInvitationLinkHash(code,link.slug),tokenHash:'',slug:'',codeCiphertext:'',keyVersion:''};
+    });
+    await tx.invitationLink.createMany({data:retired,skipDuplicates:true});
+    await tx.invitationLink.deleteMany({where:{invitationId}});
+   }
+   await tx.rSVP.deleteMany({where:{invitationId}});
+   await tx.wish.deleteMany({where:{invitationId}});
+   await tx.idempotencyRecord.deleteMany({where:{actorKeyHash:hashToken(invitationId),scope:{in:['guest.rsvp','guest.wish']}}});
+   await tx.invitation.delete({where:{id:invitationId}});
+  }
+  await tx.guest.delete({where:{id,version:expectedVersion}});
+  await audit(tx,req,'GUEST_DELETED',guest.eventId,'Guest',id);
+ });
+ res.status(204).end();
+};
 export const getAdminInvitationsLink:RequestHandler=async(req,res)=>{
  ok(res,await withTransaction(async tx=>{const inv=await adminInvitation(tx,req,uuid.parse(req.params.id)),url=await invitationLink(tx,inv,inv.guest.fullName);return {url,message:`Thân mời ${inv.guest.displayName||inv.guest.fullName} xem thiệp mời tốt nghiệp: ${url}`};}));
 };

@@ -6,7 +6,7 @@ import {AppError} from '../errors/app-error.js';
 import {ownedEvent} from '../utils/http.js';
 import {normalizeGroupKey} from '../../../packages/contracts/src/index.js';
 import {config} from '../config/env.js';
-import {createInvitationLinkCode,encryptInvitationToken,decryptInvitationToken,invitationLinkHash,invitationLinkHashes} from '../utils/token.js';
+import {createInvitationLinkCode,encryptInvitationToken,decryptInvitationToken,invitationLinkHash,invitationLinkHashes,retiredInvitationLinkHash} from '../utils/token.js';
 
 export const uuid=z.string().uuid();
 export const include={invitation:{include:{rsvp:true,wish:true}}} as const;
@@ -28,9 +28,12 @@ export async function invitationLink(tx:Tx,invitation:Invitation,fullName:string
   orderBy:[{createdAt:'asc'},{codeHash:'asc'}],
  });
  if(!link){
+  const [current]=await tx.$queryRaw<{id:string}[]>`SELECT id FROM "Invitation" WHERE id=${invitation.id}::uuid FOR KEY SHARE`;
+  if(!current)throw new AppError(404,'NOT_FOUND','Không tìm thấy thiệp');
   for(let attempt=0;attempt<10;attempt++){
    const code=createInvitationLinkCode();
-   if(await tx.invitationLink.findFirst({where:{codeHash:{in:invitationLinkHashes(code,slug)}},select:{codeHash:true}}))continue;
+   const usedHashes=[...invitationLinkHashes(code,slug),retiredInvitationLinkHash(code,slug)];
+   if(await tx.invitationLink.findFirst({where:{codeHash:{in:usedHashes}},select:{codeHash:true}}))continue;
    const encrypted=encryptInvitationToken(invitation.id,code);
    link=await tx.invitationLink.create({data:{...where,codeHash:invitationLinkHash(code,slug),codeCiphertext:encrypted.tokenCiphertext,keyVersion:encrypted.keyVersion}});break;
   }

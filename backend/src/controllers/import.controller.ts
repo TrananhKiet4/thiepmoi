@@ -85,7 +85,10 @@ export const getAdminEventsExports:RequestHandler=async(req,res)=>{
  if(kind==='links')headers.push('invitation_url');else headers.push('rsvp_status','rsvp_note','rsvp_updated_at','wish','consent_public','moderation_status','wish_deleted_at');
  const rows:unknown[][]=[];
  for(const g of guests){const i=g.invitation,row:unknown[]=[g.guestCode,g.fullName,g.displayName,g.groupKey,g.salutation,i?.personalMessage??'',g.email,g.phone,g.archivedAt?.toISOString(),i?.revokedAt?.toISOString()];
-  if(kind==='links')row.push(i?await withTransaction(tx=>invitationLink(tx,i,g.fullName)):'');
+  if(kind==='links'){
+   try{row.push(i?await withTransaction(tx=>invitationLink(tx,i,g.fullName)):'');}
+   catch(error){if(error instanceof AppError&&error.code==='NOT_FOUND')continue;throw error;}
+  }
   else row.push(i?.rsvp?.status??'UNANSWERED',i?.rsvp?.note??'',i?.rsvp?.updatedAt.toISOString(),i?.wish?.body??'',i?.wish?.consentPublic??false,i?.wish?.moderationStatus??'NONE',i?.wish?.deletedAt?.toISOString());rows.push(row);}
  textSheet(book,kind==='links'?'Link thiệp':'Phản hồi',headers,rows);await sendWorkbook(req,res,book,kind==='links'?'link-thiep':'phan-hoi');
 };

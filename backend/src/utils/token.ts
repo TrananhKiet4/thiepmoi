@@ -21,3 +21,4 @@ export function createInvitationLinkCode(){const alphabet='ABCDEFGHIJKLMNOPQRSTU
 export const parseShortCredential=(value:string)=>/^([A-Za-z0-9]{5})\.([a-z0-9-]{1,200})$/.exec(value);
 export const invitationLinkHash=(code:string,slug:string,version=config.invitationKeyVersion)=>createHmac('sha256',key(version)).update('invitation-link:v1\0'+slug+'\0'+code).digest('hex');
 export const invitationLinkHashes=(code:string,slug:string)=>[...new Set([config.invitationKeyVersion,...Object.keys(config.invitationOldKeys)])].map(version=>invitationLinkHash(code,slug,version));
+export const retiredInvitationLinkHash=(code:string,slug:string)=>hashToken('retired-invitation-link:v1\0'+slug+'\0'+code);
