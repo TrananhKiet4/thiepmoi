@@ -202,7 +202,7 @@ test('admin can sign in and navigate all management areas', async ({ page }) => 
   }
 });
 
-test('published guest links receive updates and open feedback without losing typed replies or conflict checks',async({page,context})=>{
+test('published guest links receive updates and open feedback without losing typed replies or conflict checks',async({page,context},testInfo)=>{
  test.setTimeout(180000);
  await page.goto('/admin');await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.',exact:true})).toBeVisible();
@@ -216,12 +216,32 @@ test('published guest links receive updates and open feedback without losing typ
   const gallery=guestPage.locator('#gallery'),photos=gallery.locator('.companion-gallery figure > a');
   const photoPaths=Array.from({length:30},(_,index)=>`/invitation-assets/photos/companions/${String(index+1).padStart(2,'0')}.webp`);
   await expect(gallery.getByText('04 / NGƯỜI ĐỒNG HÀNH',{exact:true})).toBeVisible();
+  const filmRows=gallery.locator('.film-row');
+  await expect(filmRows).toHaveCount(4);
   await expect(photos).toHaveCount(30);
   expect(await photos.evaluateAll(links=>links.map(link=>link.getAttribute('href')))).toEqual(photoPaths);
   const images=photos.locator('img');
   await expect(images).toHaveCount(30);
   expect(await images.evaluateAll(nodes=>nodes.map(image=>image.getAttribute('src')))).toEqual(photoPaths);
   expect(await images.evaluateAll(nodes=>nodes.every(image=>getComputedStyle(image).objectFit==='contain'&&image.getAttribute('loading')==='lazy'))).toBe(true);
+  await guestPage.bringToFront();
+  await filmRows.first().scrollIntoViewIfNeeded();
+  const positions=()=>filmRows.evaluateAll(rows=>rows.map(row=>row.scrollLeft));
+  await expect.poll(async()=>(await positions())[1]).toBeGreaterThan(0);
+  const moving=await positions();
+  await guestPage.clock.runFor(240);
+  const advanced=await positions();
+  expect(advanced[0]).toBeGreaterThan(moving[0]);
+  expect(advanced[1]).toBeLessThan(moving[1]);
+  await gallery.getByRole('button',{name:'Tạm dừng dải ảnh',exact:true}).click();
+  const paused=await positions();
+  await guestPage.clock.runFor(400);
+  expect(await positions()).toEqual(paused);
+  await gallery.locator('.companion-gallery').screenshot({path:`.data/qa/companion-film-${testInfo.project.name}.png`});
+  const playFilm=gallery.getByRole('button',{name:'Chạy dải ảnh',exact:true});
+  await playFilm.click();
+  await guestPage.emulateMedia({reducedMotion:'reduce'});
+  await expect(playFilm).toBeVisible();
   await expect(guestPage.getByRole('button',{name:'Gửi xác nhận',exact:true})).toBeDisabled();await expect(guestPage.getByRole('button',{name:'Gửi lời chúc',exact:true})).toBeDisabled();
   await page.reload();await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.',exact:true})).toBeVisible();await navigate(page,'Nội dung');await page.getByLabel('Ngành học',{exact:true}).fill(marker);
   const publish=page.getByRole('button',{name:'Lưu & cập nhật thiệp',exact:true});await expect(publish).toBeVisible();await publish.click();
