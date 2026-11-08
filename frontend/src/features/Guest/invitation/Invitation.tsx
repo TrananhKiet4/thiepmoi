@@ -173,10 +173,9 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
   case 'invitation':return <div className="invitation-letter">
    <PaperSparkle className="letter-sparkle"/>
    <h2>{s.data.title}</h2>
-   <p className="guest-recipient"><span>{view.guest.recipientGreeting??'Kính gửi'}</span><strong>{view.guest.salutation&&<span className="recipient-salutation">{view.guest.salutation} </span>}{name}</strong></p>
+   <p className="guest-recipient"><span>{view.guest.recipientGreeting??'Kính gửi'}</span><strong>{view.guest.salutation&&<span className="recipient-salutation">{view.guest.salutation} </span>}<span className="recipient-name">{name}</span></strong></p>
    <p className="invite-prose">{s.data.message}</p>
    <GraduationSchedule ceremony={c.ceremony} phone={c.contact?.phone} facebookUrl={c.contact?.facebookUrl}/>
-   <p className="signature">{c.host.fullName}</p>
   </div>;
   case 'map': {
    const location=s.data.locationSource==='MEETUP'&&c.meetup?c.meetup:c.ceremony;
@@ -184,7 +183,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    return <>
     <h2>{s.data.title}</h2>
     <MapView location={location} image={media(location.mapImageAssetId)}/>
-    <p className="invite-prose">{s.data.instructions}<br/>{location.entranceNote}</p>
+    {location.entranceNote&&<p className="invite-prose">{location.entranceNote}</p>}
     {notes.length>0&&<aside className="invitation-notes" aria-label="Lưu ý khi đến dự lễ">
      <p className="eyebrow">THÔNG TIN CẦN BIẾT</p>
      <h3>Một chút lưu ý nhỏ</h3>

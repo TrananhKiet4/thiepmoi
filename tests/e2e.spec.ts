@@ -98,7 +98,16 @@ test('admin edits a guest letter and previews it on the existing link',async({pa
   await dialog.getByRole('button',{name:'Mở thiệp',exact:true}).click();
   await expect(dialog.locator('.invitation-letter h2')).toHaveText('Một lời hẹn riêng');
   await expect(dialog.locator('.guest-recipient strong')).toHaveText(displayName);
+  const recipient=dialog.locator('.guest-recipient strong');
+  await expect.poll(()=>recipient.evaluate(row=>{
+   const box=row.getBoundingClientRect(),name=row.querySelector('.recipient-name')!,salutation=row.querySelector('.recipient-salutation')!;
+   const nameBox=name.getBoundingClientRect(),salutationBox=salutation.getBoundingClientRect();
+   return Math.abs(nameBox.left+nameBox.width/2-(box.left+box.width/2))<=1
+    &&nameBox.left-salutationBox.right>=9
+    &&parseFloat(getComputedStyle(salutation).fontSize)<parseFloat(getComputedStyle(name).fontSize);
+  })).toBe(true);
   await expect(dialog.locator('.invitation-letter > .eyebrow')).toHaveCount(0);
+  await expect(dialog.locator('.invitation-letter > .signature')).toHaveCount(0);
   await guestPage.goto(url);
   await expect(guestPage.locator('.envelope-message')).toHaveText('Lời mở dành riêng');
   await guestPage.getByRole('button',{name:'Mở thiệp',exact:true}).click();
@@ -269,6 +278,7 @@ test('campus map selection survives draft save and renders in preview',async({pa
   await expect(map).toHaveAttribute('src','/invitation-assets/photos/demo.webp');
   await expect.poll(()=>map.evaluate((image:HTMLImageElement)=>image.naturalWidth)).toBeGreaterThan(0);
   await expect(dialog.getByRole('link',{name:'Mở Google Maps',exact:true})).toHaveAttribute('href','https://maps.app.goo.gl/School123');await expect(dialog.locator('iframe')).toHaveCount(0);await expect(dialog.getByText('Hạn phản hồi:',{exact:false})).toHaveCount(0);
+  await expect(dialog.locator('#location > .invite-prose')).toHaveText(saved.ceremony.entranceNote?[saved.ceremony.entranceNote]:[]);
   await expect(dialog.getByRole('heading',{name:'Lưu lại ngày này',exact:true})).toBeVisible();
   await expect(dialog.getByRole('table',{name:'Lịch lễ tốt nghiệp trong tháng',exact:true}).locator('time[data-event-day]')).toHaveCount(1);
   await expect(dialog.getByRole('timer',{name:'Đếm ngược đến lễ tốt nghiệp',exact:true})).toBeVisible();

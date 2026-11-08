@@ -204,7 +204,14 @@
 .invitation .guest-recipient { margin: 0 0 25px; }
 .invitation .guest-recipient > span { display: block; font-size: 12px; margin-bottom: 7px; color: #76685f; }
 .invitation .guest-recipient strong { font: 400 clamp(29px, 4.5vw, 44px)/1.35 "Fz Alpha Brights", var(--invite-heading); color: var(--invite-accent); display: block; text-transform: none; }
-.invitation .recipient-salutation { font-family: "Times New Roman", serif; font-size: .72em; }
+.invitation .guest-recipient strong:has(.recipient-salutation) {
+  display: grid;
+  grid-template-columns: minmax(3.25rem, 1fr) minmax(0, max-content) minmax(3.25rem, 1fr);
+  align-items: center;
+  column-gap: clamp(10px, 1.7vw, 24px);
+}
+.invitation .recipient-salutation { justify-self: end; font: 400 clamp(13px, 1.65vw, 18px)/1.2 "Times New Roman", serif; text-align: right; }
+.invitation .recipient-name { text-wrap: balance; }
 .invitation .event-card { border: 0; border-top: 1px solid #d9cbb7; border-bottom: 1px solid #d9cbb7; border-radius: 0; background: transparent; padding: 28px 12px; margin-bottom: 28px; }
 .invitation .event-card .eyebrow { font-size: 10px; margin-bottom: 8px; }
 .invitation .event-card>svg { margin: 12px auto 18px; }
