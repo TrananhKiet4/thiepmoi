@@ -1,0 +1,3 @@
+ALTER TABLE "Invitation"
+  ADD COLUMN "letterTitle" TEXT NOT NULL DEFAULT '',
+  ADD COLUMN "letterMessage" TEXT NOT NULL DEFAULT '';

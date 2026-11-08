@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
 import type {Prisma} from '@prisma/client';
-import {guestSchema,rsvpSchema,versionSchema} from '../../../packages/contracts/src/index.js';
+import {guestSchema,invitationContentSchema,rsvpSchema,versionSchema} from '../../../packages/contracts/src/index.js';
 import {withTransaction} from '../config/database.js';
 import {config} from '../config/env.js';
 import {AppError} from '../errors/app-error.js';
@@ -72,6 +72,19 @@ export const deleteAdminGuest:RequestHandler=async(req,res)=>{
 };
 export const getAdminInvitationsLink:RequestHandler=async(req,res)=>{
  ok(res,await withTransaction(async tx=>{const inv=await adminInvitation(tx,req,uuid.parse(req.params.id)),url=await invitationLink(tx,inv,inv.guest.fullName);return {url,message:`Thân mời ${inv.guest.displayName||inv.guest.fullName} xem thiệp mời tốt nghiệp: ${url}`};}));
+};
+export const patchAdminInvitationContent:RequestHandler=async(req,res)=>{
+ const id=uuid.parse(req.params.id),{expectedVersion,...data}=invitationContentSchema.parse(req.body);
+ ok(res,await withTransaction(async tx=>{
+  const found=await adminInvitation(tx,req,id);
+  await lockEvent(tx,found.eventId);
+  const invitation=await adminInvitation(tx,req,id);
+  if(invitation.version!==expectedVersion)throw conflict();
+  if(invitation.personalMessage===data.personalMessage&&invitation.letterTitle===data.letterTitle&&invitation.letterMessage===data.letterMessage)return {version:invitation.version};
+  const updated=await tx.invitation.update({where:{id,version:expectedVersion},data:{...data,version:{increment:1}},select:{version:true}});
+  await audit(tx,req,'INVITATION_CONTENT_UPDATED',invitation.eventId,'Invitation',id);
+  return updated;
+ }));
 };
 export function postAdminInvitationsAction(action:'revoke'|'rotate'):RequestHandler{return async(req,res)=>{
  const id=uuid.parse(req.params.id),{expectedVersion}=versionSchema.parse(req.body);

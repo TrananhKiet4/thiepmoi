@@ -50,11 +50,13 @@ export async function invitationView(content:Content,event:Event,guest?:Guest,in
  const sections=content.sections.map(section=>{
   if(section.type!=='invitation')return section;
   const lead=/^\s*(?:mình\s+)?trân trọng mời bạn(?=\s|[.,!]|$)/iu;
-  let message=section.data.message;
-  if(lead.test(message))message=message.replace(lead,()=>`Trân trọng mời ${address}`)
+  let message=invitation?.letterMessage||section.data.message;
+  if(!invitation?.letterMessage&&lead.test(message))message=message.replace(lead,()=>`Trân trọng mời ${address}`)
    .replaceAll('nếu bạn có thời gian',()=>`nếu ${address} có thời gian`)
    .replaceAll('gặp bạn để',()=>`gặp ${address} để`);
-  return {...section,data:{...section.data,message:personalize(message,{...openingVars,salutation:address})}};
+  const vars={...openingVars,salutation:address};
+  const title=invitation?.letterTitle?personalize(invitation.letterTitle,vars):section.data.title;
+  return {...section,data:{title,message:personalize(message,vars)}};
  });
  const previewWishes=preview&&event.wallEnabled?(await readPublicWishes(tx,event.id,6,undefined,invitation?.id)).items:undefined;
  return {content:{...content,sections},media:mediaUrls(content),guest:{displayName,fullName:guest?.fullName??displayName,salutation:openingVars.salutation,recipientGreeting},personalMessage:personalize(template,openingVars),rsvp:rsvpView(invitation?.rsvp),wish:wishView(invitation?.wish),canRsvp:!preview&&canWrite(event.rsvpEnabled,content.rsvpDeadline),canCreateOrEditWish:!preview&&canWrite(event.wishesEnabled,content.wishDeadline),canWithdrawWish:!preview&&!!invitation?.wish&&!invitation.wish.deletedAt,eventId:event.id,wallEnabled:event.wallEnabled,...(preview?{preview:true,previewWishes}:{})};

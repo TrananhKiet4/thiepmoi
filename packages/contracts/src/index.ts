@@ -72,6 +72,7 @@ export const guestSchema=z.object({guestCode:z.string().trim().min(1).max(40).re
 export const rsvpSchema=z.object({status:z.enum(['ATTENDING','DECLINED']),note:text(500).default(''),expectedVersion:z.number().int().min(0)}).strict();
 export const wishSchema=z.object({body:text(1000).min(1),consentPublic:z.boolean(),consentAttendancePublic:z.boolean().optional(),expectedVersion:z.number().int().min(0)}).strict();
 export const versionSchema=z.object({expectedVersion:z.number().int().min(1)}).strict();
+export const invitationContentSchema=versionSchema.extend({personalMessage:text(1000),letterTitle:text(200),letterMessage:text(2000)});
 export function assetIds(content:Content):string[]{
  const ids=new Set<string>();if(content.music.assetId)ids.add(content.music.assetId);
  for(const location of [content.ceremony,content.meetup])if(location?.mapImageAssetId)ids.add(location.mapImageAssetId);

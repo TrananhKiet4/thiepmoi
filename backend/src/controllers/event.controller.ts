@@ -46,7 +46,10 @@ export const patchAdminEventsControls:RequestHandler=async(req,res)=>{
 };
 export const getAdminEventsPreview:RequestHandler=async(req,res)=>{
  ok(res,await withTransaction(async tx=>{
-  const event=await ownedEvent(req,String(req.params.id),tx),revision=event.draftRevisionId?await tx.eventRevision.findFirst({where:{id:event.draftRevisionId,eventId:event.id}}):null;
+  const event=await ownedEvent(req,String(req.params.id),tx);
+  const source=z.enum(['draft','published']).default('draft').parse(req.query.source);
+  const revisionId=source==='published'?(event.publishedRevisionId??event.draftRevisionId):event.draftRevisionId;
+  const revision=revisionId?await tx.eventRevision.findFirst({where:{id:revisionId,eventId:event.id}}):null;
   if(!revision)throw new AppError(404,'DRAFT_REQUIRED','Chưa có bản nháp');
   const guestId=z.string().uuid().optional().parse(req.query.guestId),guest=guestId?await tx.guest.findFirst({where:{id:guestId,eventId:event.id},include:{invitation:{include:{rsvp:true,wish:true}}}}):null;
   if(guestId&&!guest)throw new AppError(404,'NOT_FOUND','Không tìm thấy khách');

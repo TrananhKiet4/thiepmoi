@@ -13,6 +13,48 @@ test('configured admin alias signs in through the username field',async({page})=
  await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.',exact:true})).toBeVisible();
 });
 
+test('admin edits a guest letter and previews it on the existing link',async({page,context})=>{
+ await page.goto('/admin');
+ await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);
+ await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);
+ await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.',exact:true})).toBeVisible();
+ const event=(await (await page.request.get('/api/v1/admin/events/current')).json()).data;
+ const admin=(await (await page.request.get('/api/v1/admin/auth/me')).json()).data;
+ const headers={Origin:process.env.APP_ORIGIN!,'X-CSRF-Token':admin.csrfToken};
+ const name='Khách sửa thiệp '+crypto.randomUUID().slice(0,8);
+ const created=await page.request.post(`/api/v1/admin/events/${event.id}/guests`,{headers,data:{guestCode:'EDIT-'+crypto.randomUUID().slice(0,8),fullName:name}});
+ expect(created.status()).toBe(201);
+ const row=(await created.json()).data;
+ const guestPage=await context.newPage();
+ try{
+  const {data:{url}}=await (await page.request.get(`/api/v1/admin/invitations/${row.invitation.id}/link`)).json();
+  await page.goto('/admin/guests');
+  await page.getByLabel('Tìm khách mời').fill(name);
+  const edit=page.getByRole('button',{name:'Nội dung thiệp của '+name,exact:true});
+  await edit.click();
+  let dialog=page.getByRole('dialog');
+  await dialog.getByLabel('Lời mở phong bì').fill('Lời mở dành riêng');
+  await dialog.getByLabel('Tiêu đề lời mời').fill('Một lời hẹn riêng');
+  await dialog.getByLabel('Nội dung lời mời').fill('Hẹn gặp bạn ở lễ tốt nghiệp.');
+  await dialog.getByRole('button',{name:'Lưu nội dung thiệp',exact:true}).click();
+  await expect(dialog).toHaveCount(0);
+  await edit.click();
+  dialog=page.getByRole('dialog');
+  await dialog.getByRole('button',{name:'Xem thiệp đã lưu',exact:true}).click();
+  await expect(dialog.locator('.envelope-message')).toHaveText('Lời mở dành riêng');
+  await dialog.getByRole('button',{name:'Mở thiệp',exact:true}).click();
+  await expect(dialog.locator('.invitation-letter h2')).toHaveText('Một lời hẹn riêng');
+  await guestPage.goto(url);
+  await expect(guestPage.locator('.envelope-message')).toHaveText('Lời mở dành riêng');
+  await guestPage.getByRole('button',{name:'Mở thiệp',exact:true}).click();
+  await expect(guestPage.locator('.invitation-letter .invite-prose')).toHaveText('Hẹn gặp bạn ở lễ tốt nghiệp.');
+ }finally{
+  await guestPage.close();
+  await page.request.delete(`/api/v1/admin/guests/${row.id}`,{headers,data:{expectedVersion:row.version}});
+ }
+});
+
 test('Vietnamese serif heading renders with one font family instead of mixed fallback glyphs',async({page})=>{
  await page.goto('/admin');await expect(page.getByRole('button',{name:'Đăng nhập',exact:true})).toBeVisible();
  const cdp=await page.context().newCDPSession(page);await cdp.send('DOM.enable');await cdp.send('CSS.enable');const {root}=await cdp.send('DOM.getDocument');

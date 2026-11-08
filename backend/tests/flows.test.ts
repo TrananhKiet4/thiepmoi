@@ -15,6 +15,37 @@ const admin=(method:'get'|'post'|'put'|'patch'|'delete',path:string)=>request(ap
 beforeEach(async()=>{await resetTestDatabase();f=await setupTestData();});
 
 describe('published invitation and immutable content',()=>{
+ it('edits and previews one invitation on its existing guest link',async()=>{
+  const link=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url;
+  const credential=credentialFromLink(link);
+  const original=(await guest('get','invitation',credential)).body.data;
+  const letter=(view:any)=>view.content.sections.find((section:{type:string})=>section.type==='invitation').data;
+  const other=await setupTestData();
+  const path=`invitations/${f.invitation.id}/content`;
+  const data={expectedVersion:f.invitation.version,personalMessage:'Lời mở riêng',letterTitle:'Tiêu đề riêng',letterMessage:'Trân trọng mời {{guestName}} đến dự lễ.'};
+  expect((await admin('patch',`invitations/${other.invitation.id}/content`).send(data)).status).toBe(404);
+  const invalid=await admin('patch',path).send({...data,letterTitle:'x'.repeat(201)});
+  expect(invalid.status).toBe(400);
+  expect(invalid.body.error.code).toBe('VALIDATION_ERROR');
+  expect((await admin('patch',path).send(data)).status).toBe(200);
+  expect((await admin('patch',path).send(data)).status).toBe(409);
+  const current=(await guest('get','invitation',credential)).body.data;
+  expect(current.personalMessage).toBe(data.personalMessage);
+  expect(letter(current)).toEqual({title:data.letterTitle,message:`Trân trọng mời ${current.guest.displayName} đến dự lễ.`});
+  const draft=await prisma.eventRevision.create({data:{eventId:f.event.id,revisionNo:2,contentJson:{...f.content,host:{...f.content.host,fullName:'Chỉ có ở bản nháp'}}}});
+  await prisma.event.update({where:{id:f.event.id},data:{draftRevisionId:draft.id}});
+  const preview=(await admin('get',`events/${f.event.id}/preview?guestId=${f.guest.id}&source=published`)).body.data;
+  expect(preview.preview).toBe(true);
+  expect(preview.content.host.fullName).toBe(current.content.host.fullName);
+  expect(letter(preview)).toEqual(letter(current));
+  expect(preview.canRsvp).toBe(false);
+  expect((await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url).toBe(link);
+  expect((await prisma.invitation.findUniqueOrThrow({where:{id:f.invitation.id}})).openedAt).toBeNull();
+  expect((await admin('patch',path).send({expectedVersion:f.invitation.version+1,personalMessage:'',letterTitle:'',letterMessage:''})).status).toBe(200);
+  const reset=(await guest('get','invitation',credential)).body.data;
+  expect(letter(reset)).toEqual(letter(original));
+  expect(reset.personalMessage).toBe(original.personalMessage);
+ });
  it('uses the recipient’s greeting and honorific in the published invitation',async()=>{
   const message='Mình trân trọng mời bạn đến dự lễ tốt nghiệp. Sau buổi lễ, nếu bạn có thời gian, mình rất muốn gặp bạn để chụp ảnh cùng bạn bè.';
   const content={...f.content,sections:f.content.sections.map(section=>section.type==='invitation'?{...section,data:{...section.data,message}}:section)};

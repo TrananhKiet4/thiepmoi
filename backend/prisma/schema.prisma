@@ -88,6 +88,8 @@ model Invitation {
  guestId String @unique @db.Uuid
  guest Guest @relation(fields:[guestId],references:[id])
  personalMessage String @default("")
+ letterTitle String @default("")
+ letterMessage String @default("")
  tokenHash String @unique
  tokenCiphertext String
  keyVersion String
