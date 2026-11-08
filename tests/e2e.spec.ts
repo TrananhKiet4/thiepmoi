@@ -92,14 +92,25 @@ test('mobile invitation balances headings and plays music on open',async({page},
  await page.route('**/api/v1/guest/opened',route=>route.fulfill({json:{data:{}}}));
  for(const font of ['be-vietnam-pro','lora'] as const){
   content.theme.font=font;
+  const reducedMotion=font==='lora';
+  await page.emulateMedia({reducedMotion:reducedMotion?'reduce':'no-preference'});
   await page.setViewportSize({width:320,height:760});
   await page.goto('/i/'+'x'.repeat(43));
   const audio=page.locator('audio');
   await expect(audio).toHaveJSProperty('paused',true);
+  const invitation=page.locator('.invitation');
+  await expect(invitation.locator('.envelope .paper-sparkle')).toHaveCount(3);
+  await invitation.evaluate(root=>root.addEventListener('animationstart',event=>{
+   if(event.animationName==='envelope-reveal')root.setAttribute('data-envelope-animated','true');
+  }));
   const open=page.getByRole('button',{name:'Mở thiệp',exact:true});
   if(testInfo.project.use.hasTouch)await open.tap();
   else await open.click();
   await expect(page.getByRole('button',{name:'Tắt nhạc',exact:true})).toBeVisible();
+  if(reducedMotion)await expect(invitation).not.toHaveAttribute('data-envelope-animated','true');
+  else await expect(invitation).toHaveAttribute('data-envelope-animated','true');
+  await expect(open).toHaveCount(0);
+  await expect(invitation.locator('.hero-text h1')).toBeFocused();
   await expect.poll(()=>audio.evaluate((player:HTMLAudioElement)=>player.currentTime)).toBeGreaterThan(.05);
   await expect(page.getByRole('link',{name:'Gửi lời hồi đáp',exact:true})).toHaveCSS('position','static');
   await page.evaluate(async()=>{await document.fonts.ready;});

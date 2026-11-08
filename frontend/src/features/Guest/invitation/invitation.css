@@ -25,13 +25,26 @@
 .invitation .eyebrow { font-size: 10px; letter-spacing: 2.5px; }
 .invitation .preview-banner { background: var(--invite-accent); letter-spacing: 1px; }
 .invitation .signature { font-size: 32px; font-style: italic; color: var(--invite-accent); }
-.invitation .paper-butterfly { position: absolute; width: 150px; height: auto; color: var(--invite-blue); pointer-events: none; filter: drop-shadow(3px 8px 5px #3b4c6126); }
-.invitation .butterfly-one { left: 7%; top: 21%; transform: rotate(-24deg); }
-.invitation .butterfly-two { right: 5%; top: 49%; width: 110px; transform: rotate(25deg); }
-.invitation .butterfly-three { bottom: 8%; left: 12%; top: auto; width: 90px; transform: rotate(12deg); }
+.invitation .paper-sparkle { position: absolute; width: 94px; height: auto; color: var(--invite-blue); pointer-events: none; filter: drop-shadow(0 0 7px currentColor); animation: paper-glimmer 4.4s ease-in-out; }
+.invitation .sparkle-one { left: 9%; top: 21%; transform: rotate(-14deg); }
+.invitation .sparkle-two { right: 8%; top: 49%; width: 78px; transform: rotate(18deg); animation-delay: .35s; }
+.invitation .sparkle-three { bottom: 8%; left: 15%; width: 58px; transform: rotate(9deg); animation-delay: .55s; }
+@keyframes paper-glimmer {
+  26% { opacity: .48; translate: 0 -4px; scale: .94; }
+  62% { opacity: 1; translate: 0 -12px; scale: 1.1; }
+}
 
-.invitation .envelope { padding: 55px 24px 35px; min-height: 100svh; background: transparent; }
+.invitation .envelope { --envelope-duration: .9s; padding: 55px 24px 35px; min-height: 100svh; background: transparent; isolation: isolate; }
 .invitation .envelope:before { display: none; }
+.invitation .envelope-panels { position: absolute; inset: 0; z-index: -1; overflow: clip; pointer-events: none; }
+.invitation .envelope-panels::before, .invitation .envelope-panels::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 50%;
+  background: linear-gradient(160deg, #fff8, transparent 80%), var(--envelope-paper, #f1eadd);
+}
+.invitation .envelope-panels::before { --panel-travel: -105%; z-index: 1; box-shadow: 0 3px 12px #53493a1a; }
+.invitation .envelope-panels::after { --panel-travel: 105%; inset: 50% 0 0; }
 .invitation .envelope-heading { line-height: .83; margin-bottom: 30px; position: relative; z-index: 1; font-family: var(--invite-heading); }
 .invitation .envelope-heading span { display: block; font-size: clamp(66px, 10vw, 130px); color: var(--invite-blue); font-style: italic; letter-spacing: -4px; }
 .invitation .envelope-heading em { display: block; font-size: clamp(31px, 4.5vw, 56px); font-weight: 400; margin: 10px 0 0 26%; color: #393943; }
@@ -49,6 +62,26 @@
 .invitation .envelope-message { font-family: var(--invite-heading); color: #625a54; font-size: 17px; max-width: 560px; line-height: 1.7; }
 .invitation .envelope-cover { width: 85px; height: 100px; margin: 7px 0 15px; background: #fffdf8; }
 .invitation .envelope-year { position: static; margin-top: 25px; font-size: 9px; letter-spacing: 4px; color: #7b7264; }
+.invitation .envelope.is-opening { animation: envelope-reveal var(--envelope-duration) ease-in both; }
+.invitation .is-opening .envelope-panels::before, .invitation .is-opening .envelope-panels::after { animation: envelope-part var(--envelope-duration) cubic-bezier(.58, .03, .25, 1) both; }
+.invitation .is-opening .wax-seal { animation: wax-release .48s ease-out both; cursor: default; }
+.invitation .is-opening .envelope-letter { animation: letter-lift var(--envelope-duration) ease-out both; }
+.invitation .is-opening .paper-envelope::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  width: 114px;
+  aspect-ratio: 1;
+  background: radial-gradient(circle, #fffc, #fff6 33%, transparent 70%);
+  pointer-events: none;
+  animation: seal-light .62s ease-out both;
+}
+@keyframes envelope-reveal { 65% { opacity: 1; } to { opacity: 0; } }
+@keyframes envelope-part { 12% { transform: translateY(0); } to { transform: translateY(var(--panel-travel)); } }
+@keyframes wax-release { 27% { transform: translateX(-50%) rotate(0) scale(1.08); } to { transform: translateX(-50%) translateY(10px) rotate(9deg) scale(.84); opacity: 0; } }
+@keyframes letter-lift { 23% { translate: 0 0; } to { translate: 0 -28px; } }
+@keyframes seal-light { from { transform: translateX(-50%) scale(.45); opacity: 0; } 32% { opacity: .75; } to { transform: translateX(-50%) scale(1.7); opacity: 0; } }
 
 .invitation .invite-nav { position: sticky; top: 0; z-index: 25; background: #faf7f0f5; backdrop-filter: blur(12px); padding: 13px 5vw; gap: 24px; border-bottom: 1px solid #d9d1c4; }
 .invitation .invite-brand { display: flex; align-items: center; gap: 10px; color: var(--invite-accent); min-width: 0; max-width: 330px; }
@@ -71,8 +104,8 @@
 .invitation .photo-caption { position: static; display: block; font-family: var(--invite-heading); font-style: italic; font-size: 32px; color: var(--invite-accent); line-height: 1.2; margin-top: 18px; }
 .invitation .photo-placeholder { background: linear-gradient(145deg, #d6e3ee, #b4c9da); color: #59758b; min-height: 240px; aspect-ratio: 4/5; }
 .invitation .photo-placeholder>span { font-size: 9px; letter-spacing: 2px; }
-.invitation .invite-hero .butterfly-one { top: 39%; left: 20%; width: 190px; }
-.invitation .invite-hero .butterfly-two { top: 51%; right: 22%; width: 140px; }
+.invitation .invite-hero .sparkle-one { top: 39%; left: 22%; width: 110px; }
+.invitation .invite-hero .sparkle-two { top: 51%; right: 23%; width: 84px; }
 .invitation .admission-ticket { position: absolute; top: 30%; right: 7%; width: 165px; padding: 18px 12px; background: #e9dbc5; border: 1px dashed #bca383; color: #765e50; transform: rotate(12deg); display: flex; align-items: center; flex-direction: column; gap: 12px; box-shadow: 0 3px 8px #64523e14; }
 .invitation .admission-ticket>span { font-size: 9px; letter-spacing: 1px; }
 .invitation .admission-ticket strong { font-family: var(--invite-heading); font-size: 18px; font-weight: 400; border-top: 1px solid #bca383; padding-top: 12px; }
@@ -83,7 +116,9 @@
 .invitation .hero-subtitle { font-family: var(--invite-heading); font-size: 20px; color: #72605d; margin-bottom: 12px; }
 .invitation .hero-text>p:not(.eyebrow):not(.hero-subtitle) { color: #67636a; font-size: 13px; }
 .invitation .hero-text .text-button { font-size: 12px; margin-top: 0; }
-.invitation .invite-hero { animation: invite-unfold .7s ease both; }
+.invitation .invite-hero :is(.ceremony-heading, .hero-photo, .admission-ticket, .hero-text) { animation: invite-unfold .62s ease-out both; }
+.invitation .invite-hero :is(.hero-photo, .admission-ticket) { animation-delay: .1s; }
+.invitation .invite-hero .hero-text { animation-delay: .2s; }
 
 .invitation .invite-section { padding: 75px 8vw; border-top: 1px dashed #d3c7b5; scroll-margin-top: 110px; }
 .invitation .section-number { font-size: 9px; margin-bottom: 27px; }
@@ -157,7 +192,7 @@
 .invitation .film-row img { display: block; width: auto; max-width: none; height: var(--film-height); object-fit: contain; border-radius: 2px; }
 .invitation .section-invitation { background: #e6edf180; }
 .invitation .invitation-letter { position: relative; max-width: 1100px; padding: 55px 45px 30px; margin: auto; background: #fffdf8; border: 1px solid #dbceba; outline: 1px dashed #d3c4ad; outline-offset: -12px; box-shadow: 5px 10px 25px #67533810; }
-.invitation .letter-butterfly { width: 130px; right: -45px; top: -32px; transform: rotate(15deg); }
+.invitation .letter-sparkle { width: 78px; right: -23px; top: -22px; transform: rotate(15deg); }
 .invitation .guest-recipient { margin: 0 0 25px; }
 .invitation .guest-recipient span { display: block; font-size: 12px; margin-bottom: 7px; color: #76685f; }
 .invitation .guest-recipient strong { font: italic 30px/1.3 var(--invite-heading); color: var(--invite-accent); display: block; }
@@ -330,7 +365,8 @@
   background-color: #f1f6fc;
   color: #243e59;
 }
-.invitation.palette-blue .paper-butterfly { color: #a7c2df; }
+.invitation.palette-blue .envelope { --envelope-paper: #e5eff9; }
+.invitation.palette-blue .paper-sparkle { color: #88aed4; }
 .invitation.palette-blue .envelope-heading em { color: var(--invite-accent); }
 .invitation.palette-blue .paper-envelope { background: #d8e6f3; border-color: var(--blue-line); }
 .invitation.palette-blue .envelope-fold {
@@ -359,7 +395,7 @@
 .invitation.palette-blue .wish-card::before { background: #bfd6ee; }
 .invitation.palette-blue .button.secondary:hover:not(:disabled) { background: var(--blue-tint); }
 
-@keyframes invite-unfold { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes invite-unfold { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }
 @media (max-width: 767px) {
   .invitation :is(.envelope, .invite-hero) { container-type: inline-size; }
   .invitation :is(h1, h2, h3, .photo-caption, .hero-subtitle) { text-wrap: balance; }
@@ -373,9 +409,9 @@
   .invitation .envelope-hint { font-size: 8px; letter-spacing: 1.4px; }
   .invitation .envelope-message { font-size: 16px; padding: 0 5px; }
   .invitation .wax-seal { width: 75px; height: 75px; bottom: 30px; }
-  .invitation .butterfly-one { width: 80px; left: -13px; top: 17%; }
-  .invitation .butterfly-two { width: 70px; right: -12px; top: 53%; }
-  .invitation .butterfly-three { width: 55px; left: 1%; bottom: 7%; }
+  .invitation .sparkle-one { width: 48px; left: 2px; top: 17%; }
+  .invitation .sparkle-two { width: 43px; right: 2px; top: 53%; }
+  .invitation .sparkle-three { width: 32px; left: 3%; bottom: 7%; }
   .invitation .invite-nav {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -400,8 +436,8 @@
   .invitation .hero-photo { width: min(68%, 330px); margin: 0; padding: 10px 10px 14px; border-width: 6px; outline-offset: -9px; }
   .invitation .photo-caption { font-size: clamp(19px, 6vw, 26px); margin-top: 12px; }
   .invitation .hero-photo .photo-placeholder { min-height: 190px; }
-  .invitation .invite-hero .butterfly-one { width: 78px; left: 0; top: 25%; }
-  .invitation .invite-hero .butterfly-two { width: 66px; right: 0; top: 65%; }
+  .invitation .invite-hero .sparkle-one { width: 54px; left: 0; top: 25%; }
+  .invitation .invite-hero .sparkle-two { width: 44px; right: 0; top: 65%; }
   .invitation .admission-ticket { top: 10%; right: 3%; width: clamp(94px, 28%, 116px); padding: 10px 6px; gap: 6px; transform: rotate(8deg); z-index: 3; }
   .invitation .admission-ticket>span { font-size: 8px; letter-spacing: .1px; text-wrap: balance; }
   .invitation .admission-ticket strong { font-size: 10px; padding-top: 7px; white-space: nowrap; }
@@ -425,7 +461,7 @@
   .invitation .companion-gallery::after { bottom: 6px; }
   .invitation .invitation-letter { padding: 37px 23px 23px; outline-offset: -8px; }
   .invitation .footer-details { grid-template-columns: 1fr; gap: 24px; }
-  .invitation .letter-butterfly { width: 80px; right: -20px; top: -20px; }
+  .invitation .letter-sparkle { width: 49px; right: -10px; top: -15px; }
   .invitation .guest-recipient strong { font-size: 27px; }
   .invitation .event-card { padding: 23px 0; }
   .invitation .event-card h3 { font-size: 24px; }
@@ -442,6 +478,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .invitation *, .invitation *::before, .invitation *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .invitation .is-opening .paper-envelope::after { display: none; }
   .invitation .film-track { width: 100%; }
   .invitation .film-strip { width: 100%; flex-wrap: wrap; justify-content: center; padding-inline: var(--film-gap); }
   .invitation .film-strip[aria-hidden="true"] { display: none; }

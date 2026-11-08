@@ -70,7 +70,19 @@ function GuestData({token}:{token:string}) {
   return <><ErrorBox error={query.error}/><Invitation view={query.data!} token={token} save={save}/></>;
 }
 export function Invitation({view,token,save}: {view:InvitationView;token?:string;save?:(path:string,method:string,body?:unknown)=>Promise<any>}) {
- const c=view.content,[opened,setOpened]=useState(false),[playing,setPlaying]=useState(false),[audioError,setAudioError]=useState(''),audio=useRef<HTMLAudioElement>(null),root=useRef<HTMLElement>(null),[volume,setVolume]=useState(()=>{try{const stored=localStorage.getItem('graduation.music.volume');return stored===null?c.music.volume:Math.min(1,Math.max(0,Number(stored)||0));}catch{return c.music.volume;}});
+ const [phase,setPhase]=useState<'closed'|'opening'|'opened'>('closed');
+ const envelope=useRef<HTMLElement>(null);
+ const opened=phase==='opened';
+ const c=view.content,[playing,setPlaying]=useState(false),[audioError,setAudioError]=useState(''),audio=useRef<HTMLAudioElement>(null),root=useRef<HTMLElement>(null),[volume,setVolume]=useState(()=>{try{const stored=localStorage.getItem('graduation.music.volume');return stored===null?c.music.volume:Math.min(1,Math.max(0,Number(stored)||0));}catch{return c.music.volume;}});
+ useEffect(()=>{
+  if(phase!=='opening')return;
+  const animation=envelope.current?.getAnimations?.()[0];
+  if(!animation){setPhase('opened');return;}
+  let active=true;
+  const reveal=()=>{if(active)setPhase('opened');};
+  void animation.finished.then(reveal,reveal);
+  return()=>{active=false;};
+ },[phase]);
  useEffect(()=>{
   if(!opened)return;
   root.current?.scrollIntoView({block:'start',behavior:'instant'});
@@ -100,23 +112,25 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
   else player?.pause();
  }
  function open(){
+  if(phase!=='closed')return;
   // Start playback while the tap still grants media activation on mobile.
   void startMusic();
-  setOpened(true);
+  setPhase('opening');
   if(token)void request('/guest/opened',{method:'POST'},token).catch(()=>{});
  }
  return <main ref={root} className={`invitation palette-${c.theme.palette} font-${c.theme.font}`}>
   {view.preview&&<div className="preview-banner">BẢN XEM TRƯỚC · Phản hồi không được lưu</div>}
   {hasMusic&&<audio ref={el=>{audio.current=el;if(el)el.volume=volume;}} src={media(c.music.assetId)!.url} loop={c.music.loop} preload="metadata"
     onPlay={()=>setPlaying(true)} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)} onError={()=>setPlaying(false)}/>}
-  {!opened?<section className="envelope" aria-label="Phong bì thiệp mời">
-   <Butterfly className="butterfly-one"/><Butterfly className="butterfly-two"/><Butterfly className="butterfly-three"/>
+  {!opened?<section ref={envelope} className={phase==='opening'?'envelope is-opening':'envelope'} aria-label="Phong bì thiệp mời">
+   <div className="envelope-panels" aria-hidden="true"/>
+   <PaperSparkle className="sparkle-one"/><PaperSparkle className="sparkle-two"/><PaperSparkle className="sparkle-three"/>
    <p className="envelope-heading" aria-hidden="true"><span>Graduation</span><em>Invitation</em></p>
    <p className="eyebrow envelope-school">{c.host.university}</p>
    <div className="paper-envelope">
     <div className="envelope-letter"><p className="eyebrow">{opening?.type==='opening'?opening.data.title:'MỘT LỜI MỜI DÀNH RIÊNG CHO'}</p><h1>{name}</h1><p className="signature">{c.host.fullName}</p></div>
     <div className="envelope-fold" aria-hidden="true"/>
-    <button className="wax-seal" aria-label="Mở thiệp" onClick={open}><GraduationCap size={30} strokeWidth={1}/><span>Mở thiệp</span></button>
+    <button className="wax-seal" aria-label="Mở thiệp" aria-disabled={phase==='opening'} onClick={open}><GraduationCap size={30} strokeWidth={1}/><span>Mở thiệp</span></button>
    </div>
    <p className="envelope-hint">CHẠM VÀO CON DẤU ĐỂ MỞ THIỆP</p>
    <p className="envelope-message">{message}</p>
@@ -132,7 +146,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    <section className="invite-hero" id="invitation-top">
     <div className="ceremony-heading" aria-hidden="true"><span>Graduation</span><span>Ceremony</span></div>
     <div className="hero-art">
-     <Butterfly className="butterfly-one"/><Butterfly className="butterfly-two"/>
+     <PaperSparkle className="sparkle-one"/><PaperSparkle className="sparkle-two"/>
      <div className="admission-ticket"><span>YOU'RE INVITED</span><GraduationCap size={24} strokeWidth={1}/><strong>CLASS OF {year}</strong><span>{date(c.ceremony.startAt)}</span></div>
      <figure className="hero-photo">{img(hero?.type==='hero'?hero.data.heroAssetId:null,true)}<figcaption className="photo-caption">{c.host.fullName}</figcaption></figure>
     </div>
@@ -152,7 +166,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    <CompanionFilm/>
   </>;
   case 'invitation':return <div className="invitation-letter">
-   <Butterfly className="letter-butterfly"/>
+   <PaperSparkle className="letter-sparkle"/>
    <p className="eyebrow">TRÂN TRỌNG MỜI</p>
    <h2>{s.data.title}</h2>
    <p className="guest-recipient"><span>Kính gửi</span><strong>{name}</strong></p>
@@ -207,7 +221,13 @@ function InvitationFooter({content,year,mapImage}:{content:Content;year:string;m
   <small>© {year} · {host.fullName}</small>
  </footer>;
 }
-function Butterfly({className}:{className:string}){return <svg className={'paper-butterfly '+className} viewBox="0 0 140 104" fill="none" aria-hidden="true"><g fill="currentColor" stroke="#fffdf7" strokeWidth="1.2"><path d="M69 50C52 7 9-7 7 26C5 49 37 65 69 55ZM68 54C41 51 20 66 34 89C46 110 64 78 70 57ZM71 50C88 7 131-7 133 26C135 49 103 65 71 55ZM72 54C99 51 120 66 106 89C94 110 76 78 70 57Z"/><path d="M69 52 20 19M67 56 39 84M71 52 120 19M73 56 101 84M69 53 14 37M71 53 126 37"/></g><path d="M70 42v29m0-28-7-10m7 10 7-10" stroke="#54738d" strokeWidth="2" strokeLinecap="round"/></svg>;}
+function PaperSparkle({className}:{className:string}){
+ return <svg className={'paper-sparkle '+className} viewBox="0 0 88 84" fill="currentColor" aria-hidden="true">
+  <path d="M41 6C44 27 49 32 70 35C49 39 44 44 41 65C37 44 32 39 11 35C32 32 37 27 41 6Z" stroke="#fffdf8" strokeWidth="1.4"/>
+  <path d="M72 48Q74 59 85 61Q74 63 72 74Q70 63 59 61Q70 59 72 48ZM15 57Q17 65 25 67Q17 69 15 77Q13 69 5 67Q13 65 15 57Z"/>
+  <circle cx="69" cy="15" r="2.5"/><circle cx="24" cy="12" r="1.8"/>
+ </svg>;
+}
 const sectionLabel:Record<string,string>={opening:'LỜI MỞ',hero:'KHOẢNH KHẮC',story:'CHẶNG ĐƯỜNG',gallery:'NGƯỜI ĐỒNG HÀNH',invitation:'MỘT LỜI HẸN',map:'ĐIỂM HẸN',response:'LỜI HỒI ĐÁP',closing:'HẸN GẶP BẠN'};
 function AssetImage({asset,priority,sizes='(max-width: 767px) 86vw, 42vw'}:{asset:MediaView;priority:boolean;sizes?:string}){const [failed,setFailed]=useState(false);useEffect(()=>setFailed(false),[asset.url]);return failed?<div className="photo-placeholder" role="img" aria-label={asset.alt||'Khoảnh khắc đang được cập nhật'}><GraduationCap size={50} strokeWidth={1}/><span>Ảnh tạm thời không hiển thị</span></div>:<img src={asset.url} alt={asset.alt} width={asset.width||1200} height={asset.height||1500} srcSet={asset.srcSet} sizes={sizes} loading={priority?'eager':'lazy'} fetchPriority={priority?'high':'auto'} onError={()=>setFailed(true)}/>;}
 function MapView({location,image}:{location:Content['ceremony'];image?:MediaView}){return <div className="map-card">{image&&<div className="campus-map-image"><a href={image.url} target="_blank" rel="noopener noreferrer" aria-label="Mở ảnh sơ đồ trường đầy đủ"><AssetImage asset={image} priority={false} sizes="90vw"/></a></div>}<h3>{location.venueName}</h3><p>{location.address}</p><div className="row map-actions"><Action run={()=>navigator.clipboard.writeText(location.address)}>Sao chép địa chỉ</Action><a className="button secondary" href={googleMapsLink(location)} target="_blank" rel="noopener noreferrer">Mở Google Maps <ArrowUpRight size={17}/></a></div></div>;}
