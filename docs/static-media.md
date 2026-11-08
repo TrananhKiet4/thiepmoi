@@ -10,12 +10,12 @@ Chặng **04 Người đồng hành** có 60 ô. Hàng 1 chứa ảnh 1–15, h�
 
 1. Đặt ảnh gốc JPEG, PNG hoặc WebP vào thư mục `đồng hành/`. Dùng tên số từ 1 đến 60, chẳng hạn `31.jpg`.
 2. Chạy `node scripts/publish-static-media.mjs` ở thư mục dự án. Lệnh tạo ảnh WebP, đồng bộ lên **Supabase Storage** và cập nhật `packages/contracts/src/companion-photos.ts`. Không có bước ghi ảnh vào bảng PostgreSQL.
-3. Commit danh sách và push lên `codex/wish-card-wall`. Để Vercel tự phát hành bản Production khi push, chọn nhánh này tại **Settings → Environments → Production → Branch Tracking**.
+3. Commit danh sách và push lên `main`, nhánh Production của dự án trên Vercel.
 
    ```powershell
    git add packages/contracts/src/companion-photos.ts
    git commit -m "Cap nhat anh nguoi dong hanh"
-   git push origin codex/wish-card-wall
+   git push origin main
    ```
 
 4. Khi deployment trên Vercel báo **Ready**, tải lại link thiệp. Ảnh gốc và bản WebP nằm ngoài GitHub.

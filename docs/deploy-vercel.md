@@ -2,7 +2,7 @@
 
 Repo `TrananhKiet4/thiepmoi` dùng Root Directory **`.`** và Framework Preset **Container**. Vercel đọc `Dockerfile.vercel` và phục vụ React, Express và các tệp thiệp cùng tên miền.
 
-Project đã tạo trong team `trananhkiet4s-projects`: [thiepmoi](https://vercel.com/trananhkiet4s-projects/thiepmoi), ID `prj_8BdA2pnWHjvoJBQRW8Y6Jz9m1Wft`, Container preset/Node 24. Production hoạt động tại `https://thiepmoi-murex.vercel.app`, deployment `dpl_4yGsMJtj5cZge537YfqZxyUMLPUy`, mã ứng dụng commit `5725bcd` trên nhánh `codex/vercel-container`. Profile local đã cập nhật đúng origin; file import 22 biến Production là `.data/vercel-production.env`, ngoài Git, đã loại bootstrap password và DIRECT_URL. Các biến chỉ áp dụng Production, dùng `APP_STORAGE_DRIVER` để tránh trùng tên biến riêng của Buildah.
+Project [thiepmoi](https://vercel.com/trananhkiet4s-projects/thiepmoi) dùng Container preset và Node 24. Production chạy tại [tak-thiepmoi.vercel.app](https://tak-thiepmoi.vercel.app/). Vercel đã kết nối repo GitHub và theo dõi nhánh `main` tại **Settings → Environments → Production → Branch Tracking**. File `.data/vercel-production.env` nằm ngoài Git và chứa cấu hình dùng khi import biến Production.
 
 Container Runtime đang Beta. Cấu hình đã chuẩn bị; chỉ phát hành sau khi kiểm tra image Linux và duyệt kết quả. Không chạy database migration hoặc bootstrap admin trong Docker build.
 
@@ -23,7 +23,7 @@ docker build -f Dockerfile.vercel -t thiepmoi:verify .
 
 E2E dùng database `invitations_e2e`, web port 4174 và API port 4401; không dùng lại server khác trên máy. Dừng dev server của chính repo trước `npm ci` để tránh Windows khóa file native. Không dừng toàn bộ process Node trên máy.
 
-Review thay đổi trên nhánh `codex/vercel-container` và đưa vào nhánh production đã chọn trước khi kết nối Git deployment. Không commit `.env.production.local`, `.env.e2e` hoặc `.data`.
+Review thay đổi trước khi đưa vào `main`. Không commit `.env.production.local`, `.env.e2e` hoặc `.data`.
 
 ## 2. Tạo/link project trước, chưa phát hành
 
@@ -74,7 +74,7 @@ node --env-file=.env.production.local node_modules/prisma/build/index.js migrate
 
 ## 5. Deploy và kiểm tra
 
-Sau khi kiểm tra image và biến môi trường, chạy Git deployment hoặc Vercel deploy theo project đã link. Giữ cấu hình Container cho cả web và API.
+Sau khi kiểm tra thay đổi, chạy `git push origin main` hoặc merge pull request vào `main`. Vercel dùng tích hợp Git để build container và tạo deployment Production. Kiểm tra commit mới trong **Deployments** và đợi trạng thái **Ready** trước khi thử lại thiệp.
 
 Kiểm tra trên domain đã xác minh:
 
