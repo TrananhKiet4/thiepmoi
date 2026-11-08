@@ -169,7 +169,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    <PaperSparkle className="letter-sparkle"/>
    <p className="eyebrow">TRÂN TRỌNG MỜI</p>
    <h2>{s.data.title}</h2>
-   <p className="guest-recipient"><span>Kính gửi</span><strong>{name}</strong></p>
+   <p className="guest-recipient"><span>{view.guest.recipientGreeting??'Kính gửi'}</span><strong>{name}</strong></p>
    <p className="invite-prose">{s.data.message}</p>
    <GraduationSchedule ceremony={c.ceremony} phone={c.contact?.phone} calendarAction={token&&
     <Action run={()=>download('/guest/calendar.ics','loi-moi-tot-nghiep.ics',token)}><CalendarDays size={16}/> Thêm vào lịch</Action>

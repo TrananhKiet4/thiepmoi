@@ -15,6 +15,28 @@ const admin=(method:'get'|'post'|'put'|'patch'|'delete',path:string)=>request(ap
 beforeEach(async()=>{await resetTestDatabase();f=await setupTestData();});
 
 describe('published invitation and immutable content',()=>{
+ it('uses the recipient’s greeting and honorific in the published invitation',async()=>{
+  const message='Mình trân trọng mời bạn đến dự lễ tốt nghiệp. Sau buổi lễ, nếu bạn có thời gian, mình rất muốn gặp bạn để chụp ảnh cùng bạn bè.';
+  const content={...f.content,sections:f.content.sections.map(section=>section.type==='invitation'?{...section,data:{...section.data,message}}:section)};
+  const revision=await prisma.eventRevision.create({data:{eventId:f.event.id,revisionNo:2,contentJson:content}});
+  await prisma.event.update({where:{id:f.event.id},data:{publishedRevisionId:revision.id}});
+  for(const [groupKey,salutation,displayName,greeting,address] of [
+   ['club','Anh','Anh Khách','Kính gửi','anh'],
+   ['club','Chị hai','Chị hai Khách','Kính gửi','chị hai'],
+   ['club','Bạn','Bạn Khách','Thân gửi','bạn'],
+   ['club','Em','Em Khách','Thân gửi','em'],
+   ['club','','Thím iu','Kính gửi','Thím iu'],
+   ['gia_dinh','','Đại gia đình thương yêu','Thương gửi','đại gia đình'],
+   ['gia_dinh','Em yêu','Em yêu Khách','Thương gửi','em yêu'],
+  ]){
+   await prisma.guest.update({where:{id:f.guest.id},data:{groupKey,salutation,displayName}});
+   const response=await guest('get','invitation');
+   expect(response.status).toBe(200);
+   expect(response.body.data.guest.recipientGreeting).toBe(greeting);
+   expect(response.body.data.content.sections.find((section:{type:string})=>section.type==='invitation').data.message)
+    .toBe(`Trân trọng mời ${address} đến dự lễ tốt nghiệp. Sau buổi lễ, nếu ${address} có thời gian, mình rất muốn gặp ${address} để chụp ảnh cùng bạn bè.`);
+  }
+ });
  it('issues a stable five-character named link while keeping the original capability valid',async()=>{
   await prisma.guest.update({where:{id:f.guest.id},data:{fullName:'Đặng Thị Ánh',displayName:'Bạn Ánh'}});
   const first=await admin('get',`invitations/${f.invitation.id}/link`);expect(first.status).toBe(200);
