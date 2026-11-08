@@ -56,7 +56,7 @@ export const getAdminEventsPreview:RequestHandler=async(req,res)=>{
 export const getAdminEventsDashboard:RequestHandler=async(req,res)=>{
  ok(res,await withTransaction(async tx=>{
   const event=await ownedEvent(req,String(req.params.id),tx),where={eventId:event.id,revokedAt:null,guest:{archivedAt:null}};
-  const [total,attending,declined,pendingWishes,opened]=await Promise.all([tx.invitation.count({where}),tx.invitation.count({where:{...where,rsvp:{status:'ATTENDING'}}}),tx.invitation.count({where:{...where,rsvp:{status:'DECLINED'}}}),tx.wish.count({where:{deletedAt:null,consentPublic:true,moderationStatus:'PENDING',invitation:where}}),tx.invitation.count({where:{...where,openedAt:{not:null}}})]);
-  return {total,attending,declined,unanswered:total-attending-declined,pendingWishes,opened};
+  const [total,attending,declined,publicWishes,opened]=await Promise.all([tx.invitation.count({where}),tx.invitation.count({where:{...where,rsvp:{status:'ATTENDING'}}}),tx.invitation.count({where:{...where,rsvp:{status:'DECLINED'}}}),tx.wish.count({where:{deletedAt:null,consentPublic:true,moderationStatus:'APPROVED',approvedAt:{not:null},invitation:where}}),tx.invitation.count({where:{...where,openedAt:{not:null}}})]);
+  return {total,attending,declined,unanswered:total-attending-declined,publicWishes,opened};
  }));
 };

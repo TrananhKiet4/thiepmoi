@@ -351,7 +351,7 @@ paths:
       operationId: "get_admin_events_id_dashboard"
       tags: ["Administration"]
       summary: "Thống kê hiện trạng thiệp đang hoạt động"
-      description: "Excludes archived guests and revoked invitations. attending + declined + unanswered = total. opened counts distinct active invitations, not repeat opens. Pending wishes are consenting, undeleted and attached to active invitations."
+      description: "Excludes archived guests and revoked invitations. attending + declined + unanswered = total. opened counts distinct active invitations. publicWishes counts undeleted, consenting wishes with APPROVED status and a publication timestamp."
       security:
         -
           AdminCookie: []
@@ -883,7 +883,7 @@ paths:
       operationId: "put_guest_wish"
       tags: ["Guest"]
       summary: "Tạo/sửa/khôi phục lời chúc của mình"
-      description: "Independent of RSVP, including DECLINED. Requires wishesEnabled and server time before wishDeadline when set. consentPublic=false becomes NONE; true becomes PENDING. Every save clears pin/approval. Resubmitting a soft-deleted Wish restores the same record using its current deleted version."
+      description: "Independent of RSVP, including DECLINED. Requires wishesEnabled and server time before wishDeadline when set. Consenting wishes publish immediately as APPROVED with the current approvedAt and no approving admin. Private wishes stay off the wall. An admin-hidden wish stays HIDDEN across edits and consent changes. Every save clears the pin. Resubmitting a soft-deleted Wish restores the same record using its current deleted version."
       security:
         -
           GuestBearer: []
@@ -984,7 +984,7 @@ paths:
       operationId: "get_guest_wishes"
       tags: ["Guest"]
       summary: "Bức tường lời chúc theo cursor"
-      description: "Approved public wishes from other guests in this event. Archived guests, revoked invitations and deleted wishes are excluded. Attendance status requires separate consent. wallEnabled=false returns empty items and null cursor. Sort order is isPinned DESC, approvedAt DESC, id DESC."
+      description: "Public wishes from other guests in this event. Archived guests, revoked invitations and deleted wishes are excluded. Attendance status requires separate consent. wallEnabled=false returns empty items and null cursor. Sort order is isPinned DESC, approvedAt DESC, id DESC."
       security:
         -
           GuestBearer: []
@@ -1102,8 +1102,8 @@ paths:
     patch:
       operationId: "patch_admin_wishes_id_moderation"
       tags: ["Wishes"]
-      summary: "Duyệt hoặc ẩn đúng phiên bản lời chúc"
-      description: "No admin endpoint edits wish text or grants consent. APPROVE requires consent, no deletion, no archive/revocation. HIDE clears pin/approval; a nonconsenting Wish remains NONE. Deleted wishes cannot be moderated. Requires the current Wish version."
+      summary: "Ẩn hoặc hiện lại lời chúc"
+      description: "APPROVE displays a HIDDEN or legacy PENDING wish with public consent and an active invitation and guest. HIDE clears the pin and publication timestamp and preserves an existing hidden state. Deleted wishes cannot be moderated. Requires the current Wish version."
       security:
         -
           AdminCookie: []
@@ -1117,7 +1117,7 @@ paths:
         content:
           "application/json":
             schema: {"$ref":"#/components/schemas/ModerationInput"}
-            example: {"action":"APPROVE","expectedVersion":1}
+            example: {"action":"APPROVE","expectedVersion":2}
       responses:
         "200":
           description: "Success"
@@ -1146,7 +1146,7 @@ paths:
       operationId: "patch_admin_wishes_id_pin"
       tags: ["Wishes"]
       summary: "Ghim hoặc bỏ ghim lời chúc"
-      description: "Pin=true requires consentPublic=true, APPROVED, undeleted and an active invitation/guest. Uses current Wish version. Guest editing/withdrawal/deletion removes public visibility and pin."
+      description: "Pin=true requires consentPublic=true, APPROVED, undeleted and an active invitation/guest. Uses current Wish version. Guest editing clears the pin. Withdrawing consent or deleting the wish removes it from the wall."
       security:
         -
           AdminCookie: []
@@ -1997,6 +1997,7 @@ components:
               type: "string"
               enum: ["CEREMONY","MEETUP"]
             instructions: {"type":"string","maxLength":1000}
+            notes: {"type":"string","maxLength":2400,"description":"One note per line. Omit to use the default notes."}
           required: ["title","locationSource","instructions"]
       required: ["id","enabled","order","type","data"]
     ResponseSection:
@@ -2041,6 +2042,11 @@ components:
             major: {"type":"string","maxLength":200}
             cohort: {"type":"string","maxLength":80}
           required: ["fullName","university","major"]
+        contact:
+          type: "object"
+          properties:
+            phone: {"type":"string","maxLength":30,"default":""}
+            facebookUrl: {"type":"string","maxLength":2048,"default":"","description":"HTTPS Facebook profile link."}
         ceremony: {"$ref":"#/components/schemas/Location"}
         meetup:
           deprecated: true
@@ -2551,9 +2557,9 @@ components:
         attending: {"type":"integer","minimum":0}
         declined: {"type":"integer","minimum":0}
         unanswered: {"type":"integer","minimum":0}
-        pendingWishes: {"type":"integer","minimum":0}
+        publicWishes: {"type":"integer","minimum":0}
         opened: {"type":"integer","minimum":0}
-      required: ["total","attending","declined","unanswered","pendingWishes","opened"]
+      required: ["total","attending","declined","unanswered","publicWishes","opened"]
     PublicWish:
       type: "object"
       properties:

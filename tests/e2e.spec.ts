@@ -145,18 +145,33 @@ test('campus map selection survives draft save and renders in preview',async({pa
  const before=(await (await page.request.get('/api/v1/admin/events/current')).json()).data,me=(await (await page.request.get('/api/v1/admin/auth/me')).json()).data;
  try{
   await navigate(page,'Nội dung');await page.getByLabel('Link Google Maps',{exact:true}).fill('https://maps.app.goo.gl/School123');
+  await page.getByLabel('Số điện thoại công khai',{exact:true}).fill('0900000000');
+  await page.getByLabel('Link Facebook công khai',{exact:true}).fill('https://www.facebook.com/test.contact');
   const picker=page.getByLabel('Chọn ảnh sơ đồ trường',{exact:true});
   await picker.selectOption(demoMediaId);
   await expect(page.getByRole('img',{name:'Sơ đồ trường đã chọn',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Lưu bản nháp',exact:true}).click();await expect(page.locator('.editor-status')).toContainText('Đã lưu bản nháp');
   const saved=(await (await page.request.get('/api/v1/admin/events/current')).json()).data.draft.contentJson;
+  expect(saved.contact).toEqual({phone:'0900000000',facebookUrl:'https://www.facebook.com/test.contact'});
   expect(saved.ceremony.googleMapsUrl).toBe('https://maps.app.goo.gl/School123');expect(saved.ceremony.mapImageAssetId).toBe(demoMediaId);expect(saved.meetup).toBeNull();expect(saved.rsvpDeadline).toBeNull();expect(saved.wishDeadline).toBeNull();expect(saved.groupMessages).toEqual({});expect(saved.ceremony.latitude).toBeUndefined();
   await page.screenshot({path:`.data/qa/map-editor-${testInfo.project.name}.png`,fullPage:true});
+  if(testInfo.project.name==='mobile')await page.setViewportSize({width:320,height:760});
   await page.getByRole('button',{name:'Xem trước',exact:true}).click();const dialog=page.getByRole('dialog');await dialog.getByRole('button',{name:'Mở thiệp',exact:true}).click();
   const map=dialog.locator('.campus-map-image img');await map.scrollIntoViewIfNeeded();
   await expect(map).toHaveAttribute('src','/invitation-assets/photos/demo.webp');
   await expect.poll(()=>map.evaluate((image:HTMLImageElement)=>image.naturalWidth)).toBeGreaterThan(0);
   await expect(dialog.getByRole('link',{name:'Mở Google Maps',exact:true})).toHaveAttribute('href','https://maps.app.goo.gl/School123');await expect(dialog.locator('iframe')).toHaveCount(0);await expect(dialog.getByText('Hạn phản hồi:',{exact:false})).toHaveCount(0);
+  await expect(dialog.getByRole('heading',{name:'Lưu lại ngày này',exact:true})).toBeVisible();
+  await expect(dialog.getByRole('table',{name:'Lịch lễ tốt nghiệp trong tháng',exact:true}).locator('time[data-event-day]')).toHaveCount(1);
+  await expect(dialog.getByRole('timer',{name:'Đếm ngược đến lễ tốt nghiệp',exact:true})).toBeVisible();
+  const schedule=dialog.locator('.graduation-schedule');
+  expect(await schedule.evaluate(element=>element.scrollWidth<=element.clientWidth+1)).toBe(true);
+  await schedule.screenshot({path:`.data/qa/graduation-schedule-${testInfo.project.name}.png`});
+  await expect(dialog.getByRole('heading',{name:'Một chút lưu ý nhỏ',exact:true})).toBeVisible();
+  const footer=dialog.locator('.scrapbook-footer');
+  await expect(footer.getByRole('link',{name:'0900000000',exact:true})).toHaveAttribute('href','tel:0900000000');
+  await expect(footer.getByRole('link',{name:'Facebook',exact:true})).toHaveAttribute('href','https://www.facebook.com/test.contact');
+  await expect(footer.getByRole('link',{name:'Mở Google Maps từ chân thiệp',exact:true})).toHaveAttribute('href','https://maps.app.goo.gl/School123');
   await page.screenshot({path:`.data/qa/campus-map-preview-${testInfo.project.name}.png`});await dialog.getByRole('button',{name:'Đóng',exact:true}).click();
   await page.reload();await expect(picker).toHaveValue(demoMediaId);await expect(page.getByLabel('Link Google Maps',{exact:true})).toHaveValue('https://maps.app.goo.gl/School123');await expect(page.locator('.editor-status')).toContainText('Tất cả thay đổi đã được lưu');
  }finally{
@@ -386,7 +401,7 @@ test('real Excel invitations, private responses, moderation, link rotation and e
   await guestPage.getByLabel('Tôi đồng ý hiển thị tên và lời chúc').check();
   await guestPage.getByLabel('Hiển thị trạng thái tham dự cùng lời chúc').check();
   await guestPage.getByRole('button', { name: 'Gửi lời chúc', exact: true }).click();
-  await expect(guestPage.getByText('Lời chúc đã được lưu và đang chờ duyệt. Cảm ơn bạn!', { exact: true })).toBeVisible();
+  await expect(guestPage.getByText('Lời chúc đã được đăng. Cảm ơn bạn!', { exact: true })).toBeVisible();
   await guestPage.evaluate(path => { history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate')); }, new URL(secondLink).pathname);
   await expect(guestPage.getByRole('heading', { name: otherName, exact: true })).toBeVisible();
   await expect(guestPage.getByText(guestName, { exact: true })).toHaveCount(0);
@@ -397,10 +412,8 @@ test('real Excel invitations, private responses, moderation, link rotation and e
   await expect(guestPage.locator('.guest-form').first().getByRole('status')).toHaveCount(0);
   await navigate(page, 'Lời chúc');
   const card = page.locator('.moderation-card').filter({ hasText: wishText });
-  await card.getByRole('button', { name: 'Duyệt', exact: true }).click();
-  await expect(card).toHaveCount(0);
-  await guestPage.reload();
-  await guestPage.getByRole('button', { name: 'Mở thiệp', exact: true }).click();
+  await expect(card).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Duyệt', exact: true })).toHaveCount(0);
   const wishCard = guestPage.getByRole('region', { name: 'Lời chúc của khách mời' })
     .locator('.wish-card').filter({ hasText: wishText });
   await expect(wishCard.getByText(wishText, { exact: true })).toBeVisible();
@@ -411,9 +424,7 @@ test('real Excel invitations, private responses, moderation, link rotation and e
   await guestPage.getByLabel('Lời chúc của bạn', { exact: true }).fill(secondWish);
   await guestPage.getByLabel('Tôi đồng ý hiển thị tên và lời chúc').check();
   await guestPage.getByRole('button', { name: 'Gửi lời chúc', exact: true }).click();
-  await expect(guestPage.getByText('Lời chúc đã được lưu và đang chờ duyệt. Cảm ơn bạn!', { exact: true })).toBeVisible();
-  await page.reload();
-  await page.locator('.moderation-card').filter({ hasText: secondWish }).getByRole('button', { name: 'Duyệt', exact: true }).click();
+  await expect(guestPage.getByText('Lời chúc đã được đăng. Cảm ơn bạn!', { exact: true })).toBeVisible();
   await guestPage.goto(thirdLink);
   await guestPage.getByRole('button', { name: 'Mở thiệp', exact: true }).click();
   const strip = guestPage.getByRole('region', { name: 'Lời chúc của khách mời' });
@@ -436,12 +447,12 @@ test('real Excel invitations, private responses, moderation, link rotation and e
   await expect(guestPage.locator('.wish-wall').getByText(wishText, { exact: true })).toHaveCount(0);
   await guestPage.getByLabel('Lời chúc của bạn', { exact: true }).fill(wishText + ' — đã chỉnh sửa');
   await guestPage.getByRole('button', { name: 'Gửi lời chúc', exact: true }).click();
-  await expect(guestPage.getByText('Lời chúc đã được lưu và đang chờ duyệt. Cảm ơn bạn!', { exact: true })).toBeVisible();
+  await expect(guestPage.getByText('Lời chúc đã được đăng. Cảm ơn bạn!', { exact: true })).toBeVisible();
   await guestPage.goto(secondLink);
   await guestPage.getByRole('button', { name: 'Mở thiệp', exact: true }).click();
   await expect(guestPage.locator('.wish-wall').getByText('Đang tải lời chúc…')).toHaveCount(0);
   await expect(guestPage.locator('.wish-wall').getByText(wishText, { exact: true })).toHaveCount(0);
-  await expect(guestPage.locator('.wish-wall').getByText(wishText + ' — đã chỉnh sửa', { exact: true })).toHaveCount(0);
+  await expect(guestPage.locator('.wish-wall').getByText(wishText + ' — đã chỉnh sửa', { exact: true })).toBeVisible();
   await navigate(page, 'Khách mời');
   await page.getByRole('textbox', { name: 'Tìm khách mời' }).fill(first);
   await page.getByRole('button', { name: 'Lấy link ' + guestName, exact: true }).click();

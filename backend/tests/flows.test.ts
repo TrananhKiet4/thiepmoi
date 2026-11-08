@@ -89,7 +89,7 @@ describe('versioned guest responses',()=>{
   expect(outcomes.map(r=>r.status).sort()).toEqual([200,409]);
   expect(await prisma.rSVP.count()).toBe(1);
  });
- it('removes edited, withdrawn and deleted wishes from the wall, including after writes close',async()=>{
+ it('publishes consented wishes on create and edit and allows withdrawal after writes close',async()=>{
   const viewer=await admin('post',`events/${f.event.id}/guests`).send({guestCode:'WALL-VIEWER',fullName:'Wall viewer'});
   expect(viewer.status).toBe(201);
   const link=await admin('get',`invitations/${viewer.body.data.invitation.id}/link`);
@@ -97,22 +97,47 @@ describe('versioned guest responses',()=>{
   const saved=await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'Congratulations',consentPublic:true,expectedVersion:0});
   expect(saved.status).toBe(200);
   const wish=saved.body.data;
+  expect(wish).toMatchObject({moderationStatus:'APPROVED',approvedAt:expect.any(String),version:1});
   expect(wish).not.toHaveProperty('invitationId');
   expect(wish).not.toHaveProperty('approvedBy');
-  expect((await admin('patch',`wishes/${wish.id}/moderation`).send({action:'APPROVE',expectedVersion:1})).status).toBe(200);
-  expect((await guest('get','wishes',token)).body.data.items).toHaveLength(1);
+  expect((await prisma.wish.findUniqueOrThrow({where:{id:wish.id}})).approvedBy).toBeNull();
+  expect((await guest('get','wishes',token)).body.data.items[0]).toMatchObject({body:'Congratulations'});
+  expect((await admin('patch',`wishes/${wish.id}/pin`).send({isPinned:true,expectedVersion:1})).status).toBe(200);
   const edited=await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'A new message',consentPublic:true,expectedVersion:2});
-  expect(edited.body.data.moderationStatus).toBe('PENDING');
-  expect((await guest('get','wishes',token)).body.data.items).toHaveLength(0);
-  expect((await admin('patch',`wishes/${wish.id}/moderation`).send({action:'APPROVE',expectedVersion:2})).status).toBe(409);
+  expect(edited.body.data).toMatchObject({moderationStatus:'APPROVED',isPinned:false,version:3});
+  expect((await guest('get','wishes',token)).body.data.items[0]).toMatchObject({body:'A new message',isPinned:false});
+  expect((await admin('patch',`wishes/${wish.id}/moderation`).send({action:'HIDE',expectedVersion:2})).status).toBe(409);
   await admin('patch',`events/${f.event.id}/controls`).send({expectedVersion:f.event.version,wishesEnabled:false});
   expect((await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'Blocked',consentPublic:true,expectedVersion:3})).status).toBe(422);
   const withdrawn=await guest('patch','wish/visibility').send({consentPublic:false,expectedVersion:3});
   expect(withdrawn.status).toBe(200);
-  expect(withdrawn.body.data.body).toBe('A new message');
+  expect(withdrawn.body.data).toMatchObject({body:'A new message',moderationStatus:'NONE',approvedAt:null});
+  expect((await guest('get','wishes',token)).body.data.items).toEqual([]);
   expect((await guest('patch','wish/visibility').send({consentPublic:false,expectedVersion:4,body:'Bypass'})).status).toBe(400);
   expect((await guest('delete','wish').send({expectedVersion:4})).status).toBe(204);
   expect((await guest('get','invitation')).body.data.wish.deletedAt).toBeTruthy();
+ });
+ it('lets admins hide and restore public wishes and tracks the public count',async()=>{
+  const saved=await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'Public message',consentPublic:true,expectedVersion:0});
+  expect(saved.status).toBe(200);
+  const path=`wishes/${saved.body.data.id}/moderation`,dashboard=`events/${f.event.id}/dashboard`;
+  expect((await admin('get',dashboard)).body.data.publicWishes).toBe(1);
+  expect((await admin('patch',path).send({action:'APPROVE',expectedVersion:1})).status).toBe(422);
+  expect((await admin('patch',path).send({action:'HIDE',expectedVersion:1})).body.data).toMatchObject({moderationStatus:'HIDDEN',approvedAt:null});
+  expect((await admin('get',dashboard)).body.data.publicWishes).toBe(0);
+  expect((await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'Edited while hidden',consentPublic:true,expectedVersion:2})).body.data).toMatchObject({moderationStatus:'HIDDEN',approvedAt:null});
+  expect((await guest('patch','wish/visibility').send({consentPublic:false,expectedVersion:3})).body.data).toMatchObject({moderationStatus:'HIDDEN',consentPublic:false});
+  expect((await admin('patch',path).send({action:'HIDE',expectedVersion:4})).body.data).toMatchObject({moderationStatus:'HIDDEN',consentPublic:false});
+  expect((await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'Reshared while hidden',consentPublic:true,expectedVersion:5})).body.data).toMatchObject({moderationStatus:'HIDDEN'});
+  expect((await admin('get',dashboard)).body.data.publicWishes).toBe(0);
+  expect((await admin('patch',path).send({action:'APPROVE',expectedVersion:6})).body.data).toMatchObject({moderationStatus:'APPROVED',approvedBy:f.admin.id});
+  expect((await admin('get',dashboard)).body.data.publicWishes).toBe(1);
+ });
+ it('can show legacy consented wishes left pending before instant publication',async()=>{
+  const legacy=await prisma.wish.create({data:{invitationId:f.invitation.id,body:'Legacy wish',consentPublic:true,moderationStatus:'PENDING'}});
+  const result=await admin('patch',`wishes/${legacy.id}/moderation`).send({action:'APPROVE',expectedVersion:legacy.version});
+  expect(result.status).toBe(200);
+  expect(result.body.data).toMatchObject({moderationStatus:'APPROVED',approvedBy:f.admin.id});
  });
  it('never replays a revoked token and rotation preserves response history',async()=>{
   const key=randomUUID(),body={status:'DECLINED',expectedVersion:0};
@@ -145,7 +170,7 @@ describe('versioned guest responses',()=>{
   expect((await guest('get','wishes?cursor=invalid')).status).toBe(400);
   expect((await guest('get','wishes?limit=21')).status).toBe(400);
  });
- it('shows approved wishes from other guests and shares attendance only with separate consent',async()=>{
+ it('shows public wishes from other guests and shares attendance only with separate consent',async()=>{
   const writer=await admin('post',`events/${f.event.id}/guests`).send({guestCode:'WISH-WRITER',fullName:'Người gửi lời chúc'});
   expect(writer.status).toBe(201);
   const link=await admin('get',`invitations/${writer.body.data.invitation.id}/link`);
@@ -154,8 +179,6 @@ describe('versioned guest responses',()=>{
   const own=await prisma.wish.create({data:{invitationId:f.invitation.id,body:'Own message',consentPublic:true,moderationStatus:'APPROVED',approvedAt:new Date()}});
   const wish=await guest('put','wish',token).set('Idempotency-Key',randomUUID()).send({body:'Lời chúc đã đồng ý',consentPublic:true,consentAttendancePublic:true,expectedVersion:0});
   expect(wish.status).toBe(200);
-  expect((await guest('get','wishes')).body.data.items).toEqual([]);
-  expect((await admin('patch',`wishes/${wish.body.data.id}/moderation`).send({action:'APPROVE',expectedVersion:1})).status).toBe(200);
   const wall=(await guest('get','wishes')).body.data.items;
   expect(wall).toHaveLength(1);
   expect(wall[0]).toMatchObject({body:'Lời chúc đã đồng ý',displayName:'Người gửi lời chúc',attendanceStatus:'ATTENDING'});
@@ -164,10 +187,12 @@ describe('versioned guest responses',()=>{
   const preview=await admin('get',`events/${f.event.id}/preview?guestId=${f.guest.id}`);
   expect(preview.status).toBe(200);
   expect(preview.body.data.previewWishes).toEqual(wall);
-  const updated=await guest('put','wish',token).set('Idempotency-Key',randomUUID()).send({body:'Chỉ chia sẻ lời chúc',consentPublic:true,expectedVersion:2});
+  const updated=await guest('put','wish',token).set('Idempotency-Key',randomUUID()).send({body:'Chỉ chia sẻ lời chúc',consentPublic:true,expectedVersion:1});
   expect(updated.status).toBe(200);
-  expect((await admin('patch',`wishes/${wish.body.data.id}/moderation`).send({action:'APPROVE',expectedVersion:3})).status).toBe(200);
   expect((await guest('get','wishes')).body.data.items[0]).toMatchObject({body:'Chỉ chia sẻ lời chúc',attendanceStatus:null});
+  const privateWish=await guest('put','wish',token).set('Idempotency-Key',randomUUID()).send({body:'Chỉ gửi riêng',consentPublic:false,consentAttendancePublic:true,expectedVersion:2});
+  expect(privateWish.body.data).toMatchObject({moderationStatus:'NONE',approvedAt:null,consentAttendancePublic:false});
+  expect((await guest('get','wishes')).body.data.items).toEqual([]);
  });
 });
 describe('admin guest lifecycle and summary',()=>{
@@ -184,7 +209,6 @@ describe('admin guest lifecycle and summary',()=>{
   expect((await guest('put','rsvp',original).set('Idempotency-Key',rsvpKey).send(rsvp)).status).toBe(200);
   const wish=await guest('put','wish',second).set('Idempotency-Key',randomUUID()).send({body:'Chúc mừng tốt nghiệp',consentPublic:true,expectedVersion:0});
   expect(wish.status).toBe(200);
-  expect((await admin('patch',`wishes/${wish.body.data.id}/moderation`).send({action:'APPROVE',expectedVersion:1})).status).toBe(200);
   const other=await setupTestData();
   const currentVersion=renamed.body.data.version;
   expect((await request(app).delete(`/api/v1/admin/${guestPath}`).set('Origin','http://localhost:5173').set('Cookie',other.cookie).set('X-CSRF-Token',other.csrf).send({expectedVersion:currentVersion})).status).toBe(404);

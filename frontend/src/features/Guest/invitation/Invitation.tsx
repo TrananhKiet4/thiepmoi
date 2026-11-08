@@ -1,10 +1,11 @@
-import {googleMapsLink} from '@invite/contracts';
+import {defaultInvitationNotes,googleMapsLink} from '@invite/contracts';
 import {useEffect,useRef,useState} from 'react';
 import {useParams} from 'react-router-dom';
 import {useInfiniteQuery,useQuery,useQueryClient} from '@tanstack/react-query';
-import {ArrowDown,ArrowUpRight,CalendarDays,Check,Heart,Music2,VolumeX,GraduationCap,Send} from 'lucide-react';
+import {ArrowDown,ArrowUpRight,CalendarDays,Check,Facebook,Heart,MapPin,Music2,Phone,VolumeX,GraduationCap,Send} from 'lucide-react';
 import type {Content,InvitationView,MediaView,PublicWish,Section} from '@invite/contracts';
 import {CompanionFilm} from './CompanionFilm';
+import {GraduationSchedule} from './GraduationSchedule';
 import {statusName} from '../../../constants/status';
 import {ApiError,download,request} from '../../../lib/api';
 import {Action,ErrorBox,Field,Loading} from '../../../components/ui/index';
@@ -139,7 +140,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    </section>
    <a href="#response" className="quick-rsvp"><Heart size={16}/> Gửi lời hồi đáp</a>
    {sections.filter(s=>!['opening','hero'].includes(s.type)).map(s=><section key={s.id} className={'invite-section section-'+s.type} id={s.type==='invitation'?'invitation-event':s.type==='map'?'location':s.type}><p className="eyebrow section-number">{String(s.order+1).padStart(2,'0')} / {sectionLabel[s.type]}</p>{renderSection(s)}</section>)}
-   <footer className="invite-footer"><GraduationCap size={26}/><p>{c.host.fullName}</p><span>{c.host.university}</span><small>Mong gặp bạn ở một ngày thật đẹp. ✧</small></footer>
+   <InvitationFooter content={c} year={year} mapImage={media(c.ceremony.mapImageAssetId)}/>
   </>}
  </main>;
  function renderSection(s:Section){switch(s.type){
@@ -150,12 +151,61 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    <h2>Cảm ơn vì đã<br/><em>ở trong thanh xuân của mình.</em></h2>
    <CompanionFilm/>
   </>;
-  case 'invitation':return <div className="invitation-letter"><Butterfly className="letter-butterfly"/><p className="eyebrow">TRÂN TRỌNG MỜI</p><h2>{s.data.title}</h2><p className="guest-recipient"><span>Kính gửi</span><strong>{name}</strong></p><p className="invite-prose">{s.data.message}</p><div className="event-card"><p className="eyebrow">SAVE THE DATE</p><CalendarDays size={28} strokeWidth={1}/><h3>{date(c.ceremony.startAt)}</h3><p>{c.ceremony.venueName}<br/>{c.ceremony.address}</p><p className="muted">Giờ Việt Nam · GMT+7</p>{token&&<Action run={()=>download('/guest/calendar.ics','loi-moi-tot-nghiep.ics',token)}><CalendarDays size={16}/> Thêm vào lịch</Action>}</div><p className="signature">{c.host.fullName}</p></div>;
-  case 'map': {const location=s.data.locationSource==='MEETUP'&&c.meetup?c.meetup:c.ceremony;return <><h2>{s.data.title}</h2><MapView location={location} image={media(location.mapImageAssetId)}/><p className="invite-prose">{s.data.instructions}<br/>{location.entranceNote}</p></>;}
+  case 'invitation':return <div className="invitation-letter">
+   <Butterfly className="letter-butterfly"/>
+   <p className="eyebrow">TRÂN TRỌNG MỜI</p>
+   <h2>{s.data.title}</h2>
+   <p className="guest-recipient"><span>Kính gửi</span><strong>{name}</strong></p>
+   <p className="invite-prose">{s.data.message}</p>
+   <GraduationSchedule ceremony={c.ceremony} phone={c.contact?.phone} calendarAction={token&&
+    <Action run={()=>download('/guest/calendar.ics','loi-moi-tot-nghiep.ics',token)}><CalendarDays size={16}/> Thêm vào lịch</Action>
+   }/>
+   <p className="signature">{c.host.fullName}</p>
+  </div>;
+  case 'map': {
+   const location=s.data.locationSource==='MEETUP'&&c.meetup?c.meetup:c.ceremony;
+   const notes=(s.data.notes??defaultInvitationNotes).split('\n').map(line=>line.trim()).filter(Boolean);
+   return <>
+    <h2>{s.data.title}</h2>
+    <MapView location={location} image={media(location.mapImageAssetId)}/>
+    <p className="invite-prose">{s.data.instructions}<br/>{location.entranceNote}</p>
+    {notes.length>0&&<aside className="invitation-notes" aria-label="Lưu ý khi đến dự lễ">
+     <p className="eyebrow">THÔNG TIN CẦN BIẾT</p>
+     <h3>Một chút lưu ý nhỏ</h3>
+     <ol>{notes.map((note,index)=><li key={index}>{note}</li>)}</ol>
+    </aside>}
+   </>;
+  }
   case 'response':return <><h2>{s.data.title}</h2><p className="invite-prose">{s.data.rsvpIntro}</p><Response view={view} save={save}/><p className="invite-prose">{s.data.wishIntro}</p><WishForm view={view} save={save}/>{(token&&view.wallEnabled!==false||view.previewWishes!==undefined)&&<Wall key={token} token={token} previewItems={view.previewWishes}/>}</>;
   case 'closing':return <div className="closing"><span className="large-star" aria-hidden="true">✧</span><h2>{s.data.message}</h2><p>{view.rsvp?.status==='ATTENDING'?s.data.attendingMessage:view.rsvp?.status==='DECLINED'?s.data.declinedMessage:''}</p><p className="signature">{c.host.fullName}</p></div>;
   default:return null;
  }}
+}
+function InvitationFooter({content,year,mapImage}:{content:Content;year:string;mapImage?:MediaView}){
+ const {host,ceremony,contact}=content;
+ return <footer className="invite-footer scrapbook-footer">
+  <div className="footer-details">
+   <div>
+    <GraduationCap className="footer-emblem" size={34} strokeWidth={1.3} aria-hidden="true"/>
+    <h2>{host.university}</h2>
+    <address>{ceremony.address}</address>
+   </div>
+   <div>
+    <h2>Liên hệ</h2>
+    {contact?.phone&&<a href={'tel:'+contact.phone.replace(/[^+\d]/g,'')}><Phone size={17} aria-hidden="true"/> {contact.phone}</a>}
+    {contact?.facebookUrl&&<a href={contact.facebookUrl} target="_blank" rel="noopener noreferrer"><Facebook size={17} aria-hidden="true"/> Facebook</a>}
+    {!contact?.phone&&!contact?.facebookUrl&&<span>Liên hệ người gửi thiệp</span>}
+   </div>
+   <div>
+    <h2>Bản đồ</h2>
+    <a className="footer-map" href={googleMapsLink(ceremony)} target="_blank" rel="noopener noreferrer" aria-label="Mở Google Maps từ chân thiệp">
+     {mapImage&&<AssetImage asset={mapImage} priority={false} sizes="(max-width: 767px) 85vw, 320px"/>}
+     <span><MapPin size={16} aria-hidden="true"/> Mở Google Maps <ArrowUpRight size={15} aria-hidden="true"/></span>
+    </a>
+   </div>
+  </div>
+  <small>© {year} · {host.fullName}</small>
+ </footer>;
 }
 function Butterfly({className}:{className:string}){return <svg className={'paper-butterfly '+className} viewBox="0 0 140 104" fill="none" aria-hidden="true"><g fill="currentColor" stroke="#fffdf7" strokeWidth="1.2"><path d="M69 50C52 7 9-7 7 26C5 49 37 65 69 55ZM68 54C41 51 20 66 34 89C46 110 64 78 70 57ZM71 50C88 7 131-7 133 26C135 49 103 65 71 55ZM72 54C99 51 120 66 106 89C94 110 76 78 70 57Z"/><path d="M69 52 20 19M67 56 39 84M71 52 120 19M73 56 101 84M69 53 14 37M71 53 126 37"/></g><path d="M70 42v29m0-28-7-10m7 10 7-10" stroke="#54738d" strokeWidth="2" strokeLinecap="round"/></svg>;}
 const sectionLabel:Record<string,string>={opening:'LỜI MỞ',hero:'KHOẢNH KHẮC',story:'CHẶNG ĐƯỜNG',gallery:'NGƯỜI ĐỒNG HÀNH',invitation:'MỘT LỜI HẸN',map:'ĐIỂM HẸN',response:'LỜI HỒI ĐÁP',closing:'HẸN GẶP BẠN'};
@@ -178,7 +228,7 @@ function WishForm({view,save}:{view:InvitationView;save?:any}) {
  const [body,setBody]=useState(wish?.body??'');
  const [consent,setConsent]=useState(!!wish?.consentPublic);
  const [attendanceConsent,setAttendanceConsent]=useState(!!wish?.consentAttendancePublic);
- const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[done,setDone]=useState(false);
+ const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[done,setDone]=useState('');
  function changeConsent(checked:boolean){
   setConsent(checked);
   if(!checked)setAttendanceConsent(false);
@@ -188,10 +238,12 @@ function WishForm({view,save}:{view:InvitationView;save?:any}) {
   if(!save)return;
   setBusy(true);
   setError(null);
-  setDone(false);
+  setDone('');
   try{
-   await save('/guest/wish','PUT',{body,consentPublic:consent,consentAttendancePublic:consent&&attendanceConsent,expectedVersion:view.wish?.version??0});
-   setDone(true);
+   const saved=await save('/guest/wish','PUT',{body,consentPublic:consent,consentAttendancePublic:consent&&attendanceConsent,expectedVersion:view.wish?.version??0});
+   setDone(saved?.moderationStatus==='APPROVED'&&view.wallEnabled!==false
+    ?'Lời chúc đã được đăng. Cảm ơn bạn!'
+    :'Lời chúc đã được lưu. Cảm ơn bạn!');
   }catch(e){
    if(e instanceof ApiError&&e.status===409)changeConsent(false);
    setError(e);
@@ -200,16 +252,16 @@ function WishForm({view,save}:{view:InvitationView;save?:any}) {
   <fieldset disabled={!view.canCreateOrEditWish||view.preview||busy}>
    <legend>Một lời chúc dành cho mình</legend>
    <Field label="Lời chúc của bạn"><textarea value={body} required maxLength={1000} rows={5} onChange={e=>setBody(e.target.value)} placeholder="Viết một điều bạn muốn gửi gắm…"/></Field>
-   <label className="check-label"><input type="checkbox" checked={consent} onChange={e=>changeConsent(e.target.checked)}/> Tôi đồng ý hiển thị tên và lời chúc trên thiệp sau khi được duyệt.</label>
+   <label className="check-label"><input type="checkbox" checked={consent} onChange={e=>changeConsent(e.target.checked)}/> Tôi đồng ý hiển thị tên và lời chúc trên thiệp.</label>
    {consent&&<label className="check-label"><input type="checkbox" checked={attendanceConsent} onChange={e=>setAttendanceConsent(e.target.checked)}/> Hiển thị trạng thái tham dự cùng lời chúc</label>}
    <button className="button" disabled={busy}><Heart size={16}/>{busy?'Đang gửi…':'Gửi lời chúc'}</button>
   </fieldset>
   <ErrorBox error={error}/>
-  {done&&<p role="status" className="success">Lời chúc đã được lưu{consent?' và đang chờ duyệt':''}. Cảm ơn bạn!</p>}
+  {done&&<p role="status" className="success">{done}</p>}
   {!view.preview&&!view.canCreateOrEditWish&&<p className="muted">Hiện đã ngừng nhận lời chúc mới.</p>}
   {view.canWithdrawWish&&!view.preview&&<div className="row wrap">
-   {wish?.consentPublic&&<Action run={async()=>{await save('/guest/wish/visibility','PATCH',{consentPublic:false,expectedVersion:wish.version});changeConsent(false);}}>Rút đồng ý công khai</Action>}
-   <Action confirm="Bạn muốn xóa lời chúc này?" run={async()=>{await save('/guest/wish','DELETE',{expectedVersion:view.wish.version});setBody('');changeConsent(false);}}>Xóa lời chúc</Action>
+   {wish?.consentPublic&&<Action run={async()=>{await save('/guest/wish/visibility','PATCH',{consentPublic:false,expectedVersion:wish.version});changeConsent(false);setDone('');}}>Rút đồng ý công khai</Action>}
+   <Action confirm="Bạn muốn xóa lời chúc này?" run={async()=>{await save('/guest/wish','DELETE',{expectedVersion:view.wish.version});setBody('');changeConsent(false);setDone('');}}>Xóa lời chúc</Action>
   </div>}
  </form>;
 }

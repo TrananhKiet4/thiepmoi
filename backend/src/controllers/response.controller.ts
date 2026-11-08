@@ -31,13 +31,14 @@ export const putGuestWish:RequestHandler=async(req,res)=>{
  ok(res,await idempotent(req,'guest.wish',hashToken(req.invitation!.id),body,async tx=>{
   const inv=await active(tx,req),content=await publishedContent(tx,inv);if(!canWrite(inv.event.wishesEnabled,content.wishDeadline))throw new AppError(422,'WISHES_CLOSED','Đã đóng nhận lời chúc');
   const {expectedVersion,...fields}=body;if((inv.wish?.version??0)!==expectedVersion)throw conflict();
-  const data={...fields,consentAttendancePublic:fields.consentPublic&&fields.consentAttendancePublic===true,moderationStatus:fields.consentPublic?'PENDING':'NONE',isPinned:false,approvedAt:null,approvedBy:null,deletedAt:null};
+  const moderationStatus=inv.wish?.moderationStatus==='HIDDEN'?'HIDDEN':fields.consentPublic?'APPROVED':'NONE';
+  const data={...fields,consentAttendancePublic:fields.consentPublic&&fields.consentAttendancePublic===true,moderationStatus,isPinned:false,approvedAt:moderationStatus==='APPROVED'?new Date():null,approvedBy:null,deletedAt:null};
   return wishView(await(inv.wish?tx.wish.update({where:{invitationId:inv.id,version:expectedVersion},data:{...data,version:{increment:1}}}):tx.wish.create({data:{invitationId:inv.id,...data}})));
  }));
 };
 export const patchGuestWishVisibility:RequestHandler=async(req,res)=>{
  const {expectedVersion}=versionSchema.extend({consentPublic:z.literal(false)}).parse(req.body);
- ok(res,await withTransaction(async tx=>{const inv=await active(tx,req,true);if(!inv.wish)throw new AppError(404,'NOT_FOUND','Chưa có lời chúc');if(inv.wish.version!==expectedVersion)throw conflict();return wishView(await tx.wish.update({where:{id:inv.wish.id,version:expectedVersion},data:{consentPublic:false,consentAttendancePublic:false,moderationStatus:'NONE',isPinned:false,approvedAt:null,approvedBy:null,version:{increment:1}}}));}));
+ ok(res,await withTransaction(async tx=>{const inv=await active(tx,req,true);if(!inv.wish)throw new AppError(404,'NOT_FOUND','Chưa có lời chúc');if(inv.wish.version!==expectedVersion)throw conflict();return wishView(await tx.wish.update({where:{id:inv.wish.id,version:expectedVersion},data:{consentPublic:false,consentAttendancePublic:false,moderationStatus:inv.wish.moderationStatus==='HIDDEN'?'HIDDEN':'NONE',isPinned:false,approvedAt:null,approvedBy:null,version:{increment:1}}}));}));
 };
 export const deleteGuestWish:RequestHandler=async(req,res)=>{
  const {expectedVersion}=versionSchema.parse(req.body);
@@ -59,8 +60,12 @@ export const getAdminEventsWishes:RequestHandler=async(req,res)=>{
 };
 export const patchAdminWishesModeration:RequestHandler=async(req,res)=>{
  const id=z.string().uuid().parse(req.params.id),{expectedVersion,action}=versionSchema.extend({action:z.enum(['APPROVE','HIDE'])}).parse(req.body);
- ok(res,await withTransaction(async tx=>{const found=await ownedWish(tx,req,id);await lockEvent(tx,found.invitation.eventId);const wish=await ownedWish(tx,req,id);if(wish.version!==expectedVersion)throw conflict();if(wish.deletedAt||(action==='APPROVE'&&(!wish.consentPublic||wish.invitation.revokedAt||wish.invitation.guest.archivedAt)))throw new AppError(422,'WISH_NOT_PUBLIC','Lời chúc không đủ điều kiện công khai');
-  const approved=action==='APPROVE';const updated=await tx.wish.update({where:{id,version:expectedVersion},data:{moderationStatus:approved?'APPROVED':wish.consentPublic?'HIDDEN':'NONE',isPinned:false,approvedAt:approved?new Date():null,approvedBy:approved?req.admin!.id:null,version:{increment:1}}});await audit(tx,req,`WISH_${action}`,wish.invitation.eventId,'Wish',id);return updated;
+ ok(res,await withTransaction(async tx=>{const found=await ownedWish(tx,req,id);await lockEvent(tx,found.invitation.eventId);const wish=await ownedWish(tx,req,id);if(wish.version!==expectedVersion)throw conflict();
+  const restore=action==='APPROVE';
+  const restorable=wish.moderationStatus==='HIDDEN'||wish.moderationStatus==='PENDING';
+  if(wish.deletedAt||(restore&&(!restorable||!wish.consentPublic||wish.invitation.revokedAt||wish.invitation.guest.archivedAt)))throw new AppError(422,'WISH_NOT_PUBLIC','Lời chúc không đủ điều kiện công khai');
+  const moderationStatus=restore?'APPROVED':(wish.consentPublic||wish.moderationStatus==='HIDDEN')?'HIDDEN':'NONE';
+  const updated=await tx.wish.update({where:{id,version:expectedVersion},data:{moderationStatus,isPinned:false,approvedAt:restore?new Date():null,approvedBy:restore?req.admin!.id:null,version:{increment:1}}});await audit(tx,req,`WISH_${action}`,wish.invitation.eventId,'Wish',id);return updated;
  }));
 };
 export const patchAdminWishesPin:RequestHandler=async(req,res)=>{
