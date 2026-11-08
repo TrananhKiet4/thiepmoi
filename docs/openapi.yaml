@@ -4,7 +4,7 @@ jsonSchemaDialect: "https://json-schema.org/draft/2020-12/schema"
 info:
   title: "Thiệp mời tốt nghiệp API"
   version: "1.0.0"
-  description: "Contract for the implemented Express routes. Base /api/v1; health operations override the server base to /. Success JSON is {data}; errors are {error:{code,message,fields?,requestId?}} (rate limiter errors may omit requestId). All API responses carry X-Request-ID. Personal data, links, exports and previews are private, no-store; local public media has a long cache lifetime. IDs are UUIDs, timestamps ISO 8601 UTC. No admin/guest API returns token hashes, encrypted invitation tokens, password hashes or session hashes. Only explicitly authorized admin link/export endpoints return the plaintext invitation URL. JSON limit 100 KB. All guest requests count toward 120/min/IP; guest writes additionally count toward 20/min/token+IP (shared PostgreSQL counters in production; bounded memory in development). Admin owner authorization applies to every selected entity. Content defaults/normalization are defined in packages/contracts/src/index.ts."
+  description: "Contract for the implemented Express routes. Base /api/v1; health operations override the server base to /. Success JSON is {data}; errors are {error:{code,message,fields?,requestId?}} (rate limiter errors may omit requestId). All API responses carry X-Request-ID. Personal data, links, exports and previews are private, no-store. IDs are UUIDs, timestamps ISO 8601 UTC. No admin/guest API returns token hashes, encrypted invitation tokens, password hashes or session hashes. Only explicitly authorized admin link/export endpoints return the plaintext invitation URL. JSON limit 100 KB. All guest requests count toward 120/min/IP; guest writes additionally count toward 20/min/token+IP (shared PostgreSQL counters in production; bounded memory in development). Admin owner authorization applies to every selected entity. Content defaults/normalization are defined in packages/contracts/src/index.ts."
 servers:
   - {"url":"/api/v1","description":"Same-origin API (development via Vite proxy, production behind HTTPS reverse proxy)"}
 tags:
@@ -13,14 +13,13 @@ tags:
   - {"name":"Guest"}
   - {"name":"Wishes"}
   - {"name":"Excel"}
-  - {"name":"Media"}
 paths:
   "/admin/auth/login":
     post:
       operationId: "post_admin_auth_login"
       tags: ["Authentication"]
       summary: "Đăng nhập quản trị"
-      description: "Creates a signed sid cookie, HttpOnly, SameSite=Lax, Path=/, Secure in production; absolute lifetime 12 hours. No public registration or default password. 429 after 5 failed attempts per 15 minutes, using separate per-account and per-IP counters."
+      description: "Accepts an email address or admin, which resolves to the existing account selected by ADMIN_BOOTSTRAP_EMAIL. Verifies its stored Argon2 hash; no public registration or password bypass. Creates a signed sid cookie, HttpOnly, SameSite=Lax, Path=/, Secure in production; absolute lifetime 12 hours. 429 after 5 failed attempts per 15 minutes, using separate per-account and per-IP counters; the alias and email share one account counter."
       security: []
       parameters:
         - {"$ref":"#/components/parameters/Origin"}
@@ -36,7 +35,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
             Set-Cookie:
@@ -69,7 +68,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -119,7 +118,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -165,7 +164,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -187,7 +186,7 @@ paths:
       operationId: "post_admin_events_id_publish"
       tags: ["Administration"]
       summary: "Công bố nháp đã lưu"
-      description: "Validates complete content and media; makes referenced distribution files ready before changing the published revision. Failed publish leaves the previous published revision intact."
+      description: "Validates complete content and references to bundled media before changing the published revision. Failed publish leaves the previous published revision intact."
       security:
         -
           AdminCookie: []
@@ -208,7 +207,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -230,7 +229,7 @@ paths:
       operationId: "post_admin_events_id_unpublish"
       tags: ["Administration"]
       summary: "Rút công bố"
-      description: "Clears publication and immediately stops every guest read/write while preserving guest/history data. Public media already cached or downloaded may remain available."
+      description: "Clears publication and immediately stops every guest read/write while preserving guest/history data. Bundled assets are served separately at public paths."
       security:
         -
           AdminCookie: []
@@ -251,7 +250,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -294,7 +293,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -315,7 +314,7 @@ paths:
       operationId: "get_admin_events_id_preview"
       tags: ["Administration"]
       summary: "Xem nháp với khách mẫu hoặc khách được chọn"
-      description: "Uses only this event's selected guest; no guestId means a sample guest. Returns preview=true, private media URLs, and false write controls. Does not create an open, RSVP or Wish."
+      description: "Uses only this event's selected guest; no guestId means a sample guest. Returns preview=true, bundled asset URLs, and false write controls. Does not create an open, RSVP or Wish."
       security:
         -
           AdminCookie: []
@@ -332,7 +331,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -352,7 +351,7 @@ paths:
       operationId: "get_admin_events_id_dashboard"
       tags: ["Administration"]
       summary: "Thống kê hiện trạng thiệp đang hoạt động"
-      description: "Excludes archived guests and revoked invitations. attending + declined + unanswered = total. opened counts distinct active invitations, not repeat opens. Pending wishes are consenting, undeleted and attached to active invitations."
+      description: "Excludes archived guests and revoked invitations. attending + declined + unanswered = total. opened counts distinct active invitations. publicWishes counts undeleted, consenting wishes with APPROVED status and a publication timestamp."
       security:
         -
           AdminCookie: []
@@ -364,7 +363,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -403,7 +402,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -450,7 +449,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -491,7 +490,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -507,6 +506,33 @@ paths:
         "404": {"$ref":"#/components/responses/Error404"}
         "409": {"$ref":"#/components/responses/Error409"}
         "500": {"$ref":"#/components/responses/Error500"}
+    delete:
+      operationId: "delete_admin_guests_id"
+      tags: ["Administration"]
+      summary: "Xóa vĩnh viễn khách mời và vô hiệu hóa các link"
+      description: "Deletes the owned guest, invitation, RSVP, wish and guest response replays in one transaction. All issued short and legacy links stop working. Short-code hashes stay reserved with identifying link fields removed."
+      security:
+        -
+          AdminCookie: []
+          AdminCsrf: []
+      parameters:
+        - {"$ref":"#/components/parameters/Id"}
+        - {"$ref":"#/components/parameters/Origin"}
+        - {"$ref":"#/components/parameters/Csrf"}
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema: {"$ref":"#/components/schemas/VersionInput"}
+      responses:
+        "204": {"description":"Guest deleted"}
+        "400": {"$ref":"#/components/responses/Error400"}
+        "401": {"$ref":"#/components/responses/Error401"}
+        "403": {"$ref":"#/components/responses/Error403"}
+        "404": {"$ref":"#/components/responses/Error404"}
+        "409": {"$ref":"#/components/responses/Error409"}
+        "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/admin/guests/{id}/archive":
     post:
       operationId: "post_admin_guests_id_archive"
@@ -532,7 +558,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -573,7 +599,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -606,7 +632,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -646,7 +672,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -687,7 +713,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -733,7 +759,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -764,7 +790,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -779,6 +805,7 @@ paths:
         "404": {"$ref":"#/components/responses/Error404"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/guest/opened":
     post:
       operationId: "post_guest_opened"
@@ -794,7 +821,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -809,6 +836,7 @@ paths:
         "404": {"$ref":"#/components/responses/Error404"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/guest/rsvp":
     put:
       operationId: "put_guest_rsvp"
@@ -832,7 +860,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -849,12 +877,13 @@ paths:
         "422": {"$ref":"#/components/responses/Error422"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/guest/wish":
     put:
       operationId: "put_guest_wish"
       tags: ["Guest"]
       summary: "Tạo/sửa/khôi phục lời chúc của mình"
-      description: "Independent of RSVP, including DECLINED. Requires wishesEnabled and server time before wishDeadline when set. consentPublic=false becomes NONE; true becomes PENDING. Every save clears pin/approval. Resubmitting a soft-deleted Wish restores the same record using its current deleted version."
+      description: "Independent of RSVP, including DECLINED. Requires wishesEnabled and server time before wishDeadline when set. Consenting wishes publish immediately as APPROVED with the current approvedAt and no approving admin. Private wishes stay off the wall. An admin-hidden wish stays HIDDEN across edits and consent changes. Every save clears the pin. Resubmitting a soft-deleted Wish restores the same record using its current deleted version."
       security:
         -
           GuestBearer: []
@@ -872,7 +901,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -889,6 +918,7 @@ paths:
         "422": {"$ref":"#/components/responses/Error422"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
     delete:
       operationId: "delete_guest_wish"
       tags: ["Guest"]
@@ -910,6 +940,7 @@ paths:
         "409": {"$ref":"#/components/responses/Error409"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/guest/wish/visibility":
     patch:
       operationId: "patch_guest_wish_visibility"
@@ -931,7 +962,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -947,12 +978,13 @@ paths:
         "409": {"$ref":"#/components/responses/Error409"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/guest/wishes":
     get:
       operationId: "get_guest_wishes"
       tags: ["Guest"]
       summary: "Bức tường lời chúc theo cursor"
-      description: "Only this event, consenting + APPROVED + undeleted wishes with unarchived guests and unrevoked links. wallEnabled=false returns empty items and null cursor. Sort: isPinned DESC, approvedAt DESC, id DESC. Returns only id/displayName/body/approvedAt/isPinned."
+      description: "Public wishes from other guests in this event. Archived guests, revoked invitations and deleted wishes are excluded. Attendance status requires separate consent. wallEnabled=false returns empty items and null cursor. Sort order is isPinned DESC, approvedAt DESC, id DESC."
       security:
         -
           GuestBearer: []
@@ -978,7 +1010,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -993,6 +1025,7 @@ paths:
         "404": {"$ref":"#/components/responses/Error404"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/guest/calendar.ics":
     get:
       operationId: "get_guest_calendar_ics"
@@ -1008,7 +1041,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
             Content-Disposition:
@@ -1022,6 +1055,7 @@ paths:
         "404": {"$ref":"#/components/responses/Error404"}
         "429": {"$ref":"#/components/responses/Error429"}
         "500": {"$ref":"#/components/responses/Error500"}
+        "503": {"$ref":"#/components/responses/Error503"}
   "/admin/events/{id}/wishes":
     get:
       operationId: "get_admin_events_id_wishes"
@@ -1049,7 +1083,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -1068,8 +1102,8 @@ paths:
     patch:
       operationId: "patch_admin_wishes_id_moderation"
       tags: ["Wishes"]
-      summary: "Duyệt hoặc ẩn đúng phiên bản lời chúc"
-      description: "No admin endpoint edits wish text or grants consent. APPROVE requires consent, no deletion, no archive/revocation. HIDE clears pin/approval; a nonconsenting Wish remains NONE. Deleted wishes cannot be moderated. Requires the current Wish version."
+      summary: "Ẩn hoặc hiện lại lời chúc"
+      description: "APPROVE displays a HIDDEN or legacy PENDING wish with public consent and an active invitation and guest. HIDE clears the pin and publication timestamp and preserves an existing hidden state. Deleted wishes cannot be moderated. Requires the current Wish version."
       security:
         -
           AdminCookie: []
@@ -1083,14 +1117,14 @@ paths:
         content:
           "application/json":
             schema: {"$ref":"#/components/schemas/ModerationInput"}
-            example: {"action":"APPROVE","expectedVersion":1}
+            example: {"action":"APPROVE","expectedVersion":2}
       responses:
         "200":
           description: "Success"
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -1112,7 +1146,7 @@ paths:
       operationId: "patch_admin_wishes_id_pin"
       tags: ["Wishes"]
       summary: "Ghim hoặc bỏ ghim lời chúc"
-      description: "Pin=true requires consentPublic=true, APPROVED, undeleted and an active invitation/guest. Uses current Wish version. Guest editing/withdrawal/deletion removes public visibility and pin."
+      description: "Pin=true requires consentPublic=true, APPROVED, undeleted and an active invitation/guest. Uses current Wish version. Guest editing clears the pin. Withdrawing consent or deleting the wish removes it from the wall."
       security:
         -
           AdminCookie: []
@@ -1132,7 +1166,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -1164,7 +1198,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
             Content-Disposition:
@@ -1200,7 +1234,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -1252,7 +1286,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -1307,7 +1341,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -1339,7 +1373,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
             Content-Disposition:
@@ -1386,7 +1420,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
           content:
@@ -1458,7 +1492,7 @@ paths:
           headers:
             Cache-Control:
               schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+              description: "private, no-store for personal JSON, links and exports."
             X-Request-ID:
               schema: {"type":"string","format":"uuid"}
             Content-Disposition:
@@ -1472,260 +1506,6 @@ paths:
         "400": {"$ref":"#/components/responses/Error400"}
         "401": {"$ref":"#/components/responses/Error401"}
         "403": {"$ref":"#/components/responses/Error403"}
-        "404": {"$ref":"#/components/responses/Error404"}
-        "500": {"$ref":"#/components/responses/Error500"}
-  "/admin/events/{id}/media":
-    get:
-      operationId: "get_admin_events_id_media"
-      tags: ["Media"]
-      summary: "Thư viện media và URL preview riêng"
-      description: "URLs may expire; refresh the library to obtain new private URLs. No storage credentials are returned."
-      security:
-        -
-          AdminCookie: []
-      parameters:
-        - {"$ref":"#/components/parameters/Id"}
-      responses:
-        "200":
-          description: "Success"
-          headers:
-            Cache-Control:
-              schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
-            X-Request-ID:
-              schema: {"type":"string","format":"uuid"}
-          content:
-            "application/json":
-              schema:
-                type: "object"
-                properties:
-                  data:
-                    type: "object"
-                    properties:
-                      items:
-                        type: "array"
-                        items: {"$ref":"#/components/schemas/MediaItem"}
-                    required: ["items"]
-                required: ["data"]
-        "400": {"$ref":"#/components/responses/Error400"}
-        "401": {"$ref":"#/components/responses/Error401"}
-        "403": {"$ref":"#/components/responses/Error403"}
-        "404": {"$ref":"#/components/responses/Error404"}
-        "500": {"$ref":"#/components/responses/Error500"}
-    post:
-      operationId: "post_admin_events_id_media"
-      tags: ["Media"]
-      summary: "Upload ảnh hoặc audio đã kiểm tra"
-      description: "One file, at most 10 MiB. JPEG/PNG/WebP or MP3/M4A; magic-byte and decoding validation. Images up to 40 megapixels, metadata removed, optimized variants generated. SVG/HTML/executable rejected. Audio requires the configured decoder. Asset remains private until referenced by a successful publication."
-      security:
-        -
-          AdminCookie: []
-          AdminCsrf: []
-      parameters:
-        - {"$ref":"#/components/parameters/Id"}
-        - {"$ref":"#/components/parameters/Origin"}
-        - {"$ref":"#/components/parameters/Csrf"}
-      responses:
-        "201":
-          description: "Success"
-          headers:
-            Cache-Control:
-              schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
-            X-Request-ID:
-              schema: {"type":"string","format":"uuid"}
-          content:
-            "application/json":
-              schema:
-                type: "object"
-                properties:
-                  data: {"$ref":"#/components/schemas/MediaView"}
-                required: ["data"]
-        "400": {"$ref":"#/components/responses/Error400"}
-        "401": {"$ref":"#/components/responses/Error401"}
-        "403": {"$ref":"#/components/responses/Error403"}
-        "404": {"$ref":"#/components/responses/Error404"}
-        "413": {"$ref":"#/components/responses/Error413"}
-        "422": {"$ref":"#/components/responses/Error422"}
-        "500": {"$ref":"#/components/responses/Error500"}
-        "503": {"$ref":"#/components/responses/Error503"}
-      requestBody:
-        required: true
-        content:
-          "application/json":
-            schema: {"type":"object","properties":{"uploadId":{"type":"string","format":"uuid"},"alt":{"type":"string","maxLength":500}},"required":["uploadId"],"additionalProperties":false}
-          "multipart/form-data":
-            schema:
-              type: "object"
-              properties:
-                file: {"type":"string","format":"binary"}
-                alt: {"type":"string","maxLength":500,"default":""}
-              required: ["file"]
-              additionalProperties: false
-  "/admin/media/{id}":
-    patch:
-      operationId: "patch_admin_media_id"
-      tags: ["Media"]
-      summary: "Sửa mô tả thay thế media"
-      description: ""
-      security:
-        -
-          AdminCookie: []
-          AdminCsrf: []
-      parameters:
-        - {"$ref":"#/components/parameters/Id"}
-        - {"$ref":"#/components/parameters/Origin"}
-        - {"$ref":"#/components/parameters/Csrf"}
-      requestBody:
-        required: true
-        content:
-          "application/json":
-            schema:
-              type: "object"
-              properties:
-                alt: {"type":"string","maxLength":500}
-              required: ["alt"]
-              additionalProperties: false
-      responses:
-        "200":
-          description: "Success"
-          headers:
-            Cache-Control:
-              schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
-            X-Request-ID:
-              schema: {"type":"string","format":"uuid"}
-          content:
-            "application/json":
-              schema:
-                type: "object"
-                properties:
-                  data: {"$ref":"#/components/schemas/MediaView"}
-                required: ["data"]
-        "400": {"$ref":"#/components/responses/Error400"}
-        "401": {"$ref":"#/components/responses/Error401"}
-        "403": {"$ref":"#/components/responses/Error403"}
-        "404": {"$ref":"#/components/responses/Error404"}
-        "500": {"$ref":"#/components/responses/Error500"}
-    delete:
-      operationId: "delete_admin_media_id"
-      tags: ["Media"]
-      summary: "Xóa media chưa có revision giữ tham chiếu"
-      description: "Checks every retained revision, not only the current draft/published content. ASSET_IN_USE returns 409. Removing an image from the latest draft does not remove old immutable revision references. Successful response is JSON 200, not 204."
-      security:
-        -
-          AdminCookie: []
-          AdminCsrf: []
-      parameters:
-        - {"$ref":"#/components/parameters/Id"}
-        - {"$ref":"#/components/parameters/Origin"}
-        - {"$ref":"#/components/parameters/Csrf"}
-      responses:
-        "200":
-          description: "Success"
-          headers:
-            Cache-Control:
-              schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
-            X-Request-ID:
-              schema: {"type":"string","format":"uuid"}
-          content:
-            "application/json":
-              schema:
-                type: "object"
-                properties:
-                  data:
-                    type: "object"
-                    properties:
-                      deleted: {"const":true}
-                    required: ["deleted"]
-                required: ["data"]
-        "400": {"$ref":"#/components/responses/Error400"}
-        "401": {"$ref":"#/components/responses/Error401"}
-        "403": {"$ref":"#/components/responses/Error403"}
-        "404": {"$ref":"#/components/responses/Error404"}
-        "409": {"$ref":"#/components/responses/Error409"}
-        "500": {"$ref":"#/components/responses/Error500"}
-  "/admin/media/file":
-    get:
-      operationId: "get_admin_media_file"
-      tags: ["Media"]
-      summary: "Đọc file local riêng qua URL đã ký"
-      description: ""
-      security:
-        -
-          AdminCookie: []
-      parameters:
-        -
-          name: "key"
-          in: "query"
-          required: true
-          schema: {"type":"string"}
-          description: "Storage key from a server-generated preview URL; do not construct from filenames."
-        -
-          name: "expires"
-          in: "query"
-          required: true
-          schema: {"type":"integer","minimum":0}
-          description: "Expiry timestamp exactly as emitted in the signed URL."
-        -
-          name: "signature"
-          in: "query"
-          required: true
-          schema: {"type":"string"}
-      responses:
-        "302":
-          description: "S3 mode: redirect to a private signed GET valid for 5 minutes, after session and ownership checks."
-          headers:
-            Location: {"schema":{"type":"string","format":"uri"}}
-        "200":
-          description: "Private media bytes; signed URL also requires a valid owner admin session."
-          headers:
-            Cache-Control:
-              schema: {"type":"string"}
-              description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
-            X-Request-ID:
-              schema: {"type":"string","format":"uuid"}
-          content:
-            "image/webp":
-              schema: {"type":"string","format":"binary"}
-            "audio/mpeg":
-              schema: {"type":"string","format":"binary"}
-            "audio/mp4":
-              schema: {"type":"string","format":"binary"}
-        "400": {"$ref":"#/components/responses/Error400"}
-        "401": {"$ref":"#/components/responses/Error401"}
-        "403": {"$ref":"#/components/responses/Error403"}
-        "404": {"$ref":"#/components/responses/Error404"}
-        "500": {"$ref":"#/components/responses/Error500"}
-  "/media/{key}":
-    get:
-      operationId: "get_media_key"
-      tags: ["Media"]
-      summary: "Đọc bản media đã công bố (local storage)"
-      description: ""
-      security: []
-      parameters:
-        -
-          name: "key"
-          in: "path"
-          required: true
-          schema: {"type":"string"}
-          description: "Greedy path including slashes: event UUID / asset UUID / variant filename. This OpenAPI variable represents the implementation's {*key} route."
-      responses:
-        "200":
-          description: "Local-storage public bytes only for a READY/publicReady asset and an exact registered variant. With S3 storage this route returns 404; delivery uses configured public-media URLs."
-          headers:
-            Cache-Control:
-              schema: {"const":"public, max-age=31536000, immutable"}
-          content:
-            "image/webp":
-              schema: {"type":"string","format":"binary"}
-            "audio/mpeg":
-              schema: {"type":"string","format":"binary"}
-            "audio/mp4":
-              schema: {"type":"string","format":"binary"}
-        "400": {"$ref":"#/components/responses/Error400"}
         "404": {"$ref":"#/components/responses/Error404"}
         "500": {"$ref":"#/components/responses/Error500"}
   "/health/live":
@@ -1778,9 +1558,9 @@ paths:
   "/admin/events/{id}/uploads":
     post:
       operationId: prepare_private_upload
-      tags: ["Media", "Excel"]
-      summary: "Prepare a private direct upload; use before sending a file on Vercel"
-      description: "MEDIA is at most 10 MiB (JPEG/PNG/WebP/MP3/M4A); IMPORT at most 5 MiB (.xlsx). At most 20 live PUT capabilities or unclaimed active sources per administrator. Direct URLs expire after 5 minutes; source processing expires after 30 minutes. PUT exactly the declared bytes with returned headers and no app credentials. Inspect does not consume uploadId; media completion and import preview consume it once. XLSX headers are at most 200 characters and aggregate inspection metadata at most 1 MiB. Local mode returns multipart and retains the original multipart routes."
+      tags: ["Excel"]
+      summary: "Prepare a private XLSX upload; use before sending the file on Vercel"
+      description: "IMPORT accepts an .xlsx file up to 5 MiB. At most 20 live PUT capabilities or unclaimed active sources per administrator. Direct URLs expire after 5 minutes; source processing expires after 30 minutes. PUT exactly the declared bytes with returned headers and no app credentials. Inspect can reuse uploadId. Import preview consumes it once. XLSX headers are at most 200 characters and aggregate inspection metadata at most 1 MiB. Local mode returns multipart and uses the multipart inspect and preview requests."
       security: [{"AdminCookie":[],"AdminCsrf":[]}]
       parameters:
         - {"$ref":"#/components/parameters/Id"}
@@ -1790,7 +1570,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: {"type":"object","properties":{"purpose":{"enum":["MEDIA","IMPORT"]},"name":{"type":"string","minLength":1,"maxLength":255},"bytes":{"type":"integer","minimum":1,"maximum":10485760}},"required":["purpose","name","bytes"],"additionalProperties":false}
+            schema: {"type":"object","properties":{"purpose":{"const":"IMPORT"},"name":{"type":"string","minLength":1,"maxLength":255},"bytes":{"type":"integer","minimum":1,"maximum":5242880}},"required":["purpose","name","bytes"],"additionalProperties":false}
       responses:
         "200":
           description: "Direct upload information or local multipart transport"
@@ -1827,8 +1607,8 @@ components:
     GuestBearer:
       type: "http"
       scheme: "bearer"
-      bearerFormat: "32 random bytes encoded as a 43-character base64url token"
-      description: "Invitation capability from /i/{token}; send in Authorization, never query/body. Every call checks publication, revocation and archive; writes/replays recheck inside the transaction."
+      bearerFormat: "Legacy 43-character token, or five-character code followed by a dot and recipient slug"
+      description: "For /i/{code}/{guestSlug}, send Authorization: Bearer {code}.{guestSlug}. The five-character code is bound to the issued name and current invitation token. Legacy /i/{token} credentials remain valid. Short-code authentication failures are limited to five per 15 minutes per name across IPs. Successful credentials do not consume that failure budget. A busy database can return 503 DATABASE_BUSY with Retry-After. Every call checks publication, revocation and archive. Writes and replays recheck inside the transaction. Never send credentials in query/body."
     AdminCsrf:
       type: "apiKey"
       in: "header"
@@ -1840,7 +1620,7 @@ components:
       in: "path"
       required: true
       schema: {"type":"string","format":"uuid"}
-      description: "UUID of the event, guest, invitation, wish, media asset or import batch selected by this route. Admin ownership is checked."
+      description: "UUID of the event, guest, invitation, wish or import batch selected by this route. Admin ownership is checked."
     Origin:
       name: "Origin"
       in: "header"
@@ -1932,7 +1712,7 @@ components:
       headers:
         Cache-Control:
           schema: {"type":"string"}
-          description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+          description: "private, no-store for personal JSON, links and exports."
         X-Request-ID:
           schema: {"type":"string","format":"uuid"}
       content:
@@ -1949,7 +1729,7 @@ components:
       headers:
         Cache-Control:
           schema: {"type":"string"}
-          description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+          description: "private, no-store for personal JSON, links and exports."
         X-Request-ID:
           schema: {"type":"string","format":"uuid"}
       content:
@@ -1958,11 +1738,11 @@ components:
           example:
             error: {"code":"TOKEN_INVALID","message":"Dữ liệu không hợp lệ","requestId":"b63b9230-17a7-4dc5-80e8-d441f0ca7688"}
     Error403:
-      description: "Origin/CSRF forbidden or expired/invalid media signature. Admin entities owned by someone else return 404."
+      description: "Origin or CSRF check failed. Admin entities owned by someone else return 404."
       headers:
         Cache-Control:
           schema: {"type":"string"}
-          description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+          description: "private, no-store for personal JSON, links and exports."
         X-Request-ID:
           schema: {"type":"string","format":"uuid"}
       content:
@@ -1975,7 +1755,7 @@ components:
       headers:
         Cache-Control:
           schema: {"type":"string"}
-          description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+          description: "private, no-store for personal JSON, links and exports."
         X-Request-ID:
           schema: {"type":"string","format":"uuid"}
       content:
@@ -1984,11 +1764,11 @@ components:
           example:
             error: {"code":"EVENT_NOT_AVAILABLE","message":"Dữ liệu không hợp lệ","requestId":"b63b9230-17a7-4dc5-80e8-d441f0ca7688"}
     Error409:
-      description: "Version conflict, duplicate code, changed idempotent body, stale/expired import, or media still referenced by a retained revision."
+      description: "Version conflict, duplicate code, changed idempotent body, or stale/expired import."
       headers:
         Cache-Control:
           schema: {"type":"string"}
-          description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+          description: "private, no-store for personal JSON, links and exports."
         X-Request-ID:
           schema: {"type":"string","format":"uuid"}
       content:
@@ -2001,7 +1781,7 @@ components:
       headers:
         Cache-Control:
           schema: {"type":"string"}
-          description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+          description: "private, no-store for personal JSON, links and exports."
         X-Request-ID:
           schema: {"type":"string","format":"uuid"}
       content:
@@ -2010,11 +1790,11 @@ components:
           example:
             error: {"code":"UPLOAD_LIMIT","message":"Dữ liệu không hợp lệ","requestId":"b63b9230-17a7-4dc5-80e8-d441f0ca7688"}
     Error422:
-      description: "Form closed, incomplete publication, invalid media/XLSX, import row errors, or wish not eligible for publication/pinning."
+      description: "Form closed, incomplete publication, unknown or incompatible catalog assets, invalid XLSX, import row errors, or wish not eligible for publication/pinning."
       headers:
         Cache-Control:
           schema: {"type":"string"}
-          description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+          description: "private, no-store for personal JSON, links and exports."
         X-Request-ID:
           schema: {"type":"string","format":"uuid"}
       content:
@@ -2027,7 +1807,7 @@ components:
       headers:
         Cache-Control:
           schema: {"type":"string"}
-          description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+          description: "private, no-store for personal JSON, links and exports."
         X-Request-ID:
           schema: {"type":"string","format":"uuid"}
         Retry-After:
@@ -2043,7 +1823,7 @@ components:
       headers:
         Cache-Control:
           schema: {"type":"string"}
-          description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+          description: "private, no-store for personal JSON, links and exports."
         X-Request-ID:
           schema: {"type":"string","format":"uuid"}
       content:
@@ -2052,11 +1832,14 @@ components:
           example:
             error: {"code":"INTERNAL_ERROR","message":"Dữ liệu không hợp lệ","requestId":"b63b9230-17a7-4dc5-80e8-d441f0ca7688"}
     Error503:
-      description: "Dependency not ready or audio decoder unavailable."
+      description: "Dependency not ready, database busy, or audio decoder unavailable."
       headers:
+        Retry-After:
+          schema: {"type":"integer","minimum":1}
+          description: "Seconds to wait before retrying when the database is busy."
         Cache-Control:
           schema: {"type":"string"}
-          description: "private, no-store for personal JSON, links and exports. Public media uses public, max-age=31536000, immutable."
+          description: "private, no-store for personal JSON, links and exports."
         X-Request-ID:
           schema: {"type":"string","format":"uuid"}
       content:
@@ -2095,7 +1878,7 @@ components:
         latitude: {"type":"number","minimum":-90,"maximum":90,"deprecated":true,"description":"Legacy input ignored by the new parser."}
         longitude: {"type":"number","minimum":-180,"maximum":180,"deprecated":true,"description":"Legacy input ignored by the new parser."}
         googleMapsUrl: {"type":"string","maxLength":2048,"default":"","description":"Optional HTTPS Maps link: maps.app.goo.gl, maps.google.com, goo.gl/maps or google.com(/.vn)/maps. Other hosts, credentials and ports are rejected; no server-side expansion. Empty falls back to address search."}
-        mapImageAssetId: {"type":["string","null"],"format":"uuid","default":null,"description":"READY IMAGE owned by this event; included in revision ownership, publication and deletion checks."}
+        mapImageAssetId: {"type":["string","null"],"format":"uuid","default":null,"description":"Image UUID from the bundled staticMedia catalog."}
         entranceNote: {"type":"string","maxLength":1000}
       required: ["startAt","endAt","venueName","address"]
     OpeningSection:
@@ -2163,6 +1946,7 @@ components:
       required: ["id","enabled","order","type","data"]
     GallerySection:
       type: "object"
+      description: "When enabled, the gallery renders the 30 bundled photos 01.webp through 30.webp in numeric order from /invitation-assets/photos/companions/."
       properties:
         id: {"type":"string","maxLength":80,"minLength":1}
         enabled: {"type":"boolean"}
@@ -2173,6 +1957,8 @@ components:
           properties:
             items:
               type: "array"
+              deprecated: true
+              description: "Legacy entries accepted for revision compatibility. The renderer uses bundled photos, and these entries are omitted from the invitation media map."
               items:
                 type: "object"
                 properties:
@@ -2211,6 +1997,7 @@ components:
               type: "string"
               enum: ["CEREMONY","MEETUP"]
             instructions: {"type":"string","maxLength":1000}
+            notes: {"type":"string","maxLength":2400,"description":"One note per line. Omit to use the default notes."}
           required: ["title","locationSource","instructions"]
       required: ["id","enabled","order","type","data"]
     ResponseSection:
@@ -2255,6 +2042,11 @@ components:
             major: {"type":"string","maxLength":200}
             cohort: {"type":"string","maxLength":80}
           required: ["fullName","university","major"]
+        contact:
+          type: "object"
+          properties:
+            phone: {"type":"string","maxLength":30,"default":""}
+            facebookUrl: {"type":"string","maxLength":2048,"default":"","description":"HTTPS Facebook profile link."}
         ceremony: {"$ref":"#/components/schemas/Location"}
         meetup:
           deprecated: true
@@ -2275,11 +2067,11 @@ components:
           properties:
             palette:
               type: "string"
-              enum: ["cream","sage","rose"]
+              enum: ["cream","sage","rose","blue"]
               default: "cream"
             font:
               type: "string"
-              enum: ["serif","sans"]
+              enum: ["serif","sans","lora","be-vietnam-pro"]
               default: "serif"
           required: []
         music:
@@ -2330,7 +2122,7 @@ components:
           maxItems: 16
       required: ["schemaVersion","host","ceremony","theme","music","sections"]
       additionalProperties: false
-      description: "Strings are trimmed and rendered as plain text. Section IDs and section types must each be unique. opening, hero, invitation, map and response must exist and be enabled. Drafts may contain empty descriptive fields, but referenced media must be READY and owned by the event. Publish additionally requires host name/university/major, venue/address, endAt > startAt, legacy RSVP deadline <= meetup (or ceremony) startAt when set, a hero image, audio when enabled, and a meetup when map uses MEETUP. Media references are asset UUIDs, never arbitrary URLs. See packages/contracts/src/index.ts and docs/reference/dac-ta-goc.md section 11. The example is demonstration data; replace all dates/venues/names and the hero UUID with a READY asset belonging to your event before publishing."
+      description: "Strings are trimmed and rendered as plain text. Section IDs and section types must each be unique. opening, hero, invitation, map and response must exist and be enabled. Drafts may contain empty descriptive fields. Image and audio references use UUIDs from the bundled staticMedia catalog. Publish additionally requires host name/university/major, venue/address, endAt > startAt, legacy RSVP deadline <= meetup (or ceremony) startAt when set, a hero image, audio when enabled, and a meetup when map uses MEETUP. See packages/contracts/src/index.ts for the content contract and staticMedia catalog. The example uses the bundled demonstration image. Replace the dates, venues and names before publishing."
       example:
         schemaVersion: 1
         host:
@@ -2369,7 +2161,7 @@ components:
             enabled: true
             order: 1
             type: "hero"
-            data: {"title":"Hành trình mới","subtitle":"Lễ tốt nghiệp","heroAssetId":"0cb010ed-9b24-4a4d-9315-e28cd8a3e65b"}
+            data: {"title":"Hành trình mới","subtitle":"Lễ tốt nghiệp","heroAssetId":"00000000-0000-4000-8000-000000000001"}
           -
             id: "invitation"
             enabled: true
@@ -2468,6 +2260,7 @@ components:
       properties:
         body: {"type":"string","maxLength":1000,"minLength":1}
         consentPublic: {"type":"boolean"}
+        consentAttendancePublic: {"type":"boolean","default":false,"description":"Share RSVP status alongside a public wish."}
         expectedVersion: {"type":"integer","minimum":0}
       required: ["body","consentPublic","expectedVersion"]
       additionalProperties: false
@@ -2496,6 +2289,7 @@ components:
         id: {"type":"string","format":"uuid"}
         body: {"type":"string","maxLength":1000}
         consentPublic: {"type":"boolean"}
+        consentAttendancePublic: {"type":"boolean"}
         moderationStatus:
           type: "string"
           enum: ["NONE","PENDING","APPROVED","HIDDEN"]
@@ -2681,34 +2475,13 @@ components:
             - {"type":"null"}
         srcSet: {"type":"string"}
       required: ["id","url","alt","type"]
-    MediaItem:
-      type: "object"
-      properties:
-        id: {"type":"string","format":"uuid"}
-        url: {"type":"string"}
-        alt: {"type":"string","maxLength":500}
-        type:
-          type: "string"
-          enum: ["IMAGE","AUDIO"]
-        width:
-          anyOf:
-            - {"type":"integer","minimum":0}
-            - {"type":"null"}
-        height:
-          anyOf:
-            - {"type":"integer","minimum":0}
-            - {"type":"null"}
-        srcSet: {"type":"string"}
-        originalName: {"type":"string","maxLength":255}
-        bytes: {"type":"integer","minimum":0}
-        createdAt: {"type":"string","format":"date-time"}
-      required: ["id","url","alt","type","originalName","bytes","createdAt"]
     InvitationView:
       type: "object"
       properties:
         content: {"$ref":"#/components/schemas/Content"}
         media:
           type: "object"
+          description: "Referenced assets keyed by bundled catalog UUID. Guest views and admin previews use the same public static URLs."
           additionalProperties: {"$ref":"#/components/schemas/MediaView"}
         guest:
           type: "object"
@@ -2730,7 +2503,12 @@ components:
         canCreateOrEditWish: {"type":"boolean"}
         canWithdrawWish: {"type":"boolean"}
         eventId: {"type":"string","format":"uuid"}
+        wallEnabled: {"type":"boolean"}
         preview: {"type":"boolean"}
+        previewWishes:
+          type: "array"
+          maxItems: 6
+          items: {"$ref":"#/components/schemas/PublicWish"}
       required: ["content","media","guest","personalMessage","rsvp","wish","canRsvp","canCreateOrEditWish","canWithdrawWish","eventId"]
       description: "Only this invitation's responses. Guest RSVP/Wish DTOs never contain invitationId, approvedBy, tokenHash, ciphertext, contacts or another guest's private information. A soft-deleted own Wish remains present with deletedAt and version."
     Revision:
@@ -2779,9 +2557,9 @@ components:
         attending: {"type":"integer","minimum":0}
         declined: {"type":"integer","minimum":0}
         unanswered: {"type":"integer","minimum":0}
-        pendingWishes: {"type":"integer","minimum":0}
+        publicWishes: {"type":"integer","minimum":0}
         opened: {"type":"integer","minimum":0}
-      required: ["total","attending","declined","unanswered","pendingWishes","opened"]
+      required: ["total","attending","declined","unanswered","publicWishes","opened"]
     PublicWish:
       type: "object"
       properties:
@@ -2790,7 +2568,8 @@ components:
         body: {"type":"string","maxLength":1000}
         approvedAt: {"type":"string","format":"date-time"}
         isPinned: {"type":"boolean"}
-      required: ["id","displayName","body","approvedAt","isPinned"]
+        attendanceStatus: {"enum":["ATTENDING","DECLINED",null]}
+      required: ["id","displayName","body","approvedAt","isPinned","attendanceStatus"]
     Wall:
       type: "object"
       properties:
@@ -2860,7 +2639,7 @@ components:
     LoginInput:
       type: "object"
       properties:
-        email: {"type":"string","maxLength":254,"format":"email"}
+        email: {"type":"string","maxLength":254,"description":"Trimmed, case-insensitive email address or the configured admin alias.","anyOf":[{"format":"email"},{"const":"admin"}]}
         password: {"type":"string","maxLength":200,"minLength":1}
       required: ["email","password"]
       additionalProperties: false

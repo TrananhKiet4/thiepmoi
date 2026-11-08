@@ -3,12 +3,12 @@ import multer from 'multer';
 import ExcelJS from 'exceljs';
 import {z} from 'zod';
 import {randomUUID,createHash} from 'node:crypto';
-import {prisma} from '../config/database.js';
+import {prisma,withTransaction} from '../config/database.js';
 import {config} from '../config/env.js';
 import {AppError} from '../errors/app-error.js';
 import {ok,ownedEvent,audit,idempotent} from '../utils/http.js';
-import {createInvitationToken,decryptInvitationToken,hashToken} from '../utils/token.js';
-import {guestFilter} from '../services/guest.service.js';
+import {createInvitationToken,hashToken} from '../utils/token.js';
+import {guestFilter,invitationLink} from '../services/guest.service.js';
 import {columns,validateMapping,parseWorkbook,normalizeRows,type Mapping,type NormalizedRow,type RowError} from '../utils/excel-parser.js';
 import type {RequestHandler} from 'express';
 import {readUpload,deleteUploadSource,createExport} from '../services/temporary-object.service.js';
@@ -16,7 +16,7 @@ import {readUpload,deleteUploadSource,createExport} from '../services/temporary-
 export const uuid=z.string().uuid(),upload=multer({storage:multer.memoryStorage(),limits:{fileSize:5*1024*1024,files:1,fields:2,fieldSize:16000,parts:3}}).single('file');
 export const receive=(req:Request,res:Response,next:any)=>req.is('multipart/form-data')?upload(req,res,error=>error?next(new AppError(413,'UPLOAD_LIMIT','XLSX tối đa 5 MB, một file mỗi lần')):next()):next();
 export type StoredRows={sheet:string;rows:NormalizedRow[];errors:RowError[];warnings:RowError[]};
-export async function file(req:Request,claim=false){if(req.is('application/json')){z.object({uploadId:uuid,sheet:z.string().optional(),mapping:z.unknown().optional()}).strict().parse(req.body);return (await readUpload(req,uuid.parse(req.params.id),req.body.uploadId,'IMPORT',claim)).bytes;}if(!req.file||!req.file.originalname.toLowerCase().endsWith('.xlsx'))throw new AppError(422,'INVALID_XLSX','Chỉ nhận file .xlsx');return req.file.buffer;}
+export async function file(req:Request,claim=false){if(req.is('application/json')){z.object({uploadId:uuid,sheet:z.string().optional(),mapping:z.unknown().optional()}).strict().parse(req.body);return readUpload(req,uuid.parse(req.params.id),req.body.uploadId,claim);}if(!req.file||!req.file.originalname.toLowerCase().endsWith('.xlsx'))throw new AppError(422,'INVALID_XLSX','Chỉ nhận file .xlsx');return req.file.buffer;}
 export function batchView(batch:any,page=1){const payload=batch.normalizedRowsJson as StoredRows,pageSize=100,pages=Math.max(1,Math.ceil(Math.max(payload.rows.length,payload.errors.length,payload.warnings.length)/pageSize));page=Math.min(page,pages);const start=(page-1)*pageSize;return {id:batch.id,status:batch.status,summary:batch.summaryJson,rows:payload.rows.slice(start,start+pageSize),errors:payload.errors.slice(start,start+pageSize).map(e=>({sheet:payload.sheet,...e})),warnings:payload.warnings.slice(start,start+pageSize),expiresAt:batch.expiresAt,pagination:{page,pageSize,pages,totalRows:payload.rows.length,totalErrors:payload.errors.length,totalWarnings:payload.warnings.length}};}
 export async function getBatch(req:Request,id:string,tx:any=prisma){const batch=await tx.importBatch.findUnique({where:{id:uuid.parse(id)}});if(!batch)throw new AppError(404,'NOT_FOUND','Không tìm thấy lần nhập');await ownedEvent(req,batch.eventId,tx);if(batch.createdBy!==req.admin!.id)throw new AppError(404,'NOT_FOUND','Không tìm thấy lần nhập');return batch;}
 export async function sendWorkbook(req:Request,res:Response,book:ExcelJS.Workbook,name:string){const bytes=Buffer.from(await book.xlsx.writeBuffer());if(config.storageDriver==='s3'){ok(res,{downloadUrl:await createExport(req,bytes,name+'.xlsx')});return;}res.set({'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename="${name}.xlsx"`,'Cache-Control':'private, no-store'});res.send(bytes);}
@@ -83,8 +83,12 @@ export const getAdminEventsExports:RequestHandler=async(req,res)=>{
  textSheet(book,'Thông tin',['exported_at','filters'],[[new Date().toISOString(),JSON.stringify(query)]]);
  const headers=['guest_code','full_name','display_name','group','salutation','personal_message','email','phone','archived_at','revoked_at'];
  if(kind==='links')headers.push('invitation_url');else headers.push('rsvp_status','rsvp_note','rsvp_updated_at','wish','consent_public','moderation_status','wish_deleted_at');
- const rows=guests.map(g=>{const i=g.invitation,row:unknown[]=[g.guestCode,g.fullName,g.displayName,g.groupKey,g.salutation,i?.personalMessage??'',g.email,g.phone,g.archivedAt?.toISOString(),i?.revokedAt?.toISOString()];
-  if(kind==='links')row.push(i?`${config.appOrigin}/i/${decryptInvitationToken(i.id,i.tokenCiphertext,i.keyVersion)}`:'');
-  else row.push(i?.rsvp?.status??'UNANSWERED',i?.rsvp?.note??'',i?.rsvp?.updatedAt.toISOString(),i?.wish?.body??'',i?.wish?.consentPublic??false,i?.wish?.moderationStatus??'NONE',i?.wish?.deletedAt?.toISOString());return row;});
+ const rows:unknown[][]=[];
+ for(const g of guests){const i=g.invitation,row:unknown[]=[g.guestCode,g.fullName,g.displayName,g.groupKey,g.salutation,i?.personalMessage??'',g.email,g.phone,g.archivedAt?.toISOString(),i?.revokedAt?.toISOString()];
+  if(kind==='links'){
+   try{row.push(i?await withTransaction(tx=>invitationLink(tx,i,g.fullName)):'');}
+   catch(error){if(error instanceof AppError&&error.code==='NOT_FOUND')continue;throw error;}
+  }
+  else row.push(i?.rsvp?.status??'UNANSWERED',i?.rsvp?.note??'',i?.rsvp?.updatedAt.toISOString(),i?.wish?.body??'',i?.wish?.consentPublic??false,i?.wish?.moderationStatus??'NONE',i?.wish?.deletedAt?.toISOString());rows.push(row);}
  textSheet(book,kind==='links'?'Link thiệp':'Phản hồi',headers,rows);await sendWorkbook(req,res,book,kind==='links'?'link-thiep':'phan-hoi');
 };

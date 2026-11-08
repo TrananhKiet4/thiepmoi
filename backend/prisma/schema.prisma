@@ -44,10 +44,10 @@ model Event {
  revisions EventRevision[]
  guests Guest[]
  invitations Invitation[]
- media MediaAsset[]
  imports ImportBatch[]
  temporaryObjects TemporaryObject[]
  @@unique([id,ownerId])
+ @@index([ownerId,createdAt(sort:Desc)])
 }
 model EventRevision {
  id String @id @default(uuid()) @db.Uuid
@@ -99,7 +99,20 @@ model Invitation {
  updatedAt DateTime @updatedAt @db.Timestamptz(3)
  rsvp RSVP?
  wish Wish?
+ links InvitationLink[]
  @@index([eventId,revokedAt])
+}
+model InvitationLink {
+ codeHash String @id
+ invitationId String? @db.Uuid
+ invitation Invitation? @relation(fields:[invitationId],references:[id],onDelete:Restrict)
+ tokenHash String
+ restoredTokenHash String?
+ slug String
+ codeCiphertext String
+ keyVersion String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([invitationId,tokenHash,slug])
 }
 model RSVP {
  id String @id @default(uuid()) @db.Uuid
@@ -118,6 +131,7 @@ model Wish {
  invitation Invitation @relation(fields:[invitationId],references:[id])
  body String
  consentPublic Boolean @default(false)
+ consentAttendancePublic Boolean @default(false)
  moderationStatus String @default("NONE")
  isPinned Boolean @default(false)
  approvedAt DateTime? @db.Timestamptz(3)
@@ -127,23 +141,6 @@ model Wish {
  createdAt DateTime @default(now()) @db.Timestamptz(3)
  updatedAt DateTime @updatedAt @db.Timestamptz(3)
  @@index([moderationStatus,isPinned,approvedAt,id])
-}
-model MediaAsset {
- id String @id @default(uuid()) @db.Uuid
- eventId String @db.Uuid
- event Event @relation(fields:[eventId],references:[id])
- storageKey String @unique
- originalName String @default("")
- type String
- mimeType String
- bytes Int
- width Int?
- height Int?
- alt String @default("")
- status String @default("READY")
- variants Json @default("{}")
- publicReady Boolean @default(false)
- createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
 model ImportBatch {
  id String @id @default(uuid()) @db.Uuid
@@ -183,6 +180,7 @@ model IdempotencyRecord {
  expiresAt DateTime @db.Timestamptz(3)
  createdAt DateTime @default(now()) @db.Timestamptz(3)
  @@unique([scope,actorKeyHash,key])
+ @@index([expiresAt])
 }
 model TemporaryObject {
  id String @id @default(uuid()) @db.Uuid

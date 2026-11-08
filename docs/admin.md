@@ -105,21 +105,21 @@ Không có RSVP nghĩa là **Chưa phản hồi**. Khách được tự đổi l
 
 Tổng quan tính từ dữ liệu hiện tại: đồng ý + từ chối + chưa phản hồi = tổng thiệp đang hoạt động. Lưu trữ khách hoặc thu hồi link làm mẫu số giảm. Lượt mở chỉ cho biết một thiệp đã được chủ động mở; không chứng minh đúng người nhận đã đọc và không được tính là xác nhận tham dự.
 
-## Kiểm duyệt lời chúc
+## Quản lý lời chúc
 
-Trong **Lời chúc**, lọc **Chờ duyệt**, **Công khai**, **Riêng tư**, **Đã ẩn**, **Đã xóa** hoặc **Tất cả**. Admin đọc được lời chúc thuộc sự kiện để quản lý, nhưng không sửa nội dung hoặc tự bật đồng ý công khai thay khách.
+Trong **Lời chúc**, lọc **Công khai**, **Riêng tư**, **Đã ẩn**, **Đã xóa** hoặc **Tất cả**. Khách tự quyết định nội dung và có chia sẻ lời chúc hay không.
 
-- **Riêng tư**: khách chưa đồng ý chia sẻ; không xuất hiện trên bức tường.
-- **Chờ duyệt**: khách đã đồng ý, nhưng phải được admin duyệt mới công khai.
-- **Duyệt**: chỉ có hiệu lực khi đồng ý vẫn còn, lời chúc chưa xóa, khách chưa lưu trữ và link chưa thu hồi.
-- **Ẩn**: bỏ ghim và ngừng hiển thị. Với lời chúc không có đồng ý công khai, trạng thái vẫn là riêng tư.
-- **Ghim lời chúc**: chỉ dùng cho lời chúc đủ điều kiện công khai. Bấm lại để bỏ ghim.
+- **Công khai** xuất hiện ngay khi khách lưu lời chúc và đồng ý chia sẻ.
+- **Riêng tư** chỉ hiển thị cho khách gửi và người quản lý sự kiện.
+- **Ẩn** gỡ lời chúc khỏi tường và bỏ ghim.
+- **Hiện lại** đưa lời chúc đã ẩn trở lại tường nếu khách vẫn đồng ý chia sẻ và link còn hoạt động.
+- **Ghim lời chúc** đưa lời chúc công khai lên đầu tường. Bấm lại để bỏ ghim.
 
-Bức tường hiển thị 6 lời chúc mỗi lần, ghim trước rồi mới đến thời điểm duyệt mới nhất. Khi khách sửa lời chúc, bản cũ được gỡ khỏi bức tường và cần duyệt lại nếu vẫn xin công khai; ghim cũng bị bỏ. Rút đồng ý công khai hoặc xóa lời chúc gỡ hiển thị ngay.
+Bức tường hiển thị 6 lời chúc mỗi lần, ưu tiên lời chúc đã ghim rồi đến lời chúc công khai gần nhất. Khi khách lưu chỉnh sửa và đồng ý chia sẻ, bản mới xuất hiện ngay và ghim cũ được bỏ. Rút đồng ý công khai hoặc xóa lời chúc gỡ hiển thị ngay.
 
-Khách vẫn được rút đồng ý hoặc xóa sau hạn khi link còn hợp lệ và thiệp còn công bố. Lời chúc xóa là xóa mềm. Gửi lại khi form còn mở khôi phục cùng bản ghi và cần duyệt lại. Không có nút admin sửa nội dung/khôi phục lời chúc thay khách.
+Khách vẫn được rút đồng ý hoặc xóa sau hạn khi link còn hợp lệ và thiệp còn công bố. Khi form còn mở, khách có thể gửi lại để khôi phục lời chúc đã xóa với nội dung và lựa chọn chia sẻ mới.
 
-Thu hồi link hoặc lưu trữ khách tạm ẩn lời chúc khỏi bức tường. Cấp lại link hoặc khôi phục quyền hợp lệ áp dụng lại các điều kiện đồng ý/duyệt hiện có; nên rà soát lời chúc trước khi khôi phục hàng loạt.
+Thu hồi link hoặc lưu trữ khách tạm ẩn lời chúc khỏi bức tường. Khi link hoạt động trở lại, lời chúc đủ điều kiện công khai xuất hiện lại.
 
 ## Xuất dữ liệu
 
@@ -148,7 +148,7 @@ Dữ liệu người dùng được ghi thành ô văn bản, kể cả nội du
 - [ ] Khách DEMO001–DEMO012 và mọi khách/thử nghiệm đã được lưu trữ hoặc loại khỏi danh sách gửi thật; không gửi các link demo.
 - [ ] Đã xem trước, lưu và công bố đúng revision; không còn thay đổi chưa lưu.
 - [ ] Đã mở ít nhất hai link khách thử riêng để kiểm tra tên/lời nhắn không lẫn, nhạc có/không nhạc, bản đồ và tải lịch.
-- [ ] Đã thử RSVP, lời chúc riêng/xin công khai, duyệt, sửa, rút đồng ý và cấp lại link; dữ liệu thử đã được xử lý trước khi gửi.
+- [ ] Đã thử RSVP, lời chúc riêng và công khai, ẩn, hiện lại, sửa, rút đồng ý và cấp lại link. Dữ liệu thử đã được xử lý trước khi gửi.
 - [ ] Đã xem thiệp trên điện thoại và máy tính, kiểm tra nút chạm, ảnh, chữ và khả năng mở link từ ứng dụng nhắn tin.
 - [ ] Địa chỉ ứng dụng và link xuất ra dùng domain thật/HTTPS; người vận hành đã xác nhận backup, media và khóa mời theo tài liệu vận hành.
 - [ ] File link/phản hồi được giữ riêng tư; mỗi người nhận đúng link của mình.

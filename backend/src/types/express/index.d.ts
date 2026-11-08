@@ -1,8 +1,7 @@
-import type {Request} from 'express';
-import {Prisma} from '@prisma/client';
+import type {Invitation} from '@prisma/client';
 
 declare global {namespace Express {interface Request {
  requestId:string;
  admin?:{id:string;email:string;csrfToken:string;sessionId:string};
- invitation?:Prisma.InvitationGetPayload<{include:{guest:true;event:true;rsvp:true;wish:true}}>;
+ invitation?:Pick<Invitation,'id'|'eventId'|'tokenHash'>;
 }}}

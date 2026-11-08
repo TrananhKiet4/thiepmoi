@@ -14,15 +14,11 @@ Tắt log query/body tại proxy và API, đặc biệt path `/i/*`, Authorizati
 
 Limiter bộ nhớ có trần số client, phù hợp một instance; không có bảo đảm rate limit chung giữa nhiều instance. Khi scale, dùng limiter kho chung/edge trước tăng số instance. Login giới hạn riêng IP và tài khoản; guest viết theo token+IP, đọc theo IP. Mạng NAT nhiều khách có thể cần nới giới hạn read sau đo thực tế, vẫn giữ giới hạn ghi và xác thực.
 
-## Media
+## Ảnh, nhạc và file Excel
 
-STORAGE_DRIVER=s3, điền endpoint/region, private/public buckets, access/secret và PUBLIC_MEDIA_BASE_URL HTTPS. Private bucket chặn truy cập công khai; public bucket/CDN chỉ phục vụ bản đã phân phối. Credentials giới hạn quyền trên hai bucket này. Không đưa credential vào frontend. Giữ FFMPEG_PATH trỏ binary FFmpeg có decoder MP3/AAC; khi thiếu decoder upload audio trả 503 thay vì chấp nhận file chưa kiểm tra. Audio được decode với giới hạn thời gian, không tải URL từ người dùng.
+Ảnh và nhạc thiệp dùng đường dẫn cố định trên website và lưu trong bucket private. Chỉ đồng bộ file đã được chọn để hiển thị trên thiệp. Giữ các tệp mà phiên bản thiệp đã lưu đang tham chiếu. Xem [hướng dẫn quản lý file cố định](static-media.md).
 
-Ảnh JPEG/PNG/WebP tối đa 10 MB/40 MP, decode rồi xuất WebP, bỏ metadata. Nhạc MP3/M4A tối đa 10 MB, xác minh signature/metadata/full decode. Các thư viện codec và FFmpeg cần được cập nhật theo bản vá tương thích. Media local chỉ dùng phát triển, nằm `.data/media/private` và `public`; không expose folder private bằng web server.
-
-Revision giữ tham chiếu media: DELETE trả409 ngay cả khi asset chỉ nằm trong revision cũ. Muốn xóa dữ liệu vĩnh viễn cần runbook chủ động có backup, không sửa database để lách check trong UI.
-
-Object storage không tham gia transaction PostgreSQL. Publish copy media xong rồi trỏ revision và đánh dấu ready trong transaction. Nếu copy/transaction thất bại có thể còn object không tham chiếu ở bucket public dưới khóa UUID; không có link được phát cho guest từ revision thất bại. Cấu hình inventory/lifecycle và dọn object mồ côi sau khi đối chiếu database; không xóa theo suy đoán. Local endpoint có thêm guard publicReady. Media đã công bố có thể còn trong CDN/browser cache sau unpublish; rút thiệp không thu hồi ảnh người khác đã tải.
+Object Storage dùng bucket private cho các lượt nhập và xuất Excel. Backend cấp đường dẫn có chữ ký ngắn hạn và dọn file tạm theo lịch.
 
 ## Backup và phục hồi
 
@@ -35,7 +31,7 @@ Backup dùng pg_dump custom format, không in mật khẩu vào lệnh/log, mặ
 
 Lập lịch hằng ngày bằng scheduler của môi trường triển khai, giữ ít nhất 7 bản thành công, sao chép sang kho khác máy và giới hạn quyền truy cập. Không xóa bản mới nhất chỉ vì một lần backup thất bại. Dump chứa dữ liệu liên hệ và lời chúc riêng tư: mã hóa/lưu trữ an toàn, không commit hoặc gửi công khai.
 
-Sao lưu cả private/public media, bật versioning hoặc cơ chế khôi phục tương đương. Lưu khóa INVITATION_KEY cùng các keyVersion cũ và SESSION_SECRET trong kho secret có backup; không chỉ backup dump. Thiếu khóa token sẽ không xuất lại link hiện có được. Phiên cũ có thể chủ động thu hồi sau phục hồi.
+Giữ bản phát hành mã nguồn và bản sao thư mục file cố định. Lưu khóa INVITATION_KEY cùng các keyVersion cũ và SESSION_SECRET trong kho secret có backup. Các khóa cũ cần thiết để xuất lại link hiện có sau khi phục hồi.
 
 Diễn tập: restore vào database mới, dùng cùng key ring, so sánh số Event/Guest/Invitation/RSVP/Wish, kiểm tra link giải mã được và chỉ đến APP_ORIGIN đúng, mở ảnh, thử RSVP bằng khách thử, kiểm tra wall/consent và admin. Chỉ đổi DATABASE_URL sau khi xác minh; giữ database cũ để rollback. Mục tiêu đề xuất RPO24h/RTO4h cần đo trên hạ tầng thật, chưa được bảo đảm từ lần thử local.
 

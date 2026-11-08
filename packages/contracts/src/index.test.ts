@@ -34,6 +34,16 @@ it('allows publication without reception deadlines while retaining mandatory cer
  const value:any=demoContent(randomUUID());value.meetup=null;value.rsvpDeadline=null;value.wishDeadline=null;value.sections.find((s:any)=>s.type==='map').data.locationSource='CEREMONY';
  const result=contentSchema.safeParse(value);expect(result.success).toBe(true);if(result.success)expect(publicationErrors(result.data)).toEqual({});
 });
+it('accepts optional public contact details while rejecting unsafe links and phone values',()=>{
+ const legacy=demoContent(null);
+ expect(contentSchema.parse(legacy).contact).toBeUndefined();
+ const contact={phone:'090 000 0000',facebookUrl:'https://www.facebook.com/test.contact'};
+ expect(contentSchema.parse({...legacy,contact}).contact).toEqual(contact);
+ for(const facebookUrl of ['javascript:alert(1)','https://facebook.com.evil.test/abc','https://user@facebook.com/abc']){
+  expect(contentSchema.safeParse({...legacy,contact:{...contact,facebookUrl}}).success).toBe(false);
+ }
+ expect(contentSchema.safeParse({...legacy,contact:{...contact,phone:'hello'}}).success).toBe(false);
+});
 it('includes the campus image in revision-owned media references without duplicates',()=>{
  const image=randomUUID(),value:any=demoContent(image);value.ceremony.mapImageAssetId=image;
  expect(contracts.assetIds(value)).toEqual([image]);value.ceremony.mapImageAssetId=randomUUID();expect(contracts.assetIds(value)).toContain(value.ceremony.mapImageAssetId);

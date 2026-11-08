@@ -22,3 +22,7 @@
 dialog.modal{position:fixed;inset:0;width:calc(100% - 32px);min-width:0;max-width:780px;max-height:calc(100dvh - 40px);margin:auto;overflow:auto;overscroll-behavior:contain}dialog.modal::backdrop{background:#20282080}dialog.modal:not([open]){display:none}dialog.modal:has(.invitation){max-width:1160px}
 
 .campus-map-field{border-top:1px solid var(--line);padding-top:22px;margin-top:8px}.campus-map-field h3{margin-bottom:10px}.campus-map-preview{max-width:700px}.campus-map-preview img,.campus-map-image img{width:100%;height:auto;object-fit:contain}.campus-map-preview .button{margin-top:14px}.campus-map-image{margin-bottom:22px}.campus-map-image img{border-radius:4px}
+
+.upload-feedback{width:100%}.upload-feedback p{margin-bottom:10px}.upload-errors{list-style:none;margin:0;padding:0}.upload-errors li{overflow-wrap:anywhere}
+
+.editor-fields{border:0;padding:0;margin:0;min-width:0}

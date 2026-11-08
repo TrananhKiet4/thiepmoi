@@ -1,17 +1,31 @@
 import {beforeEach,describe,expect,it} from 'vitest';
 import request from 'supertest';
-import {randomUUID} from 'node:crypto';
+import {randomBytes,randomUUID} from 'node:crypto';
 import {createApp} from '../src/app.js';
 import {prisma} from '../src/config/database.js';
-import {resetTestDatabase,setupTestData} from './helpers.js';
+import {config} from '../src/config/env.js';
+import {resetTestDatabase,setupTestData,credentialFromLink} from './helpers.js';
+import {vi} from 'vitest';
+import * as tokens from '../src/utils/token.js';
 
 const app=createApp();
 let f:Awaited<ReturnType<typeof setupTestData>>;
 const guest=(method:'get'|'post'|'put'|'patch'|'delete',path:string,token?:string)=>request(app)[method](`/api/v1/guest/${path}`).set('Authorization',`Bearer ${token??f.token}`);
-const admin=(method:'get'|'post'|'put'|'patch',path:string)=>request(app)[method](`/api/v1/admin/${path}`).set('Cookie',f.cookie).set('Origin','http://localhost:5173').set('X-CSRF-Token',f.csrf);
+const admin=(method:'get'|'post'|'put'|'patch'|'delete',path:string)=>request(app)[method](`/api/v1/admin/${path}`).set('Cookie',f.cookie).set('Origin','http://localhost:5173').set('X-CSRF-Token',f.csrf);
 beforeEach(async()=>{await resetTestDatabase();f=await setupTestData();});
 
 describe('published invitation and immutable content',()=>{
+ it('issues a stable five-character named link while keeping the original capability valid',async()=>{
+  await prisma.guest.update({where:{id:f.guest.id},data:{fullName:'Đặng Thị Ánh',displayName:'Bạn Ánh'}});
+  const first=await admin('get',`invitations/${f.invitation.id}/link`);expect(first.status).toBe(200);
+  const url=new URL(first.body.data.url),parts=url.pathname.split('/');expect(parts).toHaveLength(4);expect(parts[2]).toMatch(/^[A-Za-z0-9]{5}$/);expect(parts[3]).toBe('dang-thi-anh');
+  expect((await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url).toBe(first.body.data.url);
+  expect(first.body.data.message).toContain(first.body.data.url);
+  const credential=parts[2]+'.'+parts[3];expect((await guest('get','invitation',credential)).body.data.guest.fullName).toBe('Đặng Thị Ánh');
+  expect((await guest('get','invitation',parts[2]+'.nguoi-khac')).status).toBe(401);
+  expect((await guest('get','invitation')).status).toBe(200);
+  expect((await prisma.invitation.findUniqueOrThrow({where:{id:f.invitation.id}})).tokenHash).toBe(f.invitation.tokenHash);
+ });
  it('previews draft personalization without creating opens or responses and validates publication',async()=>{
   const changed={...f.content,host:{...f.content.host,fullName:'Preview host'},groupMessages:{friends:'Hi {{guestName}} from {{hostName}}'}};
   await prisma.guest.update({where:{id:f.guest.id},data:{groupKey:'friends',displayName:'Friend'}});
@@ -75,26 +89,55 @@ describe('versioned guest responses',()=>{
   expect(outcomes.map(r=>r.status).sort()).toEqual([200,409]);
   expect(await prisma.rSVP.count()).toBe(1);
  });
- it('removes edited, withdrawn and deleted wishes from the wall, including after writes close',async()=>{
+ it('publishes consented wishes on create and edit and allows withdrawal after writes close',async()=>{
+  const viewer=await admin('post',`events/${f.event.id}/guests`).send({guestCode:'WALL-VIEWER',fullName:'Wall viewer'});
+  expect(viewer.status).toBe(201);
+  const link=await admin('get',`invitations/${viewer.body.data.invitation.id}/link`);
+  const token=credentialFromLink(link.body.data.url);
   const saved=await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'Congratulations',consentPublic:true,expectedVersion:0});
   expect(saved.status).toBe(200);
   const wish=saved.body.data;
+  expect(wish).toMatchObject({moderationStatus:'APPROVED',approvedAt:expect.any(String),version:1});
   expect(wish).not.toHaveProperty('invitationId');
   expect(wish).not.toHaveProperty('approvedBy');
-  expect((await admin('patch',`wishes/${wish.id}/moderation`).send({action:'APPROVE',expectedVersion:1})).status).toBe(200);
-  expect((await guest('get','wishes')).body.data.items).toHaveLength(1);
+  expect((await prisma.wish.findUniqueOrThrow({where:{id:wish.id}})).approvedBy).toBeNull();
+  expect((await guest('get','wishes',token)).body.data.items[0]).toMatchObject({body:'Congratulations'});
+  expect((await admin('patch',`wishes/${wish.id}/pin`).send({isPinned:true,expectedVersion:1})).status).toBe(200);
   const edited=await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'A new message',consentPublic:true,expectedVersion:2});
-  expect(edited.body.data.moderationStatus).toBe('PENDING');
-  expect((await guest('get','wishes')).body.data.items).toHaveLength(0);
-  expect((await admin('patch',`wishes/${wish.id}/moderation`).send({action:'APPROVE',expectedVersion:2})).status).toBe(409);
+  expect(edited.body.data).toMatchObject({moderationStatus:'APPROVED',isPinned:false,version:3});
+  expect((await guest('get','wishes',token)).body.data.items[0]).toMatchObject({body:'A new message',isPinned:false});
+  expect((await admin('patch',`wishes/${wish.id}/moderation`).send({action:'HIDE',expectedVersion:2})).status).toBe(409);
   await admin('patch',`events/${f.event.id}/controls`).send({expectedVersion:f.event.version,wishesEnabled:false});
   expect((await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'Blocked',consentPublic:true,expectedVersion:3})).status).toBe(422);
   const withdrawn=await guest('patch','wish/visibility').send({consentPublic:false,expectedVersion:3});
   expect(withdrawn.status).toBe(200);
-  expect(withdrawn.body.data.body).toBe('A new message');
+  expect(withdrawn.body.data).toMatchObject({body:'A new message',moderationStatus:'NONE',approvedAt:null});
+  expect((await guest('get','wishes',token)).body.data.items).toEqual([]);
   expect((await guest('patch','wish/visibility').send({consentPublic:false,expectedVersion:4,body:'Bypass'})).status).toBe(400);
   expect((await guest('delete','wish').send({expectedVersion:4})).status).toBe(204);
   expect((await guest('get','invitation')).body.data.wish.deletedAt).toBeTruthy();
+ });
+ it('lets admins hide and restore public wishes and tracks the public count',async()=>{
+  const saved=await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'Public message',consentPublic:true,expectedVersion:0});
+  expect(saved.status).toBe(200);
+  const path=`wishes/${saved.body.data.id}/moderation`,dashboard=`events/${f.event.id}/dashboard`;
+  expect((await admin('get',dashboard)).body.data.publicWishes).toBe(1);
+  expect((await admin('patch',path).send({action:'APPROVE',expectedVersion:1})).status).toBe(422);
+  expect((await admin('patch',path).send({action:'HIDE',expectedVersion:1})).body.data).toMatchObject({moderationStatus:'HIDDEN',approvedAt:null});
+  expect((await admin('get',dashboard)).body.data.publicWishes).toBe(0);
+  expect((await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'Edited while hidden',consentPublic:true,expectedVersion:2})).body.data).toMatchObject({moderationStatus:'HIDDEN',approvedAt:null});
+  expect((await guest('patch','wish/visibility').send({consentPublic:false,expectedVersion:3})).body.data).toMatchObject({moderationStatus:'HIDDEN',consentPublic:false});
+  expect((await admin('patch',path).send({action:'HIDE',expectedVersion:4})).body.data).toMatchObject({moderationStatus:'HIDDEN',consentPublic:false});
+  expect((await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'Reshared while hidden',consentPublic:true,expectedVersion:5})).body.data).toMatchObject({moderationStatus:'HIDDEN'});
+  expect((await admin('get',dashboard)).body.data.publicWishes).toBe(0);
+  expect((await admin('patch',path).send({action:'APPROVE',expectedVersion:6})).body.data).toMatchObject({moderationStatus:'APPROVED',approvedBy:f.admin.id});
+  expect((await admin('get',dashboard)).body.data.publicWishes).toBe(1);
+ });
+ it('can show legacy consented wishes left pending before instant publication',async()=>{
+  const legacy=await prisma.wish.create({data:{invitationId:f.invitation.id,body:'Legacy wish',consentPublic:true,moderationStatus:'PENDING'}});
+  const result=await admin('patch',`wishes/${legacy.id}/moderation`).send({action:'APPROVE',expectedVersion:legacy.version});
+  expect(result.status).toBe(200);
+  expect(result.body.data).toMatchObject({moderationStatus:'APPROVED',approvedBy:f.admin.id});
  });
  it('never replays a revoked token and rotation preserves response history',async()=>{
   const key=randomUUID(),body={status:'DECLINED',expectedVersion:0};
@@ -103,7 +146,7 @@ describe('versioned guest responses',()=>{
   expect((await guest('put','rsvp').set('Idempotency-Key',key).send(body)).status).toBe(404);
   expect((await admin('post',`invitations/${f.invitation.id}/rotate`).send({expectedVersion:2})).status).toBe(200);
   const link=await admin('get',`invitations/${f.invitation.id}/link`);
-  const newToken=link.body.data.url.split('/i/')[1];
+  const newToken=credentialFromLink(link.body.data.url);
   expect(newToken).not.toBe(f.token);
   expect((await guest('get','invitation',newToken)).body.data.rsvp.status).toBe('DECLINED');
   expect((await guest('get','invitation')).status).toBe(401);
@@ -118,7 +161,7 @@ describe('versioned guest responses',()=>{
   expect(first.status).toBe(200);
   expect(first.body.data.items).toHaveLength(6);
   expect(first.body.data.items[0].body).toBe('Message 0');
-  expect(Object.keys(first.body.data.items[0]).sort()).toEqual(['approvedAt','body','displayName','id','isPinned']);
+  expect(Object.keys(first.body.data.items[0]).sort()).toEqual(['approvedAt','attendanceStatus','body','displayName','id','isPinned']);
   expect(first.body.data.nextCursor).toBeTruthy();
   const second=await guest('get',`wishes?cursor=${encodeURIComponent(first.body.data.nextCursor)}`);
   expect(second.body.data.items).toHaveLength(1);
@@ -127,8 +170,90 @@ describe('versioned guest responses',()=>{
   expect((await guest('get','wishes?cursor=invalid')).status).toBe(400);
   expect((await guest('get','wishes?limit=21')).status).toBe(400);
  });
+ it('shows public wishes from other guests and shares attendance only with separate consent',async()=>{
+  const writer=await admin('post',`events/${f.event.id}/guests`).send({guestCode:'WISH-WRITER',fullName:'Người gửi lời chúc'});
+  expect(writer.status).toBe(201);
+  const link=await admin('get',`invitations/${writer.body.data.invitation.id}/link`);
+  const token=credentialFromLink(link.body.data.url);
+  expect((await guest('put','rsvp',token).set('Idempotency-Key',randomUUID()).send({status:'ATTENDING',note:'Private note',expectedVersion:0})).status).toBe(200);
+  const own=await prisma.wish.create({data:{invitationId:f.invitation.id,body:'Own message',consentPublic:true,moderationStatus:'APPROVED',approvedAt:new Date()}});
+  const wish=await guest('put','wish',token).set('Idempotency-Key',randomUUID()).send({body:'Lời chúc đã đồng ý',consentPublic:true,consentAttendancePublic:true,expectedVersion:0});
+  expect(wish.status).toBe(200);
+  const wall=(await guest('get','wishes')).body.data.items;
+  expect(wall).toHaveLength(1);
+  expect(wall[0]).toMatchObject({body:'Lời chúc đã đồng ý',displayName:'Người gửi lời chúc',attendanceStatus:'ATTENDING'});
+  expect(wall[0].id).not.toBe(own.id);
+  expect(JSON.stringify(wall)).not.toContain('Private note');
+  const preview=await admin('get',`events/${f.event.id}/preview?guestId=${f.guest.id}`);
+  expect(preview.status).toBe(200);
+  expect(preview.body.data.previewWishes).toEqual(wall);
+  const updated=await guest('put','wish',token).set('Idempotency-Key',randomUUID()).send({body:'Chỉ chia sẻ lời chúc',consentPublic:true,expectedVersion:1});
+  expect(updated.status).toBe(200);
+  expect((await guest('get','wishes')).body.data.items[0]).toMatchObject({body:'Chỉ chia sẻ lời chúc',attendanceStatus:null});
+  const privateWish=await guest('put','wish',token).set('Idempotency-Key',randomUUID()).send({body:'Chỉ gửi riêng',consentPublic:false,consentAttendancePublic:true,expectedVersion:2});
+  expect(privateWish.body.data).toMatchObject({moderationStatus:'NONE',approvedAt:null,consentAttendancePublic:false});
+  expect((await guest('get','wishes')).body.data.items).toEqual([]);
+ });
 });
 describe('admin guest lifecycle and summary',()=>{
+ it('deletes the guest and responses, invalidates every link, and reserves used short codes',async()=>{
+  const linkPath=`invitations/${f.invitation.id}/link`,guestPath=`guests/${f.guest.id}`;
+  const original=credentialFromLink((await admin('get',linkPath)).body.data.url);
+  const renamed=await admin('patch',guestPath).send({
+   guestCode:f.guest.guestCode,fullName:'Khách đổi tên',expectedVersion:1,expectedInvitationVersion:1,
+  });
+  expect(renamed.status).toBe(200);
+  const second=credentialFromLink((await admin('get',linkPath)).body.data.url);
+  await expect(prisma.invitationLink.updateMany({where:{invitationId:f.invitation.id},data:{invitationId:null}})).rejects.toThrow();
+  const rsvpKey=randomUUID(),rsvp={status:'ATTENDING',note:'Có mặt',expectedVersion:0};
+  expect((await guest('put','rsvp',original).set('Idempotency-Key',rsvpKey).send(rsvp)).status).toBe(200);
+  const wish=await guest('put','wish',second).set('Idempotency-Key',randomUUID()).send({body:'Chúc mừng tốt nghiệp',consentPublic:true,expectedVersion:0});
+  expect(wish.status).toBe(200);
+  const other=await setupTestData();
+  const currentVersion=renamed.body.data.version;
+  expect((await request(app).delete(`/api/v1/admin/${guestPath}`).set('Origin','http://localhost:5173').set('Cookie',other.cookie).set('X-CSRF-Token',other.csrf).send({expectedVersion:currentVersion})).status).toBe(404);
+  expect((await admin('delete',guestPath).send({expectedVersion:1})).status).toBe(409);
+  expect((await guest('get','invitation',original)).status).toBe(200);
+
+  expect((await admin('delete',guestPath).send({expectedVersion:currentVersion})).status).toBe(204);
+  expect((await admin('get',`events/${f.event.id}/guests?archived=all`)).body.data.total).toBe(0);
+  expect((await admin('get',`events/${f.event.id}/dashboard`)).body.data.total).toBe(0);
+  expect((await admin('get',linkPath)).status).toBe(404);
+  expect((await admin('delete',guestPath).send({expectedVersion:currentVersion})).status).toBe(404);
+  for(const credential of [original,second,f.token])expect((await guest('get','invitation',credential)).status).toBe(401);
+  expect((await guest('put','rsvp',original).set('Idempotency-Key',rsvpKey).send(rsvp)).status).toBe(401);
+  expect((await guest('get','invitation',other.token)).status).toBe(200);
+  expect(await prisma.invitation.count({where:{id:f.invitation.id}})).toBe(0);
+  expect(await prisma.rSVP.count({where:{invitationId:f.invitation.id}})).toBe(0);
+  expect(await prisma.wish.count({where:{invitationId:f.invitation.id}})).toBe(0);
+  expect(await prisma.idempotencyRecord.count({where:{actorKeyHash:tokens.hashToken(f.invitation.id)}})).toBe(0);
+  expect(await prisma.auditLog.count({where:{entityId:f.guest.id,action:'GUEST_DELETED'}})).toBe(1);
+  const retired=await prisma.invitationLink.findMany({where:{invitationId:null}});
+  expect(retired).toHaveLength(2);
+  for(const alias of retired)expect(alias).toMatchObject({tokenHash:'',restoredTokenHash:null,slug:'',codeCiphertext:'',keyVersion:''});
+
+  const oldCode=original.split('.')[0],newCode=oldCode==='Z9q8R'?'N7k6M':'Z9q8R';
+  const random=vi.spyOn(tokens,'createInvitationLinkCode').mockReturnValueOnce(oldCode).mockReturnValueOnce(newCode);
+  const originalKeys={invitationKey:config.invitationKey,invitationKeyVersion:config.invitationKeyVersion,invitationOldKeys:config.invitationOldKeys};
+  try{
+   Object.assign(config,{invitationKey:randomBytes(32).toString('base64'),invitationKeyVersion:'test-rotated',invitationOldKeys:{}});
+   const replacement=await admin('post',`events/${f.event.id}/guests`).send({guestCode:f.guest.guestCode,fullName:f.guest.fullName});
+   expect(replacement.status).toBe(201);
+   const link=await admin('get',`invitations/${replacement.body.data.invitation.id}/link`);
+   expect(link.status).toBe(200);
+   const credential=credentialFromLink(link.body.data.url);
+   expect(credential.split('.')[0]).toBe(newCode);
+   expect((await guest('get','invitation',credential)).status).toBe(200);
+   expect((await guest('get','invitation',original)).status).toBe(401);
+  }finally{random.mockRestore();Object.assign(config,originalKeys);}
+ });
+ it('handles simultaneous deletes without leaving any active invitation',async()=>{
+  const path=`guests/${f.guest.id}`;
+  const results=await Promise.all([1,2].map(()=>admin('delete',path).send({expectedVersion:f.guest.version})));
+  expect(results.map(result=>result.status).sort()).toEqual([204,404]);
+  expect((await guest('get','invitation')).status).toBe(401);
+  expect(await prisma.auditLog.count({where:{entityId:f.guest.id,action:'GUEST_DELETED'}})).toBe(1);
+ });
  it('creates normalized guests atomically, rejects duplicates, and requires reasons for admin responses',async()=>{
   const created=await admin('post',`events/${f.event.id}/guests`).send({guestCode:'test_2',fullName:'Second guest',phone:'0123456',personalMessage:'Hello'});
   expect(created.status).toBe(201);
@@ -155,11 +280,13 @@ describe('admin guest lifecycle and summary',()=>{
   expect(guests.body.data.total).toBe(1);
   expect((await admin('get',`events/${f.event.id}/wishes?status=`)).status).toBe(200);
  });
- it('keeps links stable on edits, preserves revocation on restore, and excludes inactive invitations',async()=>{
+ it('keeps issued links valid on name edits, preserves revocation on restore, and excludes inactive invitations',async()=>{
   const original=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url;
   const edit=await admin('patch',`guests/${f.guest.id}`).send({guestCode:f.guest.guestCode,fullName:'Renamed',expectedVersion:1,expectedInvitationVersion:1});
   expect(edit.status).toBe(200);
-  expect((await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url).toBe(original);
+  const renamed=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url;expect(renamed).toMatch(/\/renamed$/);
+  expect((await guest('get','invitation',credentialFromLink(original))).body.data.guest.fullName).toBe('Renamed');
+  expect((await guest('get','invitation',credentialFromLink(renamed))).status).toBe(200);
   expect(JSON.stringify(edit.body)).not.toMatch(/tokenHash|tokenCiphertext|keyVersion/);
   await admin('post',`invitations/${f.invitation.id}/revoke`).send({expectedVersion:1});
   await admin('post',`guests/${f.guest.id}/archive`).send({expectedVersion:2});
@@ -177,5 +304,47 @@ describe('admin guest lifecycle and summary',()=>{
   expect(calendar.headers['content-type']).toContain('text/calendar');
   expect(calendar.text).toContain(`UID:${f.event.id}@graduation-invitation`);
   expect(JSON.stringify((await guest('get','invitation')).body)).not.toMatch(/tokenHash|tokenCiphertext|keyVersion|@example/);
+ });
+});
+describe('short invitation link allocation',()=>{
+ it('restores the selected old alias alongside the current link until the next rotation',async()=>{
+  const oldUrl=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url;
+  const oldAlias=await prisma.invitationLink.findFirstOrThrow({where:{invitationId:f.invitation.id}});
+  expect((await admin('post',`invitations/${f.invitation.id}/rotate`).send({expectedVersion:1})).status).toBe(200);
+  const currentUrl=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url;
+  const current=await prisma.invitation.findUniqueOrThrow({where:{id:f.invitation.id}});
+  expect((await guest('get','invitation',credentialFromLink(oldUrl))).status).toBe(401);
+  await prisma.invitationLink.update({where:{codeHash:oldAlias.codeHash},data:{restoredTokenHash:current.tokenHash}});
+  expect((await guest('get','invitation',credentialFromLink(oldUrl))).status).toBe(200);
+  expect((await guest('get','invitation',credentialFromLink(currentUrl))).status).toBe(200);
+  expect((await guest('get','invitation',f.token)).status).toBe(401);
+  expect((await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url).toBe(oldUrl);
+  expect((await admin('post',`invitations/${f.invitation.id}/rotate`).send({expectedVersion:2})).status).toBe(200);
+  expect((await guest('get','invitation',credentialFromLink(oldUrl))).status).toBe(401);
+ });
+ it('shares one stable alias between simultaneous requests',async()=>{
+  const responses=await Promise.all([1,2,3].map(()=>admin('get',`invitations/${f.invitation.id}/link`)));
+  expect(responses.map(r=>r.status)).toEqual([200,200,200]);expect(new Set(responses.map(r=>r.body.data.url)).size).toBe(1);
+  expect(await prisma.invitationLink.count({where:{invitationId:f.invitation.id}})).toBe(1);
+ });
+ it('resamples collisions and separates guests with the same name',async()=>{
+  const first=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url,code=new URL(first).pathname.split('/')[2],replacement=code==='Z9q8R'?'N7k6M':'Z9q8R';
+  const second=await admin('post',`events/${f.event.id}/guests`).send({guestCode:'SAME-NAME',fullName:f.guest.fullName,displayName:'Khách thứ hai'});
+  const random=vi.spyOn(tokens,'createInvitationLinkCode').mockReturnValueOnce(code).mockReturnValueOnce(replacement);
+  try{const link=await admin('get',`invitations/${second.body.data.invitation.id}/link`);expect(link.status).toBe(200);expect(new URL(link.body.data.url).pathname.split('/')[2]).toBe(replacement);
+   expect((await guest('get','invitation',credentialFromLink(link.body.data.url))).body.data.guest.displayName).toBe('Khách thứ hai');
+   expect((await guest('get','invitation',credentialFromLink(first))).body.data.guest.displayName).toBe(f.guest.displayName);
+  }finally{random.mockRestore();}
+ });
+ it('invalidates every old alias on rotation while preserving responses and the legacy capability before rotation',async()=>{
+  const first=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url;
+  expect((await guest('put','rsvp',credentialFromLink(first)).set('Idempotency-Key',randomUUID()).send({status:'ATTENDING',expectedVersion:0})).status).toBe(200);
+  await admin('patch',`guests/${f.guest.id}`).send({guestCode:f.guest.guestCode,fullName:'Tên mới',expectedVersion:1,expectedInvitationVersion:1});
+  const second=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url;
+  expect((await guest('get','invitation',credentialFromLink(first))).status).toBe(200);expect((await guest('get','invitation')).status).toBe(200);
+  expect((await admin('post',`invitations/${f.invitation.id}/rotate`).send({expectedVersion:1})).status).toBe(200);
+  for(const token of [credentialFromLink(first),credentialFromLink(second),f.token])expect((await guest('get','invitation',token)).status).toBe(401);
+  const current=(await admin('get',`invitations/${f.invitation.id}/link`)).body.data.url;
+  expect((await guest('get','invitation',credentialFromLink(current))).body.data.rsvp.status).toBe('ATTENDING');
  });
 });

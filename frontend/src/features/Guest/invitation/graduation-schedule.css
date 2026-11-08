@@ -1,0 +1,186 @@
+.graduation-schedule {
+  --schedule-paper: var(--blue-paper, #fffdf8);
+  --schedule-line: var(--blue-line, #d9cbb7);
+  --schedule-tint: var(--blue-tint, #f5ede1);
+  --schedule-accent: var(--invite-accent, #234c7c);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  align-items: start;
+  gap: 32px 22px;
+  margin-block: 35px 28px;
+}
+
+.graduation-schedule > div {
+  position: relative;
+  min-width: 0;
+  padding: 27px clamp(12px, 2.5vw, 24px) 20px;
+  border: 1px solid var(--schedule-line);
+  background: var(--schedule-paper);
+  box-shadow: 3px 7px 15px #1e395217;
+}
+
+.graduation-schedule > div::before {
+  content: '';
+  position: absolute;
+  top: -11px;
+  left: calc(50% - 40px);
+  width: 80px;
+  height: 21px;
+  background: repeating-linear-gradient(135deg, transparent 0 5px, #fff4 5px 9px), var(--schedule-line);
+  clip-path: polygon(2% 0, 100% 0, 97% 22%, 100% 46%, 98% 73%, 100% 100%, 0 100%, 3% 73%, 0 51%, 3% 24%);
+  transform: rotate(-5deg);
+  opacity: .9;
+  pointer-events: none;
+}
+
+.graduation-schedule__calendar {
+  text-align: center;
+}
+
+.graduation-schedule .graduation-schedule__eyebrow {
+  margin-bottom: 8px;
+  color: var(--schedule-accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.graduation-schedule__date {
+  margin-bottom: 16px;
+  font-size: clamp(16px, 2.5vw, 24px);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.graduation-schedule__month {
+  table-layout: fixed;
+  text-align: center;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.graduation-schedule__month caption {
+  margin-bottom: 6px;
+  color: var(--schedule-accent);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.graduation-schedule__month :is(th, td) {
+  padding: 0;
+  border: 0;
+  color: inherit;
+}
+
+.graduation-schedule__month th {
+  padding-block: 5px;
+  color: var(--schedule-accent);
+  background: var(--schedule-tint);
+  font-weight: 700;
+}
+
+.graduation-schedule__month td {
+  height: 31px;
+}
+
+.graduation-schedule__month [data-event-day] {
+  display: inline-grid;
+  place-items: center;
+  width: min(27px, 100%);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--schedule-accent);
+  font-weight: 700;
+}
+
+.graduation-schedule__countdown {
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px dashed var(--schedule-line);
+  color: var(--schedule-accent);
+}
+
+.graduation-schedule__countdown p {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.graduation-schedule__countdown ul {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.graduation-schedule__countdown li {
+  padding: 5px 2px;
+  border: 1px solid var(--schedule-line);
+  border-radius: 5px;
+  background: var(--schedule-tint);
+  font-size: 10px;
+}
+
+.graduation-schedule__countdown strong {
+  display: block;
+  font-size: clamp(15px, 2.5vw, 20px);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.graduation-schedule__pending {
+  margin: 0;
+}
+
+.graduation-schedule .graduation-schedule__note {
+  text-align: left;
+  background: repeating-linear-gradient(0deg, transparent 0 25px, color-mix(in srgb, var(--schedule-line) 22%, transparent) 25px 26px), var(--schedule-paper);
+}
+
+.graduation-schedule .graduation-schedule__note::before {
+  left: 27px;
+  transform: rotate(5deg);
+}
+
+.graduation-schedule__note h3 {
+  margin-bottom: 15px;
+  font-size: clamp(25px, 4vw, 35px);
+  font-style: italic;
+}
+
+.graduation-schedule__note dl {
+  display: grid;
+  gap: 12px;
+  margin-block: 0 17px;
+  font-size: 13px;
+}
+
+.graduation-schedule__note dt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--schedule-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.graduation-schedule__note dd {
+  margin: 2px 0 0 25px;
+  overflow-wrap: anywhere;
+}
+
+.graduation-schedule__note dd strong {
+  display: block;
+}
+
+.graduation-schedule__note dd a {
+  color: var(--schedule-accent);
+  text-decoration: underline;
+  text-underline-offset: .2em;
+}
