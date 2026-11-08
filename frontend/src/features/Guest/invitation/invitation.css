@@ -120,7 +120,16 @@
 .invitation .invite-hero :is(.hero-photo, .admission-ticket) { animation-delay: .1s; }
 .invitation .invite-hero .hero-text { animation-delay: .2s; }
 
-.invitation .invite-section { padding: 75px 8vw; border-top: 1px dashed #d3c7b5; scroll-margin-top: 110px; }
+.invitation .invite-section {
+  --invite-heading: "Times New Roman", serif;
+  font-family: var(--invite-heading);
+  text-transform: uppercase;
+  padding: 75px 8vw;
+  border-top: 1px dashed #d3c7b5;
+  scroll-margin-top: 110px;
+}
+.invitation .invite-section :is(input, textarea) { text-transform: none; }
+.invitation .invite-section .graduation-schedule__month caption { text-transform: inherit; }
 .invitation .section-number { font-size: 9px; margin-bottom: 27px; }
 .invitation .invite-section h2 { font-size: clamp(30px, 3.8vw, 47px); line-height: 1.25; margin-bottom: 30px; }
 .invitation .invite-section h2 em { color: #6e8194; }
@@ -447,7 +456,7 @@
   .invitation .hero-subtitle { font-size: 18px; }
   .invitation .hero-text>p:not(.eyebrow):not(.hero-subtitle) { font-size: 12px; }
   .invitation .invite-section { padding: 55px 23px; scroll-margin-top: 145px; }
-  .invitation .invite-section h2 { font-size: 32px; }
+  .invitation .invite-section h2 { font-size: clamp(26px, 8.5vw, 32px); }
   .invitation .invite-prose { font-size: 14px; margin-bottom: 30px; }
   .invitation .story-item { grid-template-columns: minmax(0, 1fr); gap: 28px; }
   .invitation .story-image { max-width: 360px; margin: auto; }
