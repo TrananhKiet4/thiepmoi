@@ -19,7 +19,7 @@ export async function readPublicWishes(tx:Tx,eventId:string,limit:number,after?:
  const where:Prisma.WishWhereInput={
   consentPublic:true,moderationStatus:'APPROVED',deletedAt:null,approvedAt:{not:null},
   ...(excludeInvitationId?{invitationId:{not:excludeInvitationId}}:{}),
-  invitation:{eventId,revokedAt:null,guest:{archivedAt:null}},
+  invitation:{eventId,revokedAt:null,guest:{archivedAt:null},OR:[{familyParentId:null},{familyParent:{revokedAt:null,guest:{archivedAt:null}}}]},
  };
  if(after){
   const date=new Date(after.a);
@@ -40,7 +40,10 @@ export async function readPublicWishes(tx:Tx,eventId:string,limit:number,after?:
  const last=items.at(-1);
  return {items,nextCursor:rows.length>limit&&last?Buffer.from(JSON.stringify({p:last.isPinned,a:last.approvedAt!.toISOString(),id:last.id})).toString('base64url'):null};
 }
-export async function invitationView(content:Content,event:Event,guest?:Guest,invitation?:Invitation&{rsvp?:RSVP|null;wish?:Wish|null},preview=false,tx:Tx=prisma){
+export async function invitationView(content:Content,event:Event,guest?:Guest,invitation?:Invitation&{rsvp?:RSVP|null;wish?:Wish|null;familyParent?:Invitation&{guest:Guest}|null},preview=false,tx:Tx=prisma){
+ const card=invitation?.familyParent??invitation;
+ const responderName=invitation?.familyParent?(guest?.displayName||guest?.fullName):undefined;
+ guest=invitation?.familyParent?.guest??guest;
  const displayName=guest?.displayName||guest?.fullName||'Khách xem trước';
  const family=guest?.groupKey==='gia_dinh';
  const salutation=guest?.salutation.normalize('NFC').trim().toLocaleLowerCase('vi').replace(/\s+/gu,' ')??'';
@@ -56,7 +59,7 @@ export async function invitationView(content:Content,event:Event,guest?:Guest,in
  const recipientGreeting=family?'Thương gửi':/^(bạn|em)(?:\s|$)/u.test(salutation)?'Thân gửi':'Kính gửi';
  const openingVars={guestName:recipientName,hostName:content.host.fullName,salutation:guest?.salutation??'bạn'};
  const opening=content.sections.find(s=>s.type==='opening');
- const customOpening=invitation?.personalMessage||content.groupMessages[guest?.groupKey??''];
+ const customOpening=card?.personalMessage||content.groupMessages[guest?.groupKey??''];
  const sharedOpening=opening?.data.messageTemplate??'';
  const invite=family?'Thương mời':senior||aunt?'Kính mời':'Thân mời';
  const speaker=salutation==='em yêu'?'anh':family||aunt?'con':senior?'em':junior?'anh':'mình';
@@ -76,16 +79,19 @@ export async function invitationView(content:Content,event:Event,guest?:Guest,in
   if(section.type==='closing')return {...section,data:{message:usePronouns(section.data.message),attendingMessage:usePronouns(section.data.attendingMessage),declinedMessage:usePronouns(section.data.declinedMessage)}};
   if(section.type!=='invitation')return section;
   const lead=/^\s*(?:mình\s+)?trân trọng mời bạn(?=\s|[.,!]|$)/iu;
-  let message=invitation?.letterMessage||section.data.message;
-  if(!invitation?.letterMessage&&lead.test(message))message=message.replace(lead,()=>`Trân trọng mời ${address}`)
+  let message=card?.letterMessage||section.data.message;
+  if(!card?.letterMessage&&lead.test(message))message=message.replace(lead,()=>`Trân trọng mời ${address}`)
    .replaceAll('nếu bạn có thời gian',()=>`nếu ${address} có thời gian`)
    .replaceAll('mình rất muốn gặp bạn để',()=>`${speaker} rất muốn gặp ${address} để`)
    .replaceAll('gặp bạn để',()=>`gặp ${address} để`);
   const vars={...openingVars,salutation:address};
   const standardTitle=section.data.title.toLocaleLowerCase('vi')==='hẹn bạn trong ngày đặc biệt';
-  const title=invitation?.letterTitle?personalize(invitation.letterTitle,vars):standardTitle?`Hẹn ${headingAddress} trong ngày đặc biệt`:section.data.title;
+  const title=card?.letterTitle?personalize(card.letterTitle,vars):standardTitle?`Hẹn ${headingAddress} trong ngày đặc biệt`:section.data.title;
   return {...section,data:{title,message:personalize(message,vars)}};
  });
  const previewWishes=preview&&event.wallEnabled?(await readPublicWishes(tx,event.id,6,undefined,invitation?.id)).items:undefined;
- return {content:{...content,sections},media:mediaUrls(content),guest:{displayName,recipientName,fullName:guest?.fullName??displayName,salutation:openingVars.salutation,recipientGreeting,recipientAddress},personalMessage:openingMessage,rsvp:rsvpView(invitation?.rsvp),wish:wishView(invitation?.wish),canRsvp:!preview&&canWrite(event.rsvpEnabled,content.rsvpDeadline),canCreateOrEditWish:!preview&&canWrite(event.wishesEnabled,content.wishDeadline),canWithdrawWish:!preview&&!!invitation?.wish&&!invitation.wish.deletedAt,eventId:event.id,wallEnabled:event.wallEnabled,...(preview?{preview:true,previewWishes}:{})};
+ const shared=!!invitation?.allowMultipleResponses;
+ const canRsvp=!preview&&canWrite(event.rsvpEnabled,content.rsvpDeadline);
+ const canWish=!preview&&canWrite(event.wishesEnabled,content.wishDeadline);
+ return {content:{...content,sections},media:mediaUrls(content),guest:{displayName,recipientName,fullName:guest?.fullName??displayName,salutation:guest?.salutation??'',recipientGreeting,recipientAddress},personalMessage:openingMessage,rsvp:shared?null:rsvpView(invitation?.rsvp),wish:shared?null:wishView(invitation?.wish),canRsvp:!shared&&canRsvp,canCreateOrEditWish:!shared&&canWish,canWithdrawWish:!shared&&!preview&&!!invitation?.wish&&!invitation.wish.deletedAt,eventId:event.id,wallEnabled:event.wallEnabled,...(shared?{familyReply:{canRegister:canRsvp||canWish}}:{}),...(responderName?{responderName}:{}),...(preview?{preview:true,previewWishes}:{})};
 }

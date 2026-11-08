@@ -2,7 +2,7 @@ import type {Content} from '../../../packages/contracts/src/index.js';
 
 export function canWrite(enabled:boolean,deadline:string|Date|null,now=new Date()){return enabled&&(!deadline||now.getTime()<new Date(deadline).getTime());}
 export function personalize(template:string,vars:{guestName:string;hostName:string;salutation:string}){return template.replace(/\{\{(guestName|hostName|salutation)\}\}/g,(_,key:keyof typeof vars)=>vars[key]);}
-export function publicWish(w:any){return !!(w.consentPublic&&w.moderationStatus==='APPROVED'&&!w.deletedAt&&!w.invitation.revokedAt&&!w.invitation.guest.archivedAt);}
+export function publicWish(w:any){return !!(w.consentPublic&&w.moderationStatus==='APPROVED'&&!w.deletedAt&&!w.invitation.revokedAt&&!w.invitation.guest.archivedAt&&!w.invitation.familyParent?.revokedAt&&!w.invitation.familyParent?.guest.archivedAt);}
 const icsEscape=(v:string)=>v.replace(/\\/g,'\\\\').replace(/\r?\n/g,'\\n').replace(/;/g,'\\;').replace(/,/g,'\\,');
 const icsDate=(v:string)=>new Date(v).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');
 export function createCalendar(eventId:string,content:Content){

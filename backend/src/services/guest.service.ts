@@ -12,7 +12,7 @@ export const uuid=z.string().uuid();
 export const include={invitation:{include:{rsvp:true,wish:true}}} as const;
 export function safeGuest(guest:Prisma.GuestGetPayload<{include:typeof include}>){
  const {invitation,...fields}=guest;
- return {...fields,personalMessage:invitation?.personalMessage??'',invitation:invitation?{id:invitation.id,version:invitation.version,personalMessage:invitation.personalMessage,letterTitle:invitation.letterTitle,letterMessage:invitation.letterMessage,revokedAt:invitation.revokedAt,openedAt:invitation.openedAt,lastOpenedAt:invitation.lastOpenedAt,rsvp:invitation.rsvp,wish:invitation.wish}:null};
+ return {...fields,personalMessage:invitation?.personalMessage??'',invitation:invitation?{id:invitation.id,version:invitation.version,personalMessage:invitation.personalMessage,letterTitle:invitation.letterTitle,letterMessage:invitation.letterMessage,revokedAt:invitation.revokedAt,openedAt:invitation.openedAt,lastOpenedAt:invitation.lastOpenedAt,rsvp:invitation.rsvp,wish:invitation.wish,familyResponder:!!invitation.familyParentId}:null};
 }
 export function guestFilter(req:Pick<Request,'query'>,eventId:string):Prisma.GuestWhereInput{
  const q=z.object({q:z.string().trim().max(120).optional(),group:z.string().max(60).optional(),status:z.preprocess(v=>v===''?undefined:v,z.enum(['ATTENDING','DECLINED','UNANSWERED']).optional()),archived:z.enum(['true','false','all']).default('false')}).parse(req.query);

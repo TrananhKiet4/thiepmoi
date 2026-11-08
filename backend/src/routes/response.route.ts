@@ -1,11 +1,12 @@
 import {Router} from 'express';
 import {requireAdmin,requireGuest} from '../middleware/auth.middleware.js';
-import {getGuestInvitation,postGuestOpened,putGuestRsvp,putGuestWish,patchGuestWishVisibility,deleteGuestWish,getGuestWishes,getGuestCalendarIcs,getAdminEventsWishes,patchAdminWishesModeration,patchAdminWishesPin} from '../controllers/response.controller.js';
+import {getGuestInvitation,postGuestFamilyResponder,postGuestOpened,putGuestRsvp,putGuestWish,patchGuestWishVisibility,deleteGuestWish,getGuestWishes,getGuestCalendarIcs,getAdminEventsWishes,patchAdminWishesModeration,patchAdminWishesPin} from '../controllers/response.controller.js';
 
 export const guestRouter=Router();
 export const wishesAdminRouter=Router();
 guestRouter.get('/guest/invitation',requireGuest,getGuestInvitation);
 guestRouter.post('/guest/opened',requireGuest,postGuestOpened);
+guestRouter.post('/guest/family-responders',requireGuest,postGuestFamilyResponder);
 guestRouter.put('/guest/rsvp',requireGuest,putGuestRsvp);
 guestRouter.put('/guest/wish',requireGuest,putGuestWish);
 guestRouter.patch('/guest/wish/visibility',requireGuest,patchGuestWishVisibility);

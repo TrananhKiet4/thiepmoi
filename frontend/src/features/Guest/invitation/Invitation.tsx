@@ -12,7 +12,7 @@ import {Action,ErrorBox,Field,Loading} from '../../../components/ui/index';
 import {date} from '../../../utils/date';
 
 export default function Guest(){const {token='',guestName}=useParams(),credential=token.length===5&&guestName?token+'.'+encodeURIComponent(guestName):token;return <GuestData key={credential} token={credential}/>;}
-function GuestData({token}:{token:string}) {
+function useGuestData(token:string){
   const cache=useQueryClient(), controllers=useRef(new Set<AbortController>()),operations=useRef(new Map<string,{body:string;key:string}>()),[blocked,setBlocked]=useState<unknown>(null);
   const responsesToRefresh=useRef(new Set<'rsvp'|'wish'>());
   const refreshSequence=useRef(0);
@@ -27,7 +27,7 @@ function GuestData({token}:{token:string}) {
       const refresh=new Set(responsesToRefresh.current);
       const fresh=await request('/guest/invitation',{signal},token) as InvitationView;
       const previous=cache.getQueryData<InvitationView>(queryKey);
-      if(!previous)return fresh;
+      if(!previous||fresh.familyReply)return fresh;
       // Keep the other form's version so an unseen response change still causes a conflict.
       const rsvp=refresh.has('rsvp')?fresh.rsvp:previous.rsvp;
       const wish=refresh.has('wish')?fresh.wish:previous.wish;
@@ -55,6 +55,10 @@ function GuestData({token}:{token:string}) {
       throw error;
     }finally{controllers.current.delete(c);}
   }
+  return {query,save,blocked};
+}
+function GuestData({token}:{token:string}) {
+  const {query,save,blocked}=useGuestData(token);
   if(query.isPending&&!blocked)return <Loading/>;
   if(blocked||query.error&&(!query.data||query.error instanceof ApiError&&[401,404].includes(query.error.status))){
     const error=blocked||query.error;
@@ -129,7 +133,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    <p className="envelope-heading" aria-hidden="true"><span>Graduation</span><em>Invitation</em></p>
    <p className="eyebrow envelope-school">{c.host.university}</p>
    <div className="paper-envelope">
-    <div className="envelope-letter"><p className="eyebrow">{opening?.type==='opening'?opening.data.title:'MỘT LỜI MỜI DÀNH RIÊNG CHO'}</p><h1>{name}</h1><p className="signature">{c.host.fullName}</p></div>
+    <div className="envelope-letter"><p className="eyebrow">{opening?.type==='opening'?opening.data.title:'MỘT LỜI MỜI DÀNH RIÊNG CHO'}</p><h1>{name}</h1></div>
     <div className="envelope-fold" aria-hidden="true"/>
     <button className="wax-seal" aria-label="Mở thiệp" aria-disabled={phase==='opening'} onClick={open}><GraduationCap size={30} strokeWidth={1}/><span>Mở thiệp</span></button>
    </div>
@@ -169,7 +173,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
   case 'invitation':return <div className="invitation-letter">
    <PaperSparkle className="letter-sparkle"/>
    <h2>{s.data.title}</h2>
-   <p className="guest-recipient"><span>{view.guest.recipientGreeting??'Kính gửi'}</span><strong>{name}</strong></p>
+   <p className="guest-recipient"><span>{view.guest.recipientGreeting??'Kính gửi'}</span><strong>{view.guest.salutation&&<span className="recipient-salutation">{view.guest.salutation} </span>}{name}</strong></p>
    <p className="invite-prose">{s.data.message}</p>
    <GraduationSchedule ceremony={c.ceremony} phone={c.contact?.phone} facebookUrl={c.contact?.facebookUrl}/>
    <p className="signature">{c.host.fullName}</p>
@@ -188,7 +192,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
     </aside>}
    </>;
   }
-  case 'response':return <><h2>{s.data.title}</h2><Response view={view} save={save}/><p className="invite-prose">{s.data.wishIntro}</p><WishForm view={view} save={save}/>{(token&&view.wallEnabled!==false||view.previewWishes!==undefined)&&<Wall key={token} token={token} previewItems={view.previewWishes}/>}</>;
+  case 'response':return <><h2>{s.data.title}</h2>{view.familyReply?<FamilyReply view={view} token={token} intro={s.data.wishIntro}/>:<FeedbackForms view={view} token={token} save={save} intro={s.data.wishIntro}/>}</>;
   case 'closing':return <div className="closing"><span className="large-star" aria-hidden="true">✧</span><h2>{s.data.message}</h2><p>{view.rsvp?.status==='ATTENDING'?s.data.attendingMessage:view.rsvp?.status==='DECLINED'?s.data.declinedMessage:''}</p><p className="signature">{c.host.fullName}</p></div>;
   default:return null;
  }}
@@ -229,6 +233,68 @@ function PaperSparkle({className}:{className:string}){
 const sectionLabel:Record<string,string>={opening:'LỜI MỞ',hero:'KHOẢNH KHẮC',story:'CHẶNG ĐƯỜNG',gallery:'NGƯỜI ĐỒNG HÀNH',invitation:'MỘT LỜI HẸN',map:'ĐIỂM HẸN',response:'LỜI HỒI ĐÁP'};
 function AssetImage({asset,priority,sizes='(max-width: 767px) 86vw, 42vw'}:{asset:MediaView;priority:boolean;sizes?:string}){const [failed,setFailed]=useState(false);useEffect(()=>setFailed(false),[asset.url]);return failed?<div className="photo-placeholder" role="img" aria-label={asset.alt||'Khoảnh khắc đang được cập nhật'}><GraduationCap size={50} strokeWidth={1}/><span>Ảnh tạm thời không hiển thị</span></div>:<img src={asset.url} alt={asset.alt} width={asset.width||1200} height={asset.height||1500} srcSet={asset.srcSet} sizes={sizes} loading={priority?'eager':'lazy'} fetchPriority={priority?'high':'auto'} onError={()=>setFailed(true)}/>;}
 function MapView({location,image}:{location:Content['ceremony'];image?:MediaView}){return <div className="map-card">{image&&<div className="campus-map-image"><a href={image.url} target="_blank" rel="noopener noreferrer" aria-label="Mở ảnh sơ đồ trường đầy đủ"><AssetImage asset={image} priority={false} sizes="90vw"/></a></div>}<h3>{location.venueName}</h3><p>{location.address}</p><div className="row map-actions"><Action run={()=>navigator.clipboard.writeText(location.address)}>Sao chép địa chỉ</Action><a className="button secondary" href={googleMapsLink(location)} target="_blank" rel="noopener noreferrer">Mở Google Maps <ArrowUpRight size={17}/></a></div></div>;}
+function FeedbackForms({view,token,save,intro}:{view:InvitationView;token?:string;save?:ReturnType<typeof useGuestData>['save'];intro:string}){
+ return <><Response view={view} save={save}/><p className="invite-prose">{intro}</p><WishForm view={view} save={save}/>{(token&&view.wallEnabled!==false||view.previewWishes!==undefined)&&<Wall key={token} token={token} previewItems={view.previewWishes}/>}</>;
+}
+function FamilyReply({view,token,intro}:{view:InvitationView;token?:string;intro:string}){
+ const storageKey=`graduation.family.${token}`;
+ const pendingKey=storageKey+'.pending';
+ const [credential,setCredential]=useState(()=>{
+  try{return token?sessionStorage.getItem(storageKey)??'':'';}catch{return '';}
+ });
+ const [name,setName]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null);
+ const operation=useRef<{name:string;key:string}|null>(null);
+ const canRegister=!!token&&view.familyReply?.canRegister===true;
+ function selectResponder(value:string){
+  try{if(value)sessionStorage.setItem(storageKey,value);else sessionStorage.removeItem(storageKey);}catch{}
+  setCredential(value);
+ }
+ if(credential)return <FamilyResponseForms key={credential} credential={credential} intro={intro} onChange={()=>{setName('');selectResponder('');}}/>;
+ return <>
+  <form className="guest-form" onSubmit={async e=>{
+   e.preventDefault();
+   const submitted=name.trim();
+   if(!canRegister||!submitted||busy)return;
+   setBusy(true);setError(null);
+   if(operation.current?.name!==submitted){
+    let key=crypto.randomUUID();
+    try{
+     const pending=JSON.parse(sessionStorage.getItem(pendingKey)??'null');
+     if(pending?.name===submitted&&typeof pending.key==='string')key=pending.key;
+     sessionStorage.setItem(pendingKey,JSON.stringify({name:submitted,key}));
+    }catch{}
+    operation.current={name:submitted,key};
+   }
+   try{
+    const result=await request('/guest/family-responders',{method:'POST',body:JSON.stringify({name:submitted}),headers:{'Idempotency-Key':operation.current.key}},token);
+    operation.current=null;
+    selectResponder(result.token);
+    try{sessionStorage.removeItem(pendingKey);}catch{}
+   }catch(error){setError(error);}finally{setBusy(false);}
+  }}>
+   <Field label="Người phản hồi"><input value={name} onChange={e=>setName(e.target.value)} maxLength={120} autoComplete="name" required disabled={!canRegister||busy} placeholder="Nhập tên của bạn"/></Field>
+   <button type="submit" className="button" disabled={!canRegister||busy||!name.trim()}>{busy?'Đang chuẩn bị…':'Tiếp tục'}</button>
+   {!view.preview&&!canRegister&&<p className="muted">Hiện đã ngừng nhận phản hồi mới.</p>}
+   <ErrorBox error={error}/>
+  </form>
+  {(token&&view.wallEnabled!==false||view.previewWishes!==undefined)&&<Wall token={token} previewItems={view.previewWishes}/>}
+ </>;
+}
+function FamilyResponseForms({credential,intro,onChange}:{credential:string;intro:string;onChange:()=>void}){
+ const {query,save,blocked}=useGuestData(credential);
+ const error=blocked||query.error;
+ const unauthorized=error instanceof ApiError&&[401,404].includes(error.status);
+ return <>
+  <div className="row wrap" style={{justifyContent:'center',marginBottom:16}}>
+   {query.data?.responderName&&!blocked&&<p>Người phản hồi <strong>{query.data.responderName}</strong></p>}
+   <button type="button" className="button secondary" onClick={onChange}>Đổi người phản hồi</button>
+  </div>
+  <ErrorBox error={error}/>
+  {query.error&&!unauthorized&&<Action run={()=>query.refetch()}>Thử lại</Action>}
+  {query.isPending&&!blocked&&<Loading/>}
+  {query.data&&!blocked&&!unauthorized&&<FeedbackForms view={query.data} token={credential} save={save} intro={intro}/>}
+ </>;
+}
 function Response({view,save}: {view:InvitationView;save?:any}) {
  const [status,setStatus]=useState(view.rsvp?.status||'ATTENDING'),[error,setError]=useState<unknown>(null),[busy,setBusy]=useState(false),[done,setDone]=useState(false);
  return <form className="guest-form" onSubmit={async e=>{
@@ -236,7 +302,7 @@ function Response({view,save}: {view:InvitationView;save?:any}) {
   try{await save('/guest/rsvp','PUT',{status,note:view.rsvp?.note??'',expectedVersion:view.rsvp?.version||0});setDone(true);}catch(e){setError(e);}finally{setBusy(false);}
  }}><fieldset disabled={!view.canRsvp||view.preview||busy}>
   <legend className="sr-only">Xác nhận tham dự</legend>
-  <p className="response-recipient">Khách mời<strong>{view.guest.recipientName||view.guest.displayName||view.guest.fullName||'Bạn'}</strong></p>
+  <p className="response-recipient">{view.responderName?'Người phản hồi':'Khách mời'}<strong>{view.responderName||view.guest.recipientName||view.guest.displayName||view.guest.fullName||'Bạn'}</strong></p>
   <div className="radio-cards"><label><input type="radio" name="rsvp" checked={status==='ATTENDING'} onChange={()=>setStatus('ATTENDING')}/><Check size={20}/> Mình sẽ đến</label><label><input type="radio" name="rsvp" checked={status==='DECLINED'} onChange={()=>setStatus('DECLINED')}/><Heart size={20}/> Hẹn một dịp khác</label></div>
   <button className="button" disabled={busy}><Send size={16}/>{busy?'Đang gửi…':'Gửi xác nhận'}</button>
  </fieldset>{!view.canRsvp&&<p className="muted">Hiện đã ngừng nhận xác nhận.</p>}<ErrorBox error={error}/>{done&&<p role="status" className="success">Đã lưu lời hồi đáp của bạn. Cảm ơn bạn!</p>}</form>;

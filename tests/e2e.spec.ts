@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import ExcelJS from 'exceljs';
+import {PrismaClient} from '@prisma/client';
 import type { Page } from '@playwright/test';
 import {companionPhotoPath,companionPhotos,demoMediaId} from '@invite/contracts';
 import {fileURLToPath} from 'node:url';
@@ -11,6 +12,55 @@ test('configured admin alias signs in through the username field',async({page})=
  await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);
  await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.',exact:true})).toBeVisible();
+});
+
+test('two people reply independently on the same family link',async({page,browser})=>{
+ const dbUrl=new URL(process.env.DATABASE_URL!);
+ if(!['localhost','127.0.0.1'].includes(dbUrl.hostname)||!dbUrl.pathname.endsWith('_e2e'))throw new Error('Family fixture requires a local E2E database');
+ await page.goto('/admin');
+ await page.getByLabel('Email').fill(process.env.ADMIN_BOOTSTRAP_EMAIL!);
+ await page.getByLabel('Mật khẩu').fill(process.env.ADMIN_BOOTSTRAP_PASSWORD!);
+ await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Một ngày đáng nhớ.',exact:true})).toBeVisible();
+ const event=(await (await page.request.get('/api/v1/admin/events/current')).json()).data;
+ const me=(await (await page.request.get('/api/v1/admin/auth/me')).json()).data;
+ const headers={Origin:process.env.APP_ORIGIN!,'X-CSRF-Token':me.csrfToken};
+ const created=await page.request.post(`/api/v1/admin/events/${event.id}/guests`,{headers,data:{guestCode:'GROUP-'+crypto.randomUUID().slice(0,8),fullName:'Đại gia đình thử nghiệm',groupKey:'gia_dinh'}});
+ expect(created.status()).toBe(201);
+ const row=(await created.json()).data;
+ const prisma=new PrismaClient({datasourceUrl:dbUrl.href});
+ const viewport=page.viewportSize()??undefined;
+ const contexts=await Promise.all([browser.newContext({viewport}),browser.newContext({viewport})]);
+ try{
+  await prisma.invitation.update({where:{id:row.invitation.id},data:{allowMultipleResponses:true}});
+  const {data:{url}}=await (await page.request.get(`/api/v1/admin/invitations/${row.invitation.id}/link`)).json();
+  const visitors=await Promise.all(contexts.map(context=>context.newPage()));
+  for(const [index,visitor] of visitors.entries()){
+   await visitor.goto(url);
+   await expect(visitor.locator('.envelope-letter .signature')).toHaveCount(0);
+   await visitor.getByRole('button',{name:'Mở thiệp',exact:true}).click();
+   await expect(visitor.getByRole('button',{name:'Gửi xác nhận',exact:true})).toHaveCount(0);
+   await visitor.getByLabel('Người phản hồi',{exact:true}).fill(`Người thử ${index+1}`);
+   await visitor.getByRole('button',{name:'Tiếp tục',exact:true}).click();
+   await expect(visitor.locator('.response-recipient strong')).toHaveText(`Người thử ${index+1}`);
+   await visitor.getByRole('radio',{name:index?'Hẹn một dịp khác':'Mình sẽ đến',exact:true}).check();
+   await visitor.getByRole('button',{name:'Gửi xác nhận',exact:true}).click();
+   await expect(visitor.getByText('Đã lưu lời hồi đáp', {exact:false})).toBeVisible();
+   await visitor.getByLabel('Lời chúc của bạn',{exact:true}).fill(`Lời chúc thử ${index+1}`);
+   await visitor.getByRole('button',{name:'Gửi lời chúc',exact:true}).click();
+   await expect(visitor.getByText('Lời chúc đã được lưu. Cảm ơn bạn!',{exact:true})).toBeVisible();
+  }
+  await visitors[0].reload();
+  await visitors[0].getByRole('button',{name:'Mở thiệp',exact:true}).click();
+  await expect(visitors[0].getByRole('radio',{name:'Mình sẽ đến',exact:true})).toBeChecked();
+  await expect(visitors[0].getByLabel('Lời chúc của bạn',{exact:true})).toHaveValue('Lời chúc thử 1');
+  const records=await prisma.invitation.findMany({where:{familyParentId:row.invitation.id},include:{guest:true,rsvp:true,wish:true},orderBy:{guest:{fullName:'asc'}}});
+  expect(records.map(record=>[record.guest.fullName,record.rsvp?.status,record.wish?.body])).toEqual([['Người thử 1','ATTENDING','Lời chúc thử 1'],['Người thử 2','DECLINED','Lời chúc thử 2']]);
+ }finally{
+  await Promise.all(contexts.map(context=>context.close()));
+  await prisma.$disconnect();
+  await page.request.delete(`/api/v1/admin/guests/${row.id}`,{headers,data:{expectedVersion:row.version}});
+ }
 });
 
 test('admin edits a guest letter and previews it on the existing link',async({page,context})=>{
@@ -47,7 +97,7 @@ test('admin edits a guest letter and previews it on the existing link',async({pa
   await expect(dialog.locator('.envelope-letter h1')).toHaveText(name);
   await dialog.getByRole('button',{name:'Mở thiệp',exact:true}).click();
   await expect(dialog.locator('.invitation-letter h2')).toHaveText('Một lời hẹn riêng');
-  await expect(dialog.locator('.guest-recipient strong')).toHaveText(name);
+  await expect(dialog.locator('.guest-recipient strong')).toHaveText(displayName);
   await expect(dialog.locator('.invitation-letter > .eyebrow')).toHaveCount(0);
   await guestPage.goto(url);
   await expect(guestPage.locator('.envelope-message')).toHaveText('Lời mở dành riêng');

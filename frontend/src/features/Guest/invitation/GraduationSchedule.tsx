@@ -1,5 +1,5 @@
 import type {Content} from '@invite/contracts';
-import {CalendarDays, Clock3, Facebook, MapPin, Phone} from 'lucide-react';
+import {CalendarDays, Clock3, MapPin, Phone} from 'lucide-react';
 import {useEffect, useState} from 'react';
 import './graduation-schedule.css';
 
@@ -51,12 +51,12 @@ export function GraduationSchedule({ceremony, phone, facebookUrl}: {
           <dt><MapPin aria-hidden="true" size={17}/> Địa điểm</dt>
           <dd>{ceremony.venueName && <strong>{ceremony.venueName}</strong>}{ceremony.address}{!ceremony.venueName && !ceremony.address && 'Đang cập nhật'}</dd>
         </div>
-        {phone && <div>
+        {(phone || facebookUrl) && <div>
           <dt><Phone aria-hidden="true" size={17}/> Liên hệ</dt>
-          <dd>{/^\+?\d+$/.test(phoneNumber) ? <a href={`tel:${phoneNumber}`}>{phone}</a> : phone}</dd>
+          {phone && <dd>{/^\+?\d+$/.test(phoneNumber) ? <a href={`tel:${phoneNumber}`}>{phone}</a> : phone}</dd>}
+          {facebookUrl && <dd><a href={facebookUrl} target="_blank" rel="noopener noreferrer">Facebook</a></dd>}
         </div>}
       </dl>
-      {facebookUrl && <a className="button secondary" href={facebookUrl} target="_blank" rel="noopener noreferrer"><Facebook size={16} aria-hidden="true"/> Facebook</a>}
     </div>
   </section>;
 }

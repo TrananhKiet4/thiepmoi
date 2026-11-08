@@ -41,8 +41,9 @@ export const deleteAdminGuest:RequestHandler=async(req,res)=>{
   await lockEvent(tx,guest.eventId);
   if(guest.version!==expectedVersion)throw conflict();
   await tx.$queryRaw`SELECT id FROM "Guest" WHERE id=${id}::uuid FOR UPDATE`;
-  if(guest.invitation){
-   const invitationId=guest.invitation.id;
+  const responders=guest.invitation?await tx.invitation.findMany({where:{familyParentId:guest.invitation.id},select:{id:true,guestId:true}}):[];
+  for(const invitation of guest.invitation?[...responders,guest.invitation]:[]){
+   const invitationId=invitation.id;
    await tx.$queryRaw`SELECT id FROM "Invitation" WHERE id=${invitationId}::uuid FOR UPDATE`;
    const links=await tx.invitationLink.findMany({
     where:{invitationId},
@@ -62,8 +63,9 @@ export const deleteAdminGuest:RequestHandler=async(req,res)=>{
    }
    await tx.rSVP.deleteMany({where:{invitationId}});
    await tx.wish.deleteMany({where:{invitationId}});
-   await tx.idempotencyRecord.deleteMany({where:{actorKeyHash:hashToken(invitationId),scope:{in:['guest.rsvp','guest.wish']}}});
+   await tx.idempotencyRecord.deleteMany({where:{actorKeyHash:hashToken(invitationId),scope:{in:['guest.rsvp','guest.wish','guest.family-responder']}}});
    await tx.invitation.delete({where:{id:invitationId}});
+   if(invitation.guestId!==id)await tx.guest.delete({where:{id:invitation.guestId}});
   }
   await tx.guest.delete({where:{id,version:expectedVersion}});
   await audit(tx,req,'GUEST_DELETED',guest.eventId,'Guest',id);
@@ -79,6 +81,7 @@ export const patchAdminInvitationContent:RequestHandler=async(req,res)=>{
   const found=await adminInvitation(tx,req,id);
   await lockEvent(tx,found.eventId);
   const invitation=await adminInvitation(tx,req,id);
+  if(invitation.familyParentId)throw new AppError(422,'FAMILY_RESPONDER','Sửa nội dung tại thiệp gia đình');
   if(invitation.version!==expectedVersion)throw conflict();
   if(invitation.personalMessage===data.personalMessage&&invitation.letterTitle===data.letterTitle&&invitation.letterMessage===data.letterMessage)return {version:invitation.version};
   const updated=await tx.invitation.update({where:{id,version:expectedVersion},data:{...data,version:{increment:1}},select:{version:true}});

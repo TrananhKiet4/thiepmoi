@@ -87,6 +87,10 @@ model Invitation {
  event Event @relation(fields:[eventId],references:[id])
  guestId String @unique @db.Uuid
  guest Guest @relation(fields:[guestId],references:[id])
+ allowMultipleResponses Boolean @default(false)
+ familyParentId String? @db.Uuid
+ familyParent Invitation? @relation("FamilyResponses",fields:[familyParentId],references:[id],onDelete:Restrict)
+ familyResponses Invitation[] @relation("FamilyResponses")
  personalMessage String @default("")
  letterTitle String @default("")
  letterMessage String @default("")
@@ -103,6 +107,7 @@ model Invitation {
  wish Wish?
  links InvitationLink[]
  @@index([eventId,revokedAt])
+ @@index([familyParentId])
 }
 model InvitationLink {
  codeHash String @id

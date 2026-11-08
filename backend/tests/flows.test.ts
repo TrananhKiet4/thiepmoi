@@ -134,6 +134,47 @@ describe('published invitation and immutable content',()=>{
  });
 });
 describe('versioned guest responses',()=>{
+ it('keeps named replies on a shared family invitation independent',async()=>{
+  const register=(name:string,key=randomUUID(),token?:string)=>guest('post','family-responders',token).set('Idempotency-Key',key).send({name});
+  expect((await register('Khách A')).status).toBe(404);
+  await prisma.rSVP.create({data:{invitationId:f.invitation.id,status:'ATTENDING',note:'Phản hồi gia đình trước đây'}});
+  await prisma.invitation.update({where:{id:f.invitation.id},data:{allowMultipleResponses:true}});
+  const shared=(await guest('get','invitation')).body.data;
+  expect(shared.familyReply).toEqual({canRegister:true});
+  expect(shared.rsvp).toBeNull();
+  expect(shared.canRsvp).toBe(false);
+  expect((await guest('put','rsvp').set('Idempotency-Key',randomUUID()).send({status:'DECLINED',expectedVersion:1})).body.error.code).toBe('RESPONDER_REQUIRED');
+  expect((await guest('put','wish').set('Idempotency-Key',randomUUID()).send({body:'Lời chúc không có tên',consentPublic:false,expectedVersion:0})).body.error.code).toBe('RESPONDER_REQUIRED');
+  const key=randomUUID();
+  const first=await register('Khách A',key),replay=await register('Khách A',key),second=await register('Khách B');
+  expect([first.status,replay.status,second.status]).toEqual([201,201,201]);
+  const a=first.body.data.token,b=second.body.data.token;
+  expect(replay.body.data.token).toBe(a);
+  expect(b).not.toBe(a);
+  expect((await register('Khách C',randomUUID(),a)).status).toBe(404);
+  expect(await prisma.invitation.count({where:{familyParentId:f.invitation.id}})).toBe(2);
+  const reply=await guest('put','rsvp',a).set('Idempotency-Key',randomUUID()).send({status:'ATTENDING',expectedVersion:0});
+  expect(reply.status).toBe(200);
+  expect((await guest('put','rsvp',b).set('Idempotency-Key',randomUUID()).send({status:'DECLINED',expectedVersion:0})).status).toBe(200);
+  for(const [token,body] of [[a,'Lời chúc A'],[b,'Lời chúc B']]){
+   expect((await guest('put','wish',token).set('Idempotency-Key',randomUUID()).send({body,consentPublic:true,expectedVersion:0})).status).toBe(200);
+  }
+  const privateA=(await guest('get','invitation',a)).body.data,privateB=(await guest('get','invitation',b)).body.data;
+  expect(privateA).toMatchObject({responderName:'Khách A',guest:{displayName:shared.guest.displayName},rsvp:{status:'ATTENDING'},wish:{body:'Lời chúc A'}});
+  expect(privateB).toMatchObject({responderName:'Khách B',rsvp:{status:'DECLINED'},wish:{body:'Lời chúc B'}});
+  expect((await guest('get','invitation')).body.data.wish).toBeNull();
+  expect((await guest('get','wishes')).body.data.items.map((item:{displayName:string})=>item.displayName).sort()).toEqual(['Khách A','Khách B']);
+  const adminRows=(await admin('get',`events/${f.event.id}/guests`)).body.data.items;
+  expect(adminRows.filter((row:any)=>row.invitation.familyResponder).map((row:any)=>row.fullName).sort()).toEqual(['Khách A','Khách B']);
+  expect((await admin('post',`invitations/${f.invitation.id}/revoke`).send({expectedVersion:f.invitation.version})).status).toBe(200);
+  expect((await guest('get','invitation',a)).status).toBe(404);
+  expect((await guest('get','invitation',b)).status).toBe(404);
+  expect((await admin('get',`events/${f.event.id}/preview`)).body.data.previewWishes).toEqual([]);
+  expect((await admin('delete',`guests/${f.guest.id}`).send({expectedVersion:f.guest.version})).status).toBe(204);
+  expect(await prisma.rSVP.count()).toBe(0);
+  expect(await prisma.wish.count()).toBe(0);
+  expect(await prisma.guest.count()).toBe(0);
+ });
  it('returns the same result to simultaneous retries of one idempotent create',async()=>{
   const key=randomUUID(),body={status:'ATTENDING',note:'One submission',expectedVersion:0};
   const results=await Promise.all([1,2].map(()=>guest('put','rsvp').set('Idempotency-Key',key).send(body)));

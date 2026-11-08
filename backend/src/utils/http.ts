@@ -17,8 +17,8 @@ export async function audit(tx:Tx,req:Request,action:string,eventId:string,entit
 }
 function canonical(value:any):string{if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';if(value&&typeof value==='object')return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+canonical(value[k])).join(',')+'}';return JSON.stringify(value);}
 export async function assertGuestActive(tx:Tx,invitationId:string,expectedTokenHash?:string){
- const inv=await tx.invitation.findUnique({where:{id:invitationId},include:{event:true,guest:true,rsvp:true,wish:true}});
- if(!inv||inv.revokedAt||inv.guest.archivedAt||(expectedTokenHash&&inv.tokenHash!==expectedTokenHash))throw new AppError(404,'INVITATION_NOT_AVAILABLE','Thiệp không khả dụng');
+ const inv=await tx.invitation.findUnique({where:{id:invitationId},include:{event:true,guest:true,rsvp:true,wish:true,familyParent:{include:{guest:true}}}});
+ if(!inv||inv.revokedAt||inv.guest.archivedAt||inv.familyParent?.revokedAt||inv.familyParent?.guest.archivedAt||(expectedTokenHash&&inv.tokenHash!==expectedTokenHash))throw new AppError(404,'INVITATION_NOT_AVAILABLE','Thiệp không khả dụng');
  if(!inv.event.publishedRevisionId)throw new AppError(404,'EVENT_NOT_AVAILABLE','Thiệp chưa sẵn sàng');return inv;
 }
 export async function idempotent<T>(req:Request,scope:string,actorKeyHash:string,body:unknown,fn:(tx:Tx)=>Promise<T>):Promise<T>{
@@ -27,7 +27,9 @@ export async function idempotent<T>(req:Request,scope:string,actorKeyHash:string
  // Serialize identical keys before reading replay state, including simultaneous first requests.
  return withTransaction(async tx=>{
   await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope+actorKeyHash+key},0))::text`;
-  if(req.invitation){await tx.$queryRaw`SELECT id FROM "Event" WHERE id=${req.invitation.eventId}::uuid FOR UPDATE`;await tx.$queryRaw`SELECT id FROM "Invitation" WHERE id=${req.invitation.id}::uuid FOR UPDATE`;await assertGuestActive(tx,req.invitation.id,req.invitation.tokenHash);}
+  if(req.invitation){await tx.$queryRaw`SELECT id FROM "Event" WHERE id=${req.invitation.eventId}::uuid FOR UPDATE`;await tx.$queryRaw`SELECT id FROM "Invitation" WHERE id=${req.invitation.id}::uuid FOR UPDATE`;const invitation=await assertGuestActive(tx,req.invitation.id,req.invitation.tokenHash);
+   if(invitation.allowMultipleResponses&&(scope==='guest.rsvp'||scope==='guest.wish'))throw new AppError(422,'RESPONDER_REQUIRED','Vui lòng nhập tên người phản hồi');
+  }
   const record=await tx.idempotencyRecord.findUnique({where});
   if(record&&record.expiresAt>new Date()){if(record.requestHash!==requestHash)throw new AppError(409,'IDEMPOTENCY_CONFLICT','Khóa gửi lại đã được dùng với nội dung khác');return record.responseJson as T;}
   if(record)await tx.idempotencyRecord.delete({where:{id:record.id}});

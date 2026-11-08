@@ -51,14 +51,14 @@ export const getAdminEventsPreview:RequestHandler=async(req,res)=>{
   const revisionId=source==='published'?(event.publishedRevisionId??event.draftRevisionId):event.draftRevisionId;
   const revision=revisionId?await tx.eventRevision.findFirst({where:{id:revisionId,eventId:event.id}}):null;
   if(!revision)throw new AppError(404,'DRAFT_REQUIRED','Chưa có bản nháp');
-  const guestId=z.string().uuid().optional().parse(req.query.guestId),guest=guestId?await tx.guest.findFirst({where:{id:guestId,eventId:event.id},include:{invitation:{include:{rsvp:true,wish:true}}}}):null;
+  const guestId=z.string().uuid().optional().parse(req.query.guestId),guest=guestId?await tx.guest.findFirst({where:{id:guestId,eventId:event.id},include:{invitation:{include:{rsvp:true,wish:true,familyParent:{include:{guest:true}}}}}}):null;
   if(guestId&&!guest)throw new AppError(404,'NOT_FOUND','Không tìm thấy khách');
   return invitationView(contentSchema.parse(revision.contentJson),event,guest??undefined,guest?.invitation??undefined,true,tx);
  }));
 };
 export const getAdminEventsDashboard:RequestHandler=async(req,res)=>{
  ok(res,await withTransaction(async tx=>{
-  const event=await ownedEvent(req,String(req.params.id),tx),where={eventId:event.id,revokedAt:null,guest:{archivedAt:null}};
+  const event=await ownedEvent(req,String(req.params.id),tx),where={eventId:event.id,revokedAt:null,guest:{archivedAt:null},OR:[{familyParentId:null},{familyParent:{revokedAt:null,guest:{archivedAt:null}}}]};
   const [total,attending,declined,publicWishes,opened]=await Promise.all([tx.invitation.count({where}),tx.invitation.count({where:{...where,rsvp:{status:'ATTENDING'}}}),tx.invitation.count({where:{...where,rsvp:{status:'DECLINED'}}}),tx.wish.count({where:{deletedAt:null,consentPublic:true,moderationStatus:'APPROVED',approvedAt:{not:null},invitation:where}}),tx.invitation.count({where:{...where,openedAt:{not:null}}})]);
   return {total,attending,declined,unanswered:total-attending-declined,publicWishes,opened};
  }));
