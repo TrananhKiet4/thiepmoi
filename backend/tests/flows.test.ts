@@ -31,7 +31,7 @@ describe('published invitation and immutable content',()=>{
   expect((await admin('patch',path).send(data)).status).toBe(409);
   const current=(await guest('get','invitation',credential)).body.data;
   expect(current.personalMessage).toBe(data.personalMessage);
-  expect(letter(current)).toEqual({title:data.letterTitle,message:`Trân trọng mời ${current.guest.displayName} đến dự lễ.`});
+  expect(letter(current)).toEqual({title:data.letterTitle,message:`Trân trọng mời ${current.guest.recipientName} đến dự lễ.`});
   const draft=await prisma.eventRevision.create({data:{eventId:f.event.id,revisionNo:2,contentJson:{...f.content,host:{...f.content.host,fullName:'Chỉ có ở bản nháp'}}}});
   await prisma.event.update({where:{id:f.event.id},data:{draftRevisionId:draft.id}});
   const preview=(await admin('get',`events/${f.event.id}/preview?guestId=${f.guest.id}&source=published`)).body.data;
@@ -56,26 +56,31 @@ describe('published invitation and immutable content',()=>{
   })};
   const revision=await prisma.eventRevision.create({data:{eventId:f.event.id,revisionNo:2,contentJson:content}});
   await prisma.event.update({where:{id:f.event.id},data:{publishedRevisionId:revision.id}});
-  for(const [groupKey,salutation,displayName,greeting,address,inviting,speaker,sentenceSpeaker] of [
-   ['club','Anh','Anh Khách','Kính gửi','anh','Kính mời','em','Em'],
-   ['club','Chị hai','Chị hai Khách','Kính gửi','chị hai','Kính mời','em','Em'],
-   ['club','Bạn','Bạn Khách','Thân gửi','bạn','Thân mời','mình','Mình'],
-   ['club','Em','Em Khách','Thân gửi','em','Thân mời','anh','Anh'],
-   ['club','','Thím iu','Kính gửi','Thím iu','Kính mời','con','Con'],
-   ['gia_dinh','','Đại gia đình thương yêu','Thương gửi','đại gia đình','Thương mời','con','Con'],
-   ['gia_dinh','Em yêu','Em yêu Khách','Thương gửi','em yêu','Thương mời','con','Con'],
+  for(const [groupKey,salutation,displayName,recipientName,greeting,address,headingAddress,inviting,speaker,sentenceSpeaker] of [
+   ['club','Anh','Anh Khách','Khách','Kính gửi','anh','anh','Kính mời','em','Em'],
+   ['club','Anh hai','Anh hai Khách','Khách','Kính gửi','anh hai','anh','Kính mời','em','Em'],
+   ['club','Chị hai','Chị hai Khách','Khách','Kính gửi','chị hai','chị','Kính mời','em','Em'],
+   ['club','Bạn','Khách','Khách','Thân gửi','bạn','bạn','Thân mời','mình','Mình'],
+   ['club','Em','Em Khách','Khách','Thân gửi','em','em','Thân mời','anh','Anh'],
+   ['club','','Thím iu','Thím iu','Kính gửi','Thím iu','Thím iu','Kính mời','con','Con'],
+   ['gia_dinh','','Đại gia đình thương yêu','Đại gia đình thương yêu','Thương gửi','đại gia đình','cả nhà','Thương mời','con','Con'],
+   ['gia_dinh','Em yêu','Em yêu Khách','Khách','Thương gửi','em yêu','em yêu','Thương mời','con','Con'],
   ]){
    await prisma.guest.update({where:{id:f.guest.id},data:{groupKey,salutation,displayName}});
    const response=await guest('get','invitation');
    expect(response.status).toBe(200);
+   expect(response.body.data.guest.displayName).toBe(displayName);
+   expect(response.body.data.guest.recipientName).toBe(recipientName);
    expect(response.body.data.guest.recipientGreeting).toBe(greeting);
    expect(response.body.data.content.sections.find((section:{type:string})=>section.type==='opening').data.title).toBe('MỘT LỜI MỜI DÀNH RIÊNG CHO');
-   expect(response.body.data.personalMessage).toBe(`${inviting} ${displayName} đến chung vui trong lễ tốt nghiệp của ${speaker}. ${sentenceSpeaker} rất mong được gặp ${address} và chụp cùng nhau một tấm ảnh để nhớ ngày này.`);
-   expect(response.body.data.content.sections.find((section:{type:string})=>section.type==='invitation').data.message)
+   expect(response.body.data.personalMessage).toBe(`${inviting} ${recipientName} đến chung vui trong lễ tốt nghiệp của ${speaker}. ${sentenceSpeaker} rất mong được gặp ${address} và chụp cùng nhau một tấm ảnh để nhớ ngày này.`);
+   const letter=response.body.data.content.sections.find((section:{type:string})=>section.type==='invitation').data;
+   expect(letter.title).toBe(`Hẹn ${headingAddress} trong ngày đặc biệt`);
+   expect(letter.message)
     .toBe(`Trân trọng mời ${address} đến dự lễ tốt nghiệp. Sau buổi lễ, nếu ${address} có thời gian, mình rất muốn gặp ${address} để chụp ảnh cùng bạn bè.`);
   }
   await prisma.invitation.update({where:{id:f.invitation.id},data:{personalMessage:'Lời mở riêng dành cho {{guestName}}.'}});
-  expect((await guest('get','invitation')).body.data.personalMessage).toBe('Lời mở riêng dành cho Em yêu Khách.');
+  expect((await guest('get','invitation')).body.data.personalMessage).toBe('Lời mở riêng dành cho Khách.');
  });
  it('issues a stable five-character named link while keeping the original capability valid',async()=>{
   await prisma.guest.update({where:{id:f.guest.id},data:{fullName:'Đặng Thị Ánh',displayName:'Bạn Ánh'}});

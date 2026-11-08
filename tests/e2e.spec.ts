@@ -23,7 +23,8 @@ test('admin edits a guest letter and previews it on the existing link',async({pa
  const admin=(await (await page.request.get('/api/v1/admin/auth/me')).json()).data;
  const headers={Origin:process.env.APP_ORIGIN!,'X-CSRF-Token':admin.csrfToken};
  const name='Khách sửa thiệp '+crypto.randomUUID().slice(0,8);
- const created=await page.request.post(`/api/v1/admin/events/${event.id}/guests`,{headers,data:{guestCode:'EDIT-'+crypto.randomUUID().slice(0,8),fullName:name}});
+ const displayName='Em yêu '+name;
+ const created=await page.request.post(`/api/v1/admin/events/${event.id}/guests`,{headers,data:{guestCode:'EDIT-'+crypto.randomUUID().slice(0,8),fullName:name,displayName,salutation:'Em yêu'}});
  expect(created.status()).toBe(201);
  const row=(await created.json()).data;
  const guestPage=await context.newPage();
@@ -31,7 +32,7 @@ test('admin edits a guest letter and previews it on the existing link',async({pa
   const {data:{url}}=await (await page.request.get(`/api/v1/admin/invitations/${row.invitation.id}/link`)).json();
   await page.goto('/admin/guests');
   await page.getByLabel('Tìm khách mời').fill(name);
-  const edit=page.getByRole('button',{name:'Nội dung thiệp của '+name,exact:true});
+  const edit=page.getByRole('button',{name:'Nội dung thiệp của '+displayName,exact:true});
   await edit.click();
   let dialog=page.getByRole('dialog');
   await dialog.getByLabel('Lời mở phong bì').fill('Lời mở dành riêng');
@@ -43,12 +44,16 @@ test('admin edits a guest letter and previews it on the existing link',async({pa
   dialog=page.getByRole('dialog');
   await dialog.getByRole('button',{name:'Xem thiệp đã lưu',exact:true}).click();
   await expect(dialog.locator('.envelope-message')).toHaveText('Lời mở dành riêng');
+  await expect(dialog.locator('.envelope-letter h1')).toHaveText(name);
   await dialog.getByRole('button',{name:'Mở thiệp',exact:true}).click();
   await expect(dialog.locator('.invitation-letter h2')).toHaveText('Một lời hẹn riêng');
+  await expect(dialog.locator('.guest-recipient strong')).toHaveText(name);
+  await expect(dialog.locator('.invitation-letter > .eyebrow')).toHaveCount(0);
   await guestPage.goto(url);
   await expect(guestPage.locator('.envelope-message')).toHaveText('Lời mở dành riêng');
   await guestPage.getByRole('button',{name:'Mở thiệp',exact:true}).click();
   await expect(guestPage.locator('.invitation-letter .invite-prose')).toHaveText('Hẹn gặp bạn ở lễ tốt nghiệp.');
+  await expect(guestPage.locator('.response-recipient strong')).toHaveText(name);
  }finally{
   await guestPage.close();
   await page.request.delete(`/api/v1/admin/guests/${row.id}`,{headers,data:{expectedVersion:row.version}});

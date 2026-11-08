@@ -91,7 +91,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
   const observer=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting){entry.target.classList.add('arrived');observer.unobserve(entry.target);}},{threshold:.08});
   root.current?.querySelectorAll('.invite-section').forEach(el=>observer.observe(el));return()=>observer.disconnect();
  },[opened]);
- const sections=[...c.sections].filter(s=>s.enabled).sort((a,b)=>a.order-b.order),opening=sections.find(s=>s.type==='opening'),hero=sections.find(s=>s.type==='hero'),name=view.guest.displayName||view.guest.fullName||'Bạn';
+ const sections=[...c.sections].filter(s=>s.enabled).sort((a,b)=>a.order-b.order),opening=sections.find(s=>s.type==='opening'),hero=sections.find(s=>s.type==='hero'),name=view.guest.recipientName||view.guest.displayName||view.guest.fullName||'Bạn';
  const media=(id?:string|null)=>id?view.media[id]:undefined;
  const img=(id?:string|null,priority=false)=>{const a=media(id);return a?<AssetImage asset={a} priority={priority}/>:<div className="photo-placeholder"><GraduationCap size={70} strokeWidth={.7}/><span>MỘT CHẶNG ĐƯỜNG ĐÁNG NHỚ</span></div>;};
  const year=c.ceremony.startAt?new Intl.DateTimeFormat('vi-VN',{year:'numeric',timeZone:c.timezone}).format(new Date(c.ceremony.startAt)):'…';
@@ -167,7 +167,6 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
   </>;
   case 'invitation':return <div className="invitation-letter">
    <PaperSparkle className="letter-sparkle"/>
-   <p className="eyebrow">TRÂN TRỌNG MỜI</p>
    <h2>{s.data.title}</h2>
    <p className="guest-recipient"><span>{view.guest.recipientGreeting??'Kính gửi'}</span><strong>{name}</strong></p>
    <p className="invite-prose">{s.data.message}</p>
@@ -238,7 +237,7 @@ function Response({view,save}: {view:InvitationView;save?:any}) {
   try{await save('/guest/rsvp','PUT',{status,note,expectedVersion:view.rsvp?.version||0});setDone(true);}catch(e){setError(e);}finally{setBusy(false);}
  }}><fieldset disabled={!view.canRsvp||view.preview||busy}>
   <legend>Bạn có thể đến chung vui không?</legend>
-  <p className="response-recipient">Khách mời<strong>{view.guest.displayName||view.guest.fullName||'Bạn'}</strong></p>
+  <p className="response-recipient">Khách mời<strong>{view.guest.recipientName||view.guest.displayName||view.guest.fullName||'Bạn'}</strong></p>
   <div className="radio-cards"><label><input type="radio" name="rsvp" checked={status==='ATTENDING'} onChange={()=>setStatus('ATTENDING')}/><Check size={20}/> Mình sẽ đến</label><label><input type="radio" name="rsvp" checked={status==='DECLINED'} onChange={()=>setStatus('DECLINED')}/><Heart size={20}/> Hẹn một dịp khác</label></div>
   <Field label="Nhắn mình một chút (không bắt buộc)"><textarea maxLength={500} value={note} onChange={e=>setNote(e.target.value)}/></Field><button className="button" disabled={busy}><Send size={16}/>{busy?'Đang gửi…':'Gửi xác nhận'}</button>
  </fieldset>{!view.canRsvp&&<p className="muted">Hiện đã ngừng nhận xác nhận.</p>}<ErrorBox error={error}/>{done&&<p role="status" className="success">Đã lưu lời hồi đáp của bạn. Cảm ơn bạn!</p>}</form>;
