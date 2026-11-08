@@ -52,6 +52,8 @@ describe('published invitation and immutable content',()=>{
   const content={...f.content,sections:f.content.sections.map(section=>{
    if(section.type==='opening')return {...section,data:{...section.data,messageTemplate:openingTemplate}};
    if(section.type==='invitation')return {...section,data:{...section.data,message}};
+   if(section.type==='response')return {...section,data:{...section.data,wishIntro:'Nếu bạn muốn, hãy viết vài dòng. Mình mong được đọc lời chúc của bạn.'}};
+   if(section.type==='closing')return {...section,data:{...section.data,message:'Cảm ơn bạn đã mở thiệp. Mình rất trân trọng.'}};
    return section;
   })};
   const revision=await prisma.eventRevision.create({data:{eventId:f.event.id,revisionNo:2,contentJson:content}});
@@ -64,7 +66,7 @@ describe('published invitation and immutable content',()=>{
    ['club','Em','Em Khách','Khách','Thân gửi','em','em','Thân mời','anh','Anh'],
    ['club','','Thím iu','Thím iu','Kính gửi','Thím iu','Thím iu','Kính mời','con','Con'],
    ['gia_dinh','','Đại gia đình thương yêu','Đại gia đình thương yêu','Thương gửi','đại gia đình','cả nhà','Thương mời','con','Con'],
-   ['gia_dinh','Em yêu','Em yêu Khách','Khách','Thương gửi','em yêu','em yêu','Thương mời','con','Con'],
+   ['gia_dinh','Em yêu','Em yêu Khách','Khách','Thương gửi','em yêu','em yêu','Thương mời','anh','Anh'],
   ]){
    await prisma.guest.update({where:{id:f.guest.id},data:{groupKey,salutation,displayName}});
    const response=await guest('get','invitation');
@@ -77,7 +79,13 @@ describe('published invitation and immutable content',()=>{
    const letter=response.body.data.content.sections.find((section:{type:string})=>section.type==='invitation').data;
    expect(letter.title).toBe(`Hẹn ${headingAddress} trong ngày đặc biệt`);
    expect(letter.message)
-    .toBe(`Trân trọng mời ${address} đến dự lễ tốt nghiệp. Sau buổi lễ, nếu ${address} có thời gian, mình rất muốn gặp ${address} để chụp ảnh cùng bạn bè.`);
+    .toBe(`Trân trọng mời ${address} đến dự lễ tốt nghiệp. Sau buổi lễ, nếu ${address} có thời gian, ${speaker} rất muốn gặp ${address} để chụp ảnh cùng bạn bè.`);
+   const responseSection=response.body.data.content.sections.find((section:{type:string})=>section.type==='response').data;
+   const responseAddress=address==='đại gia đình'?'cả nhà':address;
+   expect(responseSection.title).toBe(`${responseAddress.charAt(0).toUpperCase()+responseAddress.slice(1)} sẽ đến chứ?`);
+   expect(responseSection.wishIntro).toBe(`Nếu ${address} muốn, hãy viết vài dòng. ${sentenceSpeaker} mong được đọc lời chúc của ${address}.`);
+   expect(response.body.data.content.sections.find((section:{type:string})=>section.type==='closing').data.message)
+    .toBe(`Cảm ơn ${address} đã mở thiệp. ${sentenceSpeaker} rất trân trọng.`);
   }
   await prisma.invitation.update({where:{id:f.invitation.id},data:{personalMessage:'Lời mở riêng dành cho {{guestName}}.'}});
   expect((await guest('get','invitation')).body.data.personalMessage).toBe('Lời mở riêng dành cho Khách.');

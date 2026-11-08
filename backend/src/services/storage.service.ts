@@ -6,9 +6,11 @@ import {getSignedUrl} from '@aws-sdk/s3-request-presigner';
 import {config} from '../config/env.js';
 
 let s3Client:S3Client|undefined;
+export const invitationFontKey='invitation-assets/fonts/fz-alpha-brights-b89b193c.otf';
+const temporaryKey=/^[a-f0-9-]{36}\/[a-f0-9-]{36}\/(?:source\.bin|export\.xlsx)$/;
 const s3=()=>s3Client??=new S3Client({region:config.storageRegion,endpoint:config.storageEndpoint||undefined,forcePathStyle:true,maxAttempts:2,requestHandler:{connectionTimeout:5000,requestTimeout:15000},requestChecksumCalculation:'WHEN_REQUIRED',credentials:{accessKeyId:config.storageAccessKey,secretAccessKey:config.storageSecretKey}});
 function localPath(key:string){
- if(!/^[a-f0-9-]{36}\/[a-f0-9-]{36}\/(?:source\.bin|export\.xlsx)$/.test(key))throw new Error('Storage key không hợp lệ');
+ if(!temporaryKey.test(key))throw new Error('Storage key không hợp lệ');
  const root=resolve(config.storageRoot,'private'),path=resolve(root,key);
  if(!path.startsWith(root+sep))throw new Error('Storage key không hợp lệ');return path;
 }
@@ -30,7 +32,8 @@ export async function privateDownloadUrl(key:string,name?:string){
  return getSignedUrl(s3(),new GetObjectCommand({Bucket:config.storageBucketPrivate,Key:key,...download}),{expiresIn:name?60:3600});
 }
 export async function readStored(key:string,maxBytes:number){
- const path=localPath(key);if(config.storageDriver==='local'){if((await stat(path)).size>maxBytes)throw new Error('File vượt giới hạn');const bytes=await readFile(path);if(bytes.length>maxBytes)throw new Error('File vượt giới hạn');return bytes;}
+ if(config.storageDriver==='local'){const path=localPath(key);if((await stat(path)).size>maxBytes)throw new Error('File vượt giới hạn');const bytes=await readFile(path);if(bytes.length>maxBytes)throw new Error('File vượt giới hạn');return bytes;}
+ if(key!==invitationFontKey&&!temporaryKey.test(key))throw new Error('Storage key không hợp lệ');
  const object=await s3().send(new GetObjectCommand({Bucket:config.storageBucketPrivate,Key:key}));
  const body=object.Body;if(!(body instanceof Readable))throw new Error('Không đọc được file lưu trữ');
  if((object.ContentLength??0)>maxBytes){body.destroy();throw new Error('File vượt giới hạn');}

@@ -2,12 +2,12 @@ import {defaultInvitationNotes,googleMapsLink} from '@invite/contracts';
 import {useEffect,useRef,useState} from 'react';
 import {useParams} from 'react-router-dom';
 import {useInfiniteQuery,useQuery,useQueryClient} from '@tanstack/react-query';
-import {ArrowDown,ArrowUpRight,CalendarDays,Check,Facebook,Heart,MapPin,Music2,Phone,VolumeX,GraduationCap,Send} from 'lucide-react';
+import {ArrowDown,ArrowUpRight,Check,Facebook,Heart,MapPin,Music2,Phone,VolumeX,GraduationCap,Send} from 'lucide-react';
 import type {Content,InvitationView,MediaView,PublicWish,Section} from '@invite/contracts';
 import {CompanionFilm} from './CompanionFilm';
 import {GraduationSchedule} from './GraduationSchedule';
 import {statusName} from '../../../constants/status';
-import {ApiError,download,request} from '../../../lib/api';
+import {ApiError,request} from '../../../lib/api';
 import {Action,ErrorBox,Field,Loading} from '../../../components/ui/index';
 import {date} from '../../../utils/date';
 
@@ -92,6 +92,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
   root.current?.querySelectorAll('.invite-section').forEach(el=>observer.observe(el));return()=>observer.disconnect();
  },[opened]);
  const sections=[...c.sections].filter(s=>s.enabled).sort((a,b)=>a.order-b.order),opening=sections.find(s=>s.type==='opening'),hero=sections.find(s=>s.type==='hero'),name=view.guest.recipientName||view.guest.displayName||view.guest.fullName||'Bạn';
+ const closingLabel=`Hẹn gặp ${view.guest.recipientAddress||'bạn'}`.toLocaleUpperCase('vi');
  const media=(id?:string|null)=>id?view.media[id]:undefined;
  const img=(id?:string|null,priority=false)=>{const a=media(id);return a?<AssetImage asset={a} priority={priority}/>:<div className="photo-placeholder"><GraduationCap size={70} strokeWidth={.7}/><span>MỘT CHẶNG ĐƯỜNG ĐÁNG NHỚ</span></div>;};
  const year=c.ceremony.startAt?new Intl.DateTimeFormat('vi-VN',{year:'numeric',timeZone:c.timezone}).format(new Date(c.ceremony.startAt)):'…';
@@ -153,7 +154,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
     <div className="hero-text"><p className="eyebrow">MỘT CHẶNG ĐƯỜNG · MỘT KHỞI ĐẦU MỚI</p><h1 tabIndex={-1}>{hero?.type==='hero'?hero.data.title:'Ngày mình tốt nghiệp.'}</h1><p className="hero-subtitle">{hero?.type==='hero'?hero.data.subtitle:''}</p><p>{c.host.university}<br/>{c.host.major}{c.host.cohort&&' · '+c.host.cohort}</p><a href="#invitation-event" className="text-button">Một lời mời dành riêng cho bạn <ArrowDown size={17}/></a></div>
    </section>
    <a href="#response" className="quick-rsvp"><Heart size={16}/> Gửi lời hồi đáp</a>
-   {sections.filter(s=>!['opening','hero'].includes(s.type)).map(s=><section key={s.id} className={'invite-section section-'+s.type} id={s.type==='invitation'?'invitation-event':s.type==='map'?'location':s.type}><p className="eyebrow section-number">{String(s.order+1).padStart(2,'0')} / {sectionLabel[s.type]}</p>{renderSection(s)}</section>)}
+   {sections.filter(s=>!['opening','hero'].includes(s.type)).map(s=><section key={s.id} className={'invite-section section-'+s.type} id={s.type==='invitation'?'invitation-event':s.type==='map'?'location':s.type}><p className="eyebrow section-number">{String(s.order+1).padStart(2,'0')} / {s.type==='closing'?closingLabel:sectionLabel[s.type]}</p>{renderSection(s)}</section>)}
    <InvitationFooter content={c} year={year} mapImage={media(c.ceremony.mapImageAssetId)}/>
   </>}
  </main>;
@@ -162,7 +163,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    {item.imageAssetId&&<div className="story-image">{img(item.imageAssetId)}</div>}<div><p className="eyebrow">{item.label||`CHƯƠNG ${i+1}`}</p><h3>{item.title}</h3><p>{item.body}</p></div>
   </article>)}</div></>;
   case 'gallery':return <>
-   <h2>Cảm ơn vì đã<br/><em>ở trong thanh xuân của mình.</em></h2>
+   <h2>Cảm ơn vì đã<br/><em>ở trong thanh xuân của Kiệt.</em></h2>
    <CompanionFilm/>
   </>;
   case 'invitation':return <div className="invitation-letter">
@@ -170,9 +171,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    <h2>{s.data.title}</h2>
    <p className="guest-recipient"><span>{view.guest.recipientGreeting??'Kính gửi'}</span><strong>{name}</strong></p>
    <p className="invite-prose">{s.data.message}</p>
-   <GraduationSchedule ceremony={c.ceremony} phone={c.contact?.phone} calendarAction={token&&
-    <Action run={()=>download('/guest/calendar.ics','loi-moi-tot-nghiep.ics',token)}><CalendarDays size={16}/> Thêm vào lịch</Action>
-   }/>
+   <GraduationSchedule ceremony={c.ceremony} phone={c.contact?.phone} facebookUrl={c.contact?.facebookUrl}/>
    <p className="signature">{c.host.fullName}</p>
   </div>;
   case 'map': {
@@ -189,7 +188,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
     </aside>}
    </>;
   }
-  case 'response':return <><h2>{s.data.title}</h2><p className="invite-prose">{s.data.rsvpIntro}</p><Response view={view} save={save}/><p className="invite-prose">{s.data.wishIntro}</p><WishForm view={view} save={save}/>{(token&&view.wallEnabled!==false||view.previewWishes!==undefined)&&<Wall key={token} token={token} previewItems={view.previewWishes}/>}</>;
+  case 'response':return <><h2>{s.data.title}</h2><Response view={view} save={save}/><p className="invite-prose">{s.data.wishIntro}</p><WishForm view={view} save={save}/>{(token&&view.wallEnabled!==false||view.previewWishes!==undefined)&&<Wall key={token} token={token} previewItems={view.previewWishes}/>}</>;
   case 'closing':return <div className="closing"><span className="large-star" aria-hidden="true">✧</span><h2>{s.data.message}</h2><p>{view.rsvp?.status==='ATTENDING'?s.data.attendingMessage:view.rsvp?.status==='DECLINED'?s.data.declinedMessage:''}</p><p className="signature">{c.host.fullName}</p></div>;
   default:return null;
  }}
@@ -227,19 +226,19 @@ function PaperSparkle({className}:{className:string}){
   <circle cx="69" cy="15" r="2.5"/><circle cx="24" cy="12" r="1.8"/>
  </svg>;
 }
-const sectionLabel:Record<string,string>={opening:'LỜI MỞ',hero:'KHOẢNH KHẮC',story:'CHẶNG ĐƯỜNG',gallery:'NGƯỜI ĐỒNG HÀNH',invitation:'MỘT LỜI HẸN',map:'ĐIỂM HẸN',response:'LỜI HỒI ĐÁP',closing:'HẸN GẶP BẠN'};
+const sectionLabel:Record<string,string>={opening:'LỜI MỞ',hero:'KHOẢNH KHẮC',story:'CHẶNG ĐƯỜNG',gallery:'NGƯỜI ĐỒNG HÀNH',invitation:'MỘT LỜI HẸN',map:'ĐIỂM HẸN',response:'LỜI HỒI ĐÁP'};
 function AssetImage({asset,priority,sizes='(max-width: 767px) 86vw, 42vw'}:{asset:MediaView;priority:boolean;sizes?:string}){const [failed,setFailed]=useState(false);useEffect(()=>setFailed(false),[asset.url]);return failed?<div className="photo-placeholder" role="img" aria-label={asset.alt||'Khoảnh khắc đang được cập nhật'}><GraduationCap size={50} strokeWidth={1}/><span>Ảnh tạm thời không hiển thị</span></div>:<img src={asset.url} alt={asset.alt} width={asset.width||1200} height={asset.height||1500} srcSet={asset.srcSet} sizes={sizes} loading={priority?'eager':'lazy'} fetchPriority={priority?'high':'auto'} onError={()=>setFailed(true)}/>;}
 function MapView({location,image}:{location:Content['ceremony'];image?:MediaView}){return <div className="map-card">{image&&<div className="campus-map-image"><a href={image.url} target="_blank" rel="noopener noreferrer" aria-label="Mở ảnh sơ đồ trường đầy đủ"><AssetImage asset={image} priority={false} sizes="90vw"/></a></div>}<h3>{location.venueName}</h3><p>{location.address}</p><div className="row map-actions"><Action run={()=>navigator.clipboard.writeText(location.address)}>Sao chép địa chỉ</Action><a className="button secondary" href={googleMapsLink(location)} target="_blank" rel="noopener noreferrer">Mở Google Maps <ArrowUpRight size={17}/></a></div></div>;}
 function Response({view,save}: {view:InvitationView;save?:any}) {
- const [status,setStatus]=useState(view.rsvp?.status||'ATTENDING'),[note,setNote]=useState(view.rsvp?.note||''),[error,setError]=useState<unknown>(null),[busy,setBusy]=useState(false),[done,setDone]=useState(false);
+ const [status,setStatus]=useState(view.rsvp?.status||'ATTENDING'),[error,setError]=useState<unknown>(null),[busy,setBusy]=useState(false),[done,setDone]=useState(false);
  return <form className="guest-form" onSubmit={async e=>{
   e.preventDefault();if(!save)return;setBusy(true);setError(null);setDone(false);
-  try{await save('/guest/rsvp','PUT',{status,note,expectedVersion:view.rsvp?.version||0});setDone(true);}catch(e){setError(e);}finally{setBusy(false);}
+  try{await save('/guest/rsvp','PUT',{status,note:view.rsvp?.note??'',expectedVersion:view.rsvp?.version||0});setDone(true);}catch(e){setError(e);}finally{setBusy(false);}
  }}><fieldset disabled={!view.canRsvp||view.preview||busy}>
-  <legend>Bạn có thể đến chung vui không?</legend>
+  <legend className="sr-only">Xác nhận tham dự</legend>
   <p className="response-recipient">Khách mời<strong>{view.guest.recipientName||view.guest.displayName||view.guest.fullName||'Bạn'}</strong></p>
   <div className="radio-cards"><label><input type="radio" name="rsvp" checked={status==='ATTENDING'} onChange={()=>setStatus('ATTENDING')}/><Check size={20}/> Mình sẽ đến</label><label><input type="radio" name="rsvp" checked={status==='DECLINED'} onChange={()=>setStatus('DECLINED')}/><Heart size={20}/> Hẹn một dịp khác</label></div>
-  <Field label="Nhắn mình một chút (không bắt buộc)"><textarea maxLength={500} value={note} onChange={e=>setNote(e.target.value)}/></Field><button className="button" disabled={busy}><Send size={16}/>{busy?'Đang gửi…':'Gửi xác nhận'}</button>
+  <button className="button" disabled={busy}><Send size={16}/>{busy?'Đang gửi…':'Gửi xác nhận'}</button>
  </fieldset>{!view.canRsvp&&<p className="muted">Hiện đã ngừng nhận xác nhận.</p>}<ErrorBox error={error}/>{done&&<p role="status" className="success">Đã lưu lời hồi đáp của bạn. Cảm ơn bạn!</p>}</form>;
 }
 function WishForm({view,save}:{view:InvitationView;save?:any}) {
@@ -269,7 +268,7 @@ function WishForm({view,save}:{view:InvitationView;save?:any}) {
   }finally{setBusy(false);}
  }}>
   <fieldset disabled={!view.canCreateOrEditWish||view.preview||busy}>
-   <legend>Một lời chúc dành cho mình</legend>
+   <legend>Một lời chúc dành cho Kiệt</legend>
    <Field label="Lời chúc của bạn"><textarea value={body} required maxLength={1000} rows={5} onChange={e=>setBody(e.target.value)} placeholder="Viết một điều bạn muốn gửi gắm…"/></Field>
    <label className="check-label"><input type="checkbox" checked={consent} onChange={e=>changeConsent(e.target.checked)}/> Tôi đồng ý hiển thị tên và lời chúc trên thiệp.</label>
    {consent&&<label className="check-label"><input type="checkbox" checked={attendanceConsent} onChange={e=>setAttendanceConsent(e.target.checked)}/> Hiển thị trạng thái tham dự cùng lời chúc</label>}

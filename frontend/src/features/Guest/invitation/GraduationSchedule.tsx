@@ -1,7 +1,6 @@
 import type {Content} from '@invite/contracts';
-import {CalendarDays, Clock3, MapPin, Phone} from 'lucide-react';
+import {CalendarDays, Clock3, Facebook, MapPin, Phone} from 'lucide-react';
 import {useEffect, useState} from 'react';
-import type {ReactNode} from 'react';
 import './graduation-schedule.css';
 
 const timeZone = 'Asia/Ho_Chi_Minh';
@@ -12,10 +11,10 @@ const monthAndYear = new Intl.DateTimeFormat('vi-VN', {month: 'long', year: 'num
 const dateParts = new Intl.DateTimeFormat('en', {year: 'numeric', month: '2-digit', day: '2-digit', timeZone});
 const weekdays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
-export function GraduationSchedule({ceremony, phone, calendarAction}: {
+export function GraduationSchedule({ceremony, phone, facebookUrl}: {
   ceremony: Content['ceremony'];
   phone?: string;
-  calendarAction?: ReactNode;
+  facebookUrl?: string;
 }) {
   const start = Date.parse(ceremony.startAt);
   const end = Date.parse(ceremony.endAt);
@@ -57,7 +56,7 @@ export function GraduationSchedule({ceremony, phone, calendarAction}: {
           <dd>{/^\+?\d+$/.test(phoneNumber) ? <a href={`tel:${phoneNumber}`}>{phone}</a> : phone}</dd>
         </div>}
       </dl>
-      {hasEnd && calendarAction}
+      {facebookUrl && <a className="button secondary" href={facebookUrl} target="_blank" rel="noopener noreferrer"><Facebook size={16} aria-hidden="true"/> Facebook</a>}
     </div>
   </section>;
 }

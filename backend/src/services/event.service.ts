@@ -7,6 +7,7 @@ import {mediaUrls} from './media.service.js';
 
 export const conflict=()=>new AppError(409,'VERSION_CONFLICT','Dữ liệu đã thay đổi, vui lòng tải lại');
 const standardOpening='Thân mời {{guestName}} đến chung vui trong lễ tốt nghiệp của mình. Mình rất mong được gặp bạn và chụp cùng nhau một tấm ảnh để nhớ ngày này.';
+const sentenceCase=(word:string)=>word.charAt(0).toLocaleUpperCase('vi')+word.slice(1);
 export function rsvpView(r:RSVP|null|undefined){return r?{id:r.id,status:r.status,note:r.note,version:r.version,respondedAt:r.respondedAt,updatedAt:r.updatedAt}:null;}
 export function wishView(w:Wish|null|undefined){return w?{id:w.id,body:w.body,consentPublic:w.consentPublic,consentAttendancePublic:w.consentAttendancePublic,moderationStatus:w.moderationStatus,isPinned:w.isPinned,approvedAt:w.approvedAt,deletedAt:w.deletedAt,version:w.version,createdAt:w.createdAt,updatedAt:w.updatedAt}:null;}
 export async function lockEvent(tx:Tx,id:string){await tx.$queryRaw`SELECT id FROM "Event" WHERE id=${id}::uuid FOR UPDATE`;}
@@ -50,14 +51,20 @@ export async function invitationView(content:Content,event:Event,guest?:Guest,in
  const senior=/^(anh|chị)(?:\s|$)/u.test(salutation);
  const junior=/^em(?:\s|$)/u.test(salutation);
  const address=salutation||(family?'đại gia đình':aunt?displayName:'bạn');
+ const recipientAddress=address==='đại gia đình'?'cả nhà':address;
+ const headingAddress=recipientAddress.replace(/^(anh|chị) hai$/u,'$1');
  const recipientGreeting=family?'Thương gửi':/^(bạn|em)(?:\s|$)/u.test(salutation)?'Thân gửi':'Kính gửi';
  const openingVars={guestName:recipientName,hostName:content.host.fullName,salutation:guest?.salutation??'bạn'};
  const opening=content.sections.find(s=>s.type==='opening');
  const customOpening=invitation?.personalMessage||content.groupMessages[guest?.groupKey??''];
  const sharedOpening=opening?.data.messageTemplate??'';
  const invite=family?'Thương mời':senior||aunt?'Kính mời':'Thân mời';
- const speaker=family||aunt?'con':senior?'em':junior?'anh':'mình';
- const sentenceSpeaker=speaker[0].toLocaleUpperCase('vi')+speaker.slice(1);
+ const speaker=salutation==='em yêu'?'anh':family||aunt?'con':senior?'em':junior?'anh':'mình';
+ const sentenceSpeaker=sentenceCase(speaker);
+ const usePronouns=(text:string,recipient=address)=>text.replace(/(?<![\p{L}\p{M}])(?:bạn(?!\s+bè(?![\p{L}\p{M}]))|mình)(?![\p{L}\p{M}])/giu,word=>{
+  const lower=word.toLocaleLowerCase('vi'),replacement=lower==='bạn'?recipient:speaker;
+  return word===lower?replacement:sentenceCase(replacement);
+ });
  const openingMessage=!customOpening&&sharedOpening===standardOpening
   ?`${invite} ${recipientName} đến chung vui trong lễ tốt nghiệp của ${speaker}. ${sentenceSpeaker} rất mong được gặp ${address} và chụp cùng nhau một tấm ảnh để nhớ ngày này.`
   :personalize(customOpening||sharedOpening,openingVars);
@@ -65,18 +72,20 @@ export async function invitationView(content:Content,event:Event,guest?:Guest,in
   if(section.type==='opening'&&section.data.title==='Một lời mời dành riêng cho bạn'){
    return {...section,data:{...section.data,title:'MỘT LỜI MỜI DÀNH RIÊNG CHO'}};
   }
+  if(section.type==='response')return {...section,data:{...section.data,title:usePronouns(section.data.title,recipientAddress),wishIntro:usePronouns(section.data.wishIntro)}};
+  if(section.type==='closing')return {...section,data:{message:usePronouns(section.data.message),attendingMessage:usePronouns(section.data.attendingMessage),declinedMessage:usePronouns(section.data.declinedMessage)}};
   if(section.type!=='invitation')return section;
   const lead=/^\s*(?:mình\s+)?trân trọng mời bạn(?=\s|[.,!]|$)/iu;
   let message=invitation?.letterMessage||section.data.message;
   if(!invitation?.letterMessage&&lead.test(message))message=message.replace(lead,()=>`Trân trọng mời ${address}`)
    .replaceAll('nếu bạn có thời gian',()=>`nếu ${address} có thời gian`)
+   .replaceAll('mình rất muốn gặp bạn để',()=>`${speaker} rất muốn gặp ${address} để`)
    .replaceAll('gặp bạn để',()=>`gặp ${address} để`);
   const vars={...openingVars,salutation:address};
-  const headingAddress=address==='đại gia đình'?'cả nhà':address.replace(/^(anh|chị) hai$/u,'$1');
   const standardTitle=section.data.title.toLocaleLowerCase('vi')==='hẹn bạn trong ngày đặc biệt';
   const title=invitation?.letterTitle?personalize(invitation.letterTitle,vars):standardTitle?`Hẹn ${headingAddress} trong ngày đặc biệt`:section.data.title;
   return {...section,data:{title,message:personalize(message,vars)}};
  });
  const previewWishes=preview&&event.wallEnabled?(await readPublicWishes(tx,event.id,6,undefined,invitation?.id)).items:undefined;
- return {content:{...content,sections},media:mediaUrls(content),guest:{displayName,recipientName,fullName:guest?.fullName??displayName,salutation:openingVars.salutation,recipientGreeting},personalMessage:openingMessage,rsvp:rsvpView(invitation?.rsvp),wish:wishView(invitation?.wish),canRsvp:!preview&&canWrite(event.rsvpEnabled,content.rsvpDeadline),canCreateOrEditWish:!preview&&canWrite(event.wishesEnabled,content.wishDeadline),canWithdrawWish:!preview&&!!invitation?.wish&&!invitation.wish.deletedAt,eventId:event.id,wallEnabled:event.wallEnabled,...(preview?{preview:true,previewWishes}:{})};
+ return {content:{...content,sections},media:mediaUrls(content),guest:{displayName,recipientName,fullName:guest?.fullName??displayName,salutation:openingVars.salutation,recipientGreeting,recipientAddress},personalMessage:openingMessage,rsvp:rsvpView(invitation?.rsvp),wish:wishView(invitation?.wish),canRsvp:!preview&&canWrite(event.rsvpEnabled,content.rsvpDeadline),canCreateOrEditWish:!preview&&canWrite(event.wishesEnabled,content.wishDeadline),canWithdrawWish:!preview&&!!invitation?.wish&&!invitation.wish.deletedAt,eventId:event.id,wallEnabled:event.wallEnabled,...(preview?{preview:true,previewWishes}:{})};
 }

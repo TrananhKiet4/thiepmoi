@@ -18,13 +18,13 @@ const client=new S3Client({
  credentials:{accessKeyId:env.STORAGE_ACCESS_KEY,secretAccessKey:env.STORAGE_SECRET_KEY},
 });
 const root='frontend/public';
-const types={'.webp':'image/webp','.mp3':'audio/mpeg','.m4a':'audio/mp4'};
+const types={'.webp':'image/webp','.mp3':'audio/mpeg','.m4a':'audio/mp4','.otf':'font/otf'};
 const digest=body=>createHash('sha256').update(body).digest('hex');
 function files(directory){
  return readdirSync(join(root,directory),{withFileTypes:true}).flatMap(entry=>{
   const key=directory+'/'+entry.name;
   if(entry.isDirectory())return files(key);
-  assert(entry.isFile()&&/^[a-z0-9/-]+\.(webp|mp3|m4a)$/.test(key));
+  assert(entry.isFile()&&/^[a-z0-9/-]+\.(webp|mp3|m4a|otf)$/.test(key));
   return key.endsWith('/demo.webp')?[]:[key];
  });
 }

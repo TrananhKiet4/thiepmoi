@@ -1,5 +1,12 @@
 /* Self-hosted Google Fonts. License files are in public/fonts. */
 @font-face {
+  font-family: "Fz Alpha Brights";
+  src: url(/invitation-assets/fonts/fz-alpha-brights-b89b193c.otf) format('opentype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
   font-family: 'Be Vietnam Pro';
   font-style: italic;
   font-weight: 400;

@@ -16,7 +16,7 @@ import {guestRouter,wishesAdminRouter} from './routes/response.route.js';
 import {importRouter} from './routes/import.route.js';
 import {uploadRouter} from './routes/upload.route.js';
 import {maintenanceRouter} from './routes/maintenance.route.js';
-import {privateDownloadUrl} from './services/storage.service.js';
+import {invitationFontKey,privateDownloadUrl,readStored} from './services/storage.service.js';
 
 const assetPaths=new Set(Object.values(staticMedia).flatMap(asset=>[
  asset.url,...(asset.srcSet?.split(', ').map(source=>source.split(' ')[0])??[]),
@@ -44,6 +44,11 @@ export function createApp(){
  if(config.production){
   const web=resolve('frontend/dist');
   app.use(express.static(web,{index:false}));
+  app.get('/'+invitationFontKey,async(_req,res,next)=>{
+   if(config.storageDriver!=='s3')return next();
+   const font=await readStored(invitationFontKey,100_000);
+   res.set('Cache-Control','private, max-age=86400, immutable').type('font/otf').send(font);
+  });
   app.get('/invitation-assets/{*key}',async(req,res,next)=>{
    if(!assetPaths.has(req.path))return next();
    res.set('Cache-Control','private, no-store').redirect(await privateDownloadUrl(req.path.slice(1)));
