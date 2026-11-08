@@ -146,6 +146,13 @@
 .invitation .film-row:has(:focus-visible) .film-strip[aria-hidden="true"] { display: none; }
 .invitation .film-row a:focus-visible { outline: 2px solid #fff8e8; outline-offset: -2px; }
 .invitation .film-row figure { flex: 0 0 auto; margin: 0; }
+.invitation .film-row .film-slot-empty {
+  width: var(--film-height);
+  height: var(--film-height);
+  background: #242428;
+  border: 1px solid #36363e;
+  border-radius: 2px;
+}
 .invitation .film-row a { display: block; }
 .invitation .film-row img { display: block; width: auto; max-width: none; height: var(--film-height); object-fit: contain; border-radius: 2px; }
 .invitation .section-invitation { background: #e6edf180; }

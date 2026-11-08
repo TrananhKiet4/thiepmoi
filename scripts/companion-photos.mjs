@@ -8,7 +8,7 @@ export async function prepareCompanionPhotos(source='đồng hành',target='fron
  const photos=readdirSync(source,{withFileTypes:true}).filter(entry=>entry.isFile()&&/\.(jpe?g|png|webp|heic|avif|tiff?)$/i.test(entry.name)).map(({name})=>{
   const match=/^(\d+)\.(?:jpe?g|png|webp)$/i.exec(name);
   const number=Number(match?.[1]);
-  assert(Number.isSafeInteger(number)&&number>0,'Đặt tên ảnh bằng số và dùng JPEG, PNG hoặc WebP.');
+  assert(Number.isSafeInteger(number)&&number>=1&&number<=60,'Đặt tên ảnh từ 1 đến 60 và dùng JPEG, PNG hoặc WebP.');
   return {name,number};
  }).sort((a,b)=>a.number-b.number);
  assert.equal(new Set(photos.map(photo=>photo.number)).size,photos.length,'Mỗi ảnh cần một số riêng.');

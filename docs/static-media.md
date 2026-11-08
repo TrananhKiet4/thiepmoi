@@ -4,11 +4,23 @@
 
 Trên Production, các file riêng được lưu trong bucket private của Supabase và phục vụ qua đường dẫn cố định `/invitation-assets/` của thiệp. GitHub chỉ lưu mã nguồn và ảnh minh họa demo.
 
-Để thêm ảnh vào chặng **04 Người đồng hành**, đặt ảnh gốc JPEG, PNG hoặc WebP vào thư mục `đồng hành/` và dùng số mới làm tên file, chẳng hạn `31.jpg`. Chạy `node scripts/publish-static-media.mjs` để tạo bản WebP, đồng bộ file và cập nhật danh sách `packages/contracts/src/companion-photos.ts`. Triển khai mã nguồn có danh sách mới để ảnh hiện trên thiệp. File ảnh gốc và bản WebP được giữ ngoài GitHub.
+Chặng **04 Người đồng hành** có 60 ô. Hàng 1 chứa ảnh 1–15, hàng 2 chứa ảnh 16–30, hàng 3 chứa ảnh 31–45 và hàng 4 chứa ảnh 46–60. Thiệp lấy vị trí từ số trong tên file. Ô nào thiếu ảnh sẽ để trống.
 
-Thiệp đọc ảnh theo thứ tự số và chia lần lượt qua các hàng 1, 2, 3, 4 rồi quay lại hàng 1. Số bị bỏ trống được bỏ qua.
+### Thêm ảnh lên thiệp
 
-Lệnh mặc định chỉ thêm ảnh mang số mới. Để dùng đúng bộ ảnh hiện có trong thư mục, chạy `node scripts/publish-static-media.mjs --replace-companions` rồi triển khai lại. Ảnh thay nội dung được cấp đường dẫn mới. Bản phát hành cũ vẫn có thể dùng tệp đã lưu trước đó.
+1. Đặt ảnh gốc JPEG, PNG hoặc WebP vào thư mục `đồng hành/`. Dùng tên số từ 1 đến 60, chẳng hạn `31.jpg`.
+2. Chạy `node scripts/publish-static-media.mjs` ở thư mục dự án. Lệnh tạo ảnh WebP, đồng bộ lên **Supabase Storage** và cập nhật `packages/contracts/src/companion-photos.ts`. Không có bước ghi ảnh vào bảng PostgreSQL.
+3. Commit danh sách và push lên `codex/wish-card-wall`. Để Vercel tự phát hành bản Production khi push, chọn nhánh này tại **Settings → Environments → Production → Branch Tracking**.
+
+   ```powershell
+   git add packages/contracts/src/companion-photos.ts
+   git commit -m "Cap nhat anh nguoi dong hanh"
+   git push origin codex/wish-card-wall
+   ```
+
+4. Khi deployment trên Vercel báo **Ready**, tải lại link thiệp. Ảnh gốc và bản WebP nằm ngoài GitHub.
+
+Lệnh mặc định thêm các số mới. Để thay ảnh cùng số hoặc dùng đúng bộ ảnh trong thư mục, chạy `node scripts/publish-static-media.mjs --replace-companions` ở bước 2. Ảnh thay nội dung được cấp đường dẫn mới.
 
 Ảnh bìa, ảnh chính, ảnh câu chuyện, sơ đồ và nhạc có danh sách lựa chọn trong `packages/contracts/src/static-media.ts`. Để thêm file, đặt file vào thư mục tương ứng rồi thêm mục có UUID riêng, loại `IMAGE` hoặc `AUDIO`, tên hiển thị và đường dẫn. Chạy `node scripts/publish-static-media.mjs` để đồng bộ file lên bucket từ profile Production local, rồi triển khai mã nguồn trước khi chọn file trong **Nội dung**. Script dùng tên file mới cho nội dung thay thế.
 

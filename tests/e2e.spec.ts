@@ -229,11 +229,18 @@ test('published guest links receive updates and open feedback without losing typ
   const link=(await (await page.request.get(`/api/v1/admin/invitations/${created.invitation.id}/link`)).json()).data.url;
   await guestPage.clock.install();await guestPage.goto(link);await guestPage.getByRole('button',{name:'Mở thiệp',exact:true}).click();
   const gallery=guestPage.locator('#gallery'),photos=gallery.locator('.film-strip:not([aria-hidden="true"]) figure > a');
-  const numberedPhotos=companionPhotos.map(photo=>companionPhotoPath(photo.file)+'.webp');
-  const photoPaths=Array.from({length:4},(_,row)=>numberedPhotos.filter((_,index)=>index%4===row)).flat();
+  const photoByNumber=new Map(companionPhotos.map(photo=>[Number(photo.id),companionPhotoPath(photo.file)+'.webp']));
+  const expectedRows=Array.from({length:4},(_,row)=>Array.from({length:15},(_,index)=>{
+   const slot=row*15+index+1;
+   return {slot,href:photoByNumber.get(slot)??null};
+  }));
+  const photoPaths=expectedRows.flatMap(row=>row.flatMap(slot=>slot.href?[slot.href]:[]));
   await expect(gallery.getByText('04 / NGƯỜI ĐỒNG HÀNH',{exact:true})).toBeVisible();
   const filmRows=gallery.locator('.film-row');
   await expect(filmRows).toHaveCount(4);
+  expect(await filmRows.evaluateAll(rows=>rows.map(row=>Array.from(row.querySelectorAll<HTMLElement>('.film-strip:not([aria-hidden="true"]) figure')).map(figure=>({
+   slot:Number(figure.dataset.slot),href:figure.querySelector('a')?.getAttribute('href')??null,
+  }))))).toEqual(expectedRows);
   await expect(photos).toHaveCount(companionPhotos.length);
   expect(await photos.evaluateAll(links=>links.map(link=>link.getAttribute('href')))).toEqual(photoPaths);
   const images=photos.locator('img');
