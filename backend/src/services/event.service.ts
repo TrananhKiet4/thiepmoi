@@ -6,6 +6,7 @@ import {canWrite,personalize} from '../utils/invitation.js';
 import {mediaUrls} from './media.service.js';
 
 export const conflict=()=>new AppError(409,'VERSION_CONFLICT','Dữ liệu đã thay đổi, vui lòng tải lại');
+const standardOpening='Thân mời {{guestName}} đến chung vui trong lễ tốt nghiệp của mình. Mình rất mong được gặp bạn và chụp cùng nhau một tấm ảnh để nhớ ngày này.';
 export function rsvpView(r:RSVP|null|undefined){return r?{id:r.id,status:r.status,note:r.note,version:r.version,respondedAt:r.respondedAt,updatedAt:r.updatedAt}:null;}
 export function wishView(w:Wish|null|undefined){return w?{id:w.id,body:w.body,consentPublic:w.consentPublic,consentAttendancePublic:w.consentAttendancePublic,moderationStatus:w.moderationStatus,isPinned:w.isPinned,approvedAt:w.approvedAt,deletedAt:w.deletedAt,version:w.version,createdAt:w.createdAt,updatedAt:w.updatedAt}:null;}
 export async function lockEvent(tx:Tx,id:string){await tx.$queryRaw`SELECT id FROM "Event" WHERE id=${id}::uuid FOR UPDATE`;}
@@ -42,12 +43,25 @@ export async function invitationView(content:Content,event:Event,guest?:Guest,in
  const displayName=guest?.displayName||guest?.fullName||'Khách xem trước';
  const family=guest?.groupKey==='gia_dinh';
  const salutation=guest?.salutation.trim().toLocaleLowerCase('vi')??'';
- const address=salutation||(family?'đại gia đình':/^thím(?:\s|$)/iu.test(displayName)?displayName:'bạn');
+ const aunt=/^thím(?:\s|$)/iu.test(salutation||displayName);
+ const senior=/^(anh|chị)(?:\s|$)/u.test(salutation);
+ const junior=/^em(?:\s|$)/u.test(salutation);
+ const address=salutation||(family?'đại gia đình':aunt?displayName:'bạn');
  const recipientGreeting=family?'Thương gửi':/^(bạn|em)(?:\s|$)/u.test(salutation)?'Thân gửi':'Kính gửi';
  const openingVars={guestName:displayName,hostName:content.host.fullName,salutation:guest?.salutation??'bạn'};
  const opening=content.sections.find(s=>s.type==='opening');
- const template=invitation?.personalMessage||content.groupMessages[guest?.groupKey??'']||(opening?.type==='opening'?opening.data.messageTemplate:'');
+ const customOpening=invitation?.personalMessage||content.groupMessages[guest?.groupKey??''];
+ const sharedOpening=opening?.data.messageTemplate??'';
+ const invite=family?'Thương mời':senior||aunt?'Kính mời':'Thân mời';
+ const speaker=family||aunt?'con':senior?'em':junior?'anh':'mình';
+ const sentenceSpeaker=speaker[0].toLocaleUpperCase('vi')+speaker.slice(1);
+ const openingMessage=!customOpening&&sharedOpening===standardOpening
+  ?`${invite} ${displayName} đến chung vui trong lễ tốt nghiệp của ${speaker}. ${sentenceSpeaker} rất mong được gặp ${address} và chụp cùng nhau một tấm ảnh để nhớ ngày này.`
+  :personalize(customOpening||sharedOpening,openingVars);
  const sections=content.sections.map(section=>{
+  if(section.type==='opening'&&section.data.title==='Một lời mời dành riêng cho bạn'){
+   return {...section,data:{...section.data,title:'MỘT LỜI MỜI DÀNH RIÊNG CHO'}};
+  }
   if(section.type!=='invitation')return section;
   const lead=/^\s*(?:mình\s+)?trân trọng mời bạn(?=\s|[.,!]|$)/iu;
   let message=invitation?.letterMessage||section.data.message;
@@ -59,5 +73,5 @@ export async function invitationView(content:Content,event:Event,guest?:Guest,in
   return {...section,data:{title,message:personalize(message,vars)}};
  });
  const previewWishes=preview&&event.wallEnabled?(await readPublicWishes(tx,event.id,6,undefined,invitation?.id)).items:undefined;
- return {content:{...content,sections},media:mediaUrls(content),guest:{displayName,fullName:guest?.fullName??displayName,salutation:openingVars.salutation,recipientGreeting},personalMessage:personalize(template,openingVars),rsvp:rsvpView(invitation?.rsvp),wish:wishView(invitation?.wish),canRsvp:!preview&&canWrite(event.rsvpEnabled,content.rsvpDeadline),canCreateOrEditWish:!preview&&canWrite(event.wishesEnabled,content.wishDeadline),canWithdrawWish:!preview&&!!invitation?.wish&&!invitation.wish.deletedAt,eventId:event.id,wallEnabled:event.wallEnabled,...(preview?{preview:true,previewWishes}:{})};
+ return {content:{...content,sections},media:mediaUrls(content),guest:{displayName,fullName:guest?.fullName??displayName,salutation:openingVars.salutation,recipientGreeting},personalMessage:openingMessage,rsvp:rsvpView(invitation?.rsvp),wish:wishView(invitation?.wish),canRsvp:!preview&&canWrite(event.rsvpEnabled,content.rsvpDeadline),canCreateOrEditWish:!preview&&canWrite(event.wishesEnabled,content.wishDeadline),canWithdrawWish:!preview&&!!invitation?.wish&&!invitation.wish.deletedAt,eventId:event.id,wallEnabled:event.wallEnabled,...(preview?{preview:true,previewWishes}:{})};
 }
