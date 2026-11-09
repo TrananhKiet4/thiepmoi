@@ -111,7 +111,7 @@
 .invitation .hero-text .eyebrow { font-size: 10px; }
 .invitation .invite-hero h1 { font-size: clamp(30px, 4vw, 50px); color: var(--invite-accent); line-height: 1.2; }
 .invitation .hero-text h1:focus { outline: none; }
-.invitation .hero-title-lines { width: 100%; text-transform: uppercase; }
+.invitation .hero-title-lines { width: 100%; text-transform: uppercase; white-space: normal; }
 .invitation .hero-title-highlight {
   display: table;
   margin: 10px auto 0;
@@ -154,6 +154,9 @@
 .invitation .story-list { gap: 55px; max-width: 1100px; margin: 40px auto 0; }
 .invitation .story-item { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 55px; }
 .invitation .story-item h3 { font-size: 30px; }
+.invitation .story-title { white-space: normal; }
+.invitation .story-title .section-title-accent { display: block; }
+.invitation .story-title em, .invitation .story-item h3 em { color: #6e8194; font-style: italic; font-weight: 400; }
 .invitation .story-item>div>p:last-child { font-size: 15px; color: #625c5a; }
 .invitation .story-image { height: auto; padding: 13px; background: #fffdf8; border-color: #ded2bd; box-shadow: 4px 8px 20px #67533810; }
 .invitation .story-image>img { aspect-ratio: auto; height: auto; object-fit: contain; }
