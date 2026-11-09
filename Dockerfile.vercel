@@ -15,8 +15,8 @@ COPY frontend/ ./frontend/
 COPY packages/contracts/src/ ./packages/contracts/src/
 COPY scripts/copy-api-assets.mjs ./scripts/copy-api-assets.mjs
 # Generation/build never connect to a database; runtime credentials are injected by Vercel.
-RUN DATABASE_URL=postgresql://build:unused@localhost/build DIRECT_URL=postgresql://build:unused@localhost/build npm run db:generate
-RUN npm run build && npm prune --omit=dev
+RUN DATABASE_URL=postgresql://build:unused@localhost/build DIRECT_URL=postgresql://build:unused@localhost/build npm run legacy:db:generate
+RUN npm run legacy:build && npm prune --omit=dev
 
 FROM base AS runtime
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=8080 STORAGE_LOCAL_PATH=/tmp/invitation-media

@@ -1,0 +1,187 @@
+name: Deploy Data Online
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dataonline-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MARIADB_ROOT_PASSWORD: ci-fixture-only
+          MARIADB_ROOT_HOST: '%'
+        ports:
+          - 127.0.0.1:53329:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: shivammathur/setup-php@d52fc211a0436f8839a587b3b5b8efddab4744ea # v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, pdo_sqlite, mbstring, intl, curl, zip, gd, dom, xml, simplexml, xmlreader, xmlwriter
+          coverage: none
+          tools: composer:v2
+      - name: Install dependencies
+        env:
+          PRISMA_SKIP_POSTINSTALL_GENERATE: 'true'
+        run: |
+          composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+          npm ci --include=dev
+      - name: Verify application
+        env:
+          PHP_BINARY: php
+          MARIADB_TEST_PASSWORD: ci-fixture-only
+        run: |
+          find app bootstrap config routes -name '*.php' -print0 | xargs -0 -n1 php -l
+          php -d zend.assertions=1 -d assert.exception=1 tests/guest-port-smoke.php
+          php tests/storage-package-smoke.php
+          node tests/dataonline-export.test.mjs
+          node tests/dataonline-import-smoke.mjs
+          node tests/laravel-smoke.mjs
+          npm exec -w @invite/web -- tsc --noEmit
+      - name: Build deployment package
+        run: |
+          npm run build
+          php scripts/package-dataonline.php
+          cp .data/dataonline/thiepmoi-dataonline.zip "$RUNNER_TEMP/thiepmoi-dataonline.zip"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: dataonline-${{ github.sha }}
+          path: ${{ runner.temp }}/thiepmoi-dataonline.zip
+          retention-days: 1
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    environment:
+      name: dataonline-production
+      url: https://www.trananhkiet.id.vn
+    env:
+      FTPS_SERVER: sv66.dataonline.vn
+      FTPS_PORT: '21'
+      FTPS_SERVER_DIR: ${{ vars.FTPS_SERVER_DIR || '/domains/trananhkiet.id.vn/' }}
+      FTPS_USERNAME: ${{ secrets.FTPS_USERNAME }}
+      FTPS_PASSWORD: ${{ secrets.FTPS_PASSWORD }}
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: dataonline-${{ github.sha }}
+          path: ${{ runner.temp }}/dataonline
+      - name: Validate destination and unpack package
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in FTPS_USERNAME FTPS_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing repository secret $name"
+              exit 1
+            fi
+          done
+          if [[ "$FTPS_SERVER_DIR" != / && ! "$FTPS_SERVER_DIR" =~ ^/[A-Za-z0-9._/-]+/$ ]]; then
+            echo '::error::FTPS_SERVER_DIR must be an absolute FTP path ending with /'
+            exit 1
+          fi
+          if [[ "/$FTPS_SERVER_DIR/" == *'/../'* || "/$FTPS_SERVER_DIR/" == *'/./'* ]]; then
+            echo '::error::FTPS_SERVER_DIR cannot contain relative path segments'
+            exit 1
+          fi
+          ftp_base="ftp://${FTPS_SERVER}:${FTPS_PORT}/${FTPS_SERVER_DIR}"
+          curl --fail --silent --show-error --ssl-reqd --tlsv1.2 \
+            --connect-timeout 10 --max-time 45 \
+            --user "$FTPS_USERNAME:$FTPS_PASSWORD" \
+            "${ftp_base}thiepmoi-app/composer.json" \
+            --output "$RUNNER_TEMP/dataonline-remote-composer.json"
+          node -e 'const fs=require("node:fs");const p=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/dataonline-remote-composer.json","utf8"));if(p.name!=="trananhkiet4/thiepmoi")throw new Error("FTP destination does not match this application");'
+          mkdir -p "$RUNNER_TEMP/dataonline/release"
+          unzip -q "$RUNNER_TEMP/dataonline/thiepmoi-dataonline.zip" -d "$RUNNER_TEMP/dataonline/release"
+      - name: Pause requests during code synchronization
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/dataonline-maintenance.php" <<'PHP'
+          <?php
+          http_response_code(503);
+          header('Retry-After: 60');
+          header('Cache-Control: no-store');
+          header('Content-Type: application/json; charset=utf-8');
+          echo '{"error":{"code":"DEPLOY_IN_PROGRESS","message":"Hệ thống đang cập nhật, vui lòng thử lại sau ít phút."}}';
+          exit;
+          PHP
+          curl --fail --silent --show-error --ssl-reqd --tlsv1.2 \
+            --connect-timeout 10 --max-time 45 \
+            --user "$FTPS_USERNAME:$FTPS_PASSWORD" \
+            --upload-file "$RUNNER_TEMP/dataonline-maintenance.php" \
+            "ftp://${FTPS_SERVER}:${FTPS_PORT}/${FTPS_SERVER_DIR}thiepmoi-app/storage/framework/maintenance.php"
+      - name: Synchronize application and frontend
+        uses: SamKirkland/FTP-Deploy-Action@110f9186c050f71550953127052e77650219c287 # v4.4.0
+        with:
+          server: ${{ env.FTPS_SERVER }}
+          port: ${{ env.FTPS_PORT }}
+          protocol: ftps
+          security: strict
+          username: ${{ secrets.FTPS_USERNAME }}
+          password: ${{ secrets.FTPS_PASSWORD }}
+          local-dir: ${{ runner.temp }}/dataonline/release/
+          server-dir: ${{ env.FTPS_SERVER_DIR }}
+          state-name: .dataonline-sync-state.json
+          dangerous-clean-slate: false
+          timeout: 60000
+          log-level: minimal
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.env
+            **/.env.*
+            thiepmoi-app/storage/**
+            thiepmoi-app/bootstrap/cache/*.php
+      - name: Resume requests
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --ssl-reqd --tlsv1.2 \
+            --connect-timeout 10 --max-time 45 \
+            --user "$FTPS_USERNAME:$FTPS_PASSWORD" \
+            --quote "*DELE ${FTPS_SERVER_DIR}thiepmoi-app/storage/framework/maintenance.php" \
+            --list-only "ftp://${FTPS_SERVER}:${FTPS_PORT}/${FTPS_SERVER_DIR}thiepmoi-app/storage/framework/" \
+            --output /dev/null
+      - name: Verify production
+        shell: bash
+        run: |
+          set -euo pipefail
+          for endpoint in live ready; do
+            curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 5 \
+              --connect-timeout 10 --max-time 30 \
+              "https://www.trananhkiet.id.vn/health/$endpoint" \
+              --output "$RUNNER_TEMP/dataonline-health.json"
+            node -e 'const fs=require("node:fs");const p=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/dataonline-health.json","utf8"));if(p.ok!==true)throw new Error("Production health check failed");'
+          done
+          curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \
+            https://www.trananhkiet.id.vn/admin/login --output "$RUNNER_TEMP/dataonline-login.html"
+          grep -q '/assets/' "$RUNNER_TEMP/dataonline-login.html"
+      - name: Report incomplete deployment
+        if: failure()
+        run: echo '::error::Deployment failed. If code synchronization had started, rerun this workflow on main to complete it. The deployment maintenance page is kept when synchronization fails.'

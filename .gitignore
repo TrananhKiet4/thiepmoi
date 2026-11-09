@@ -3,6 +3,8 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.dataonline.example
+!.env.cicd.example
 .data/
 .superpowers/
 playwright-report/
@@ -21,3 +23,9 @@ backend/.devin
 !/frontend/public/invitation-assets/photos/demo.webp
 /frontend/public/invitation-assets/music/
 /frontend/public/invitation-assets/fonts/
+/vendor/
+/public/assets/
+/public/robots.txt
+/public/invitation-assets/
+/public/fonts/
+/public/index.html
