@@ -1,6 +1,9 @@
 Options -Indexes
 
 <IfModule mod_headers.c>
+    Header set X-Robots-Tag "noindex, nofollow"
+    Header set X-Content-Type-Options "nosniff"
+    Header set Referrer-Policy "no-referrer"
     <FilesMatch "-[a-f0-9]{8,}(-[0-9]+|-small)?[.]webp$">
         Header set Cache-Control "public, max-age=31536000, immutable"
     </FilesMatch>

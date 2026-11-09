@@ -32,7 +32,7 @@ Các ảnh bìa, câu chuyện và bản đồ dùng các đường dẫn đã �
 
 ## Cache và CI/CD
 
-Các tên ảnh có mã phiên bản sử dụng `Cache-Control: public, max-age=31536000, immutable`. Khi nội dung ảnh đồng hành thay đổi, tên file cũng thay đổi để trình duyệt nhận ảnh mới. Thư mục ảnh chặn liệt kê danh sách file.
+Các tên ảnh có mã phiên bản sử dụng `Cache-Control: public, max-age=31536000, immutable`. Khi nội dung ảnh đồng hành thay đổi, tên file cũng thay đổi để trình duyệt nhận ảnh mới. Thư mục ảnh chặn liệt kê danh sách file và gửi `X-Robots-Tag: noindex, nofollow` như đường phục vụ ảnh trước đó.
 
 CI/CD loại trừ file WebP trong thư mục ảnh khỏi thao tác đồng bộ mã nguồn. File cấu hình `.htaccess` của thư mục này được quản lý trong Git. Thông tin vị trí ảnh và các nội dung thiệp được cập nhật qua quy trình push `main`.
 
