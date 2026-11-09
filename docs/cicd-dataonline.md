@@ -40,11 +40,13 @@ File `.env.cicd.local` trên máy dùng để chuẩn bị thông tin và kiểm
 
 `.env`, các file `.env.*`, toàn bộ `thiepmoi-app/storage` và cache PHP trong `bootstrap/cache` nằm trong danh sách loại trừ đồng bộ. Danh mục `bootstrap/cache/invitation-media.json` được build và cập nhật cùng mã nguồn.
 
+File ảnh WebP trong `public_html/invitation-assets/photos/` cũng nằm trong danh sách loại trừ. Các ảnh được upload riêng từ máy tính bằng `npm run dataonline:photos`. Cấu hình `.htaccess` cho thư mục ảnh được cập nhật cùng mã nguồn. Xem [cách thêm ảnh lên hosting](photos-dataonline.md).
+
 Sau khi đồng bộ thành công, workflow xóa các file cache sinh tự động `config.php`, `packages.php`, `services.php` và `routes-v7.php` trong `bootstrap/cache` trước khi mở lại request. Laravel tạo lại các cache cần thiết từ cấu hình và mã vừa phát hành.
 
 Các thay đổi schema MariaDB cần migration riêng đã kiểm tra trước khi phát hành phần mã phụ thuộc vào chúng. Dữ liệu khách, RSVP và lời chúc được quản lý trong database của hosting.
 
-Mã nguồn được đồng bộ vào vị trí ứng dụng hiện có để sử dụng hạn mức inode của gói hosting. Website hiển thị trang bảo trì trong lúc đồng bộ. Các file media cá nhân dùng bucket đã cấu hình trên hosting.
+Mã nguồn được đồng bộ vào vị trí ứng dụng hiện có để sử dụng hạn mức inode của gói hosting. Website hiển thị trang bảo trì trong lúc đồng bộ. Ảnh được phục vụ trực tiếp từ thư mục ảnh trên hosting. Nhạc, font và tệp Excel tạm sử dụng các biến `STORAGE_*` đã cấu hình trên hosting.
 
 ## Khi deploy bị lỗi hoặc bị hủy
 

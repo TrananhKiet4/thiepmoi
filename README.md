@@ -49,4 +49,4 @@ npm run build
 
 Kiểm thử tích hợp tạo database dùng một lần trên MariaDB local `127.0.0.1:53329`, chạy các request qua HTTP kernel Laravel rồi xóa đúng database thử nghiệm đó. Đặt `MARIADB_TEST_PASSWORD` cho tài khoản root của instance thử nghiệm và `PHP_BINARY` trỏ đến PHP 8.3 trở lên rồi chạy `npm run test:laravel`. Bộ này chỉ sử dụng dữ liệu giả, bao gồm hai người phản hồi qua cùng thiệp gia đình và nhập Excel.
 
-Giữ file SQL chứa khách mời, cấu hình `.env`, khóa thiệp và file media cá nhân ngoài Git. Ảnh/nhạc hiện tại tiếp tục dùng bucket media riêng được khai báo bằng `STORAGE_*`.
+Giữ file SQL chứa khách mời, cấu hình `.env`, khóa thiệp và file media cá nhân ngoài Git. [Ảnh được upload riêng lên Data Online](docs/photos-dataonline.md) bằng `npm run dataonline:photos`. Nhạc, font và tệp Excel tạm sử dụng `STORAGE_*`.

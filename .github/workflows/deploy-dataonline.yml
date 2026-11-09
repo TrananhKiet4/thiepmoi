@@ -59,6 +59,7 @@ jobs:
           php tests/storage-package-smoke.php
           node tests/dataonline-export.test.mjs
           node tests/dataonline-sync.test.mjs
+          node tests/dataonline-photos.test.mjs
           node tests/dataonline-import-smoke.mjs
           node tests/laravel-smoke.mjs
           npm exec -w @invite/web -- tsc --noEmit
@@ -196,6 +197,7 @@ jobs:
             **/.env.*
             thiepmoi-app/storage/**
             thiepmoi-app/bootstrap/cache/*.php
+            public_html/invitation-assets/photos/**/*.webp
       - name: Resume requests
         shell: bash
         run: |

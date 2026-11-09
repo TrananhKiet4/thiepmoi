@@ -29,6 +29,7 @@
     "legacy:setup:local": "node scripts/setup-local.mjs",
     "dataonline:package": "php scripts/package-dataonline.php",
     "dataonline:export": "node --env-file=.env.production.local scripts/export-dataonline.mjs",
+    "dataonline:photos": "node --env-file=.env.cicd.local scripts/publish-dataonline-photos.mjs",
     "test:laravel": "node tests/laravel-smoke.mjs",
     "backup": "node scripts/database.mjs backup",
     "restore": "node scripts/database.mjs restore"

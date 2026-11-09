@@ -89,7 +89,7 @@ QUEUE_CONNECTION=sync
 
 Để mở lại các mã thiệp đã gửi, sao chép nguyên giá trị `INVITATION_KEY`, `INVITATION_KEY_VERSION`, `INVITATION_OLD_KEYS` từ cấu hình hệ thống cũ. `SESSION_SECRET` cũng được giữ nguyên. `APP_KEY` là khóa riêng của Laravel.
 
-Ảnh, nhạc và font đang dùng bucket riêng hiện có. Các biến `STORAGE_*` kết nối bucket này. Việc chuyển database sang MariaDB không di chuyển các file media. Chỉ xóa dịch vụ lưu trữ cũ sau khi đã có phương án chuyển media riêng.
+Ảnh được upload vào `public_html/invitation-assets/photos/` và được máy chủ web phục vụ trực tiếp. Xem [hướng dẫn upload ảnh](photos-dataonline.md). Các biến `STORAGE_*` kết nối kho nhạc, font và tệp Excel tạm.
 
 ## 5. Chuyển dữ liệu qua phpMyAdmin
 

@@ -21,6 +21,7 @@ backend/.devin
 /đồng hành/
 /frontend/public/invitation-assets/photos/*
 !/frontend/public/invitation-assets/photos/demo.webp
+!/frontend/public/invitation-assets/photos/.htaccess
 /frontend/public/invitation-assets/music/
 /frontend/public/invitation-assets/fonts/
 /vendor/

@@ -19,7 +19,7 @@ cpSync(join(root, 'frontend/dist'), target, {
   filter(source) {
     const path = relative(join(root, 'frontend/dist'), source).replaceAll('\\', '/');
     if (!path.startsWith('invitation-assets/')) return true;
-    return ['invitation-assets/photos', 'invitation-assets/photos/demo.webp'].includes(path);
+    return ['invitation-assets/photos', 'invitation-assets/photos/demo.webp', 'invitation-assets/photos/.htaccess'].includes(path);
   },
 });
 const companion_paths = companionPhotos.filter(photo => photo.file).flatMap(photo => [
