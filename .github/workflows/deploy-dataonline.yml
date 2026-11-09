@@ -47,6 +47,8 @@ jobs:
         run: |
           composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
           npm ci --include=dev
+      - name: Build frontend and media catalog
+        run: npm run build
       - name: Verify application
         env:
           PHP_BINARY: php
@@ -61,7 +63,6 @@ jobs:
           npm exec -w @invite/web -- tsc --noEmit
       - name: Build deployment package
         run: |
-          npm run build
           php scripts/package-dataonline.php
           cp .data/dataonline/thiepmoi-dataonline.zip "$RUNNER_TEMP/thiepmoi-dataonline.zip"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
