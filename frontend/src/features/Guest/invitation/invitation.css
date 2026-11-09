@@ -94,7 +94,7 @@
 .invitation .invite-music { display: flex; align-items: center; gap: 8px; }
 .invitation .invite-nav .icon-button { border-color: #d8c5c2; }
 .invitation .music-volume { width: 65px; }
-.invitation .invite-hero { display: flex; flex-direction: column; padding: 38px 7vw 75px; gap: 0; min-height: 0; text-align: center; }
+.invitation .invite-hero { display: flex; flex-direction: column; padding: 38px 7vw 68px; gap: 0; min-height: 0; text-align: center; }
 .invitation .ceremony-heading { width: min(1100px, 100%); font-family: var(--invite-heading); text-transform: uppercase; font-size: clamp(52px, 11.6vw, 160px); line-height: .88; letter-spacing: -5px; position: relative; z-index: 1; }
 .invitation .ceremony-heading span { display: block; color: var(--invite-blue); overflow-wrap: normal; }
 .invitation .ceremony-heading span:last-child { color: transparent; -webkit-text-stroke: 1px var(--invite-accent); font-size: .8em; margin-top: 8px; letter-spacing: 1px; }
@@ -106,18 +106,15 @@
 .invitation .photo-placeholder>span { font-size: 9px; letter-spacing: 2px; }
 .invitation .invite-hero .sparkle-one { top: 39%; left: 22%; width: 110px; }
 .invitation .invite-hero .sparkle-two { top: 51%; right: 23%; width: 84px; }
-.invitation .admission-ticket { position: absolute; top: 30%; right: 7%; width: 165px; padding: 18px 12px; background: #e9dbc5; border: 1px dashed #bca383; color: #765e50; transform: rotate(12deg); display: flex; align-items: center; flex-direction: column; gap: 12px; box-shadow: 0 3px 8px #64523e14; }
-.invitation .admission-ticket>span { font-size: 9px; letter-spacing: 1px; }
-.invitation .admission-ticket strong { font-family: var(--invite-heading); font-size: 18px; font-weight: 400; border-top: 1px solid #bca383; padding-top: 12px; }
-.invitation .hero-text { max-width: 700px; position: relative; z-index: 2; }
-.invitation .hero-text .eyebrow { font-size: 9px; margin-bottom: 18px; }
-.invitation .invite-hero h1 { font-size: clamp(29px, 3.8vw, 46px); color: var(--invite-accent); line-height: 1.2; margin: 0 0 15px; }
+.invitation .hero-text { display: grid; gap: 16px; max-width: 780px; position: relative; z-index: 2; }
+.invitation .hero-text > :is(p, h1) { margin: 0; }
+.invitation .hero-text .eyebrow { font-size: 10px; }
+.invitation .invite-hero h1 { font-size: clamp(30px, 4vw, 50px); color: var(--invite-accent); line-height: 1.2; }
 .invitation .hero-text h1:focus { outline: none; }
-.invitation .hero-subtitle { font-family: var(--invite-heading); font-size: 20px; color: #72605d; margin-bottom: 12px; }
-.invitation .hero-text>p:not(.eyebrow):not(.hero-subtitle) { color: #67636a; font-size: 13px; }
-.invitation .hero-text .text-button { font-size: 12px; margin-top: 0; }
-.invitation .invite-hero :is(.ceremony-heading, .hero-photo, .admission-ticket, .hero-text) { animation: invite-unfold .62s ease-out both; }
-.invitation .invite-hero :is(.hero-photo, .admission-ticket) { animation-delay: .1s; }
+.invitation .hero-subtitle { font-family: var(--invite-heading); font-size: 23px; color: #72605d; }
+.invitation .hero-text>p:not(.eyebrow):not(.hero-subtitle) { color: #67636a; font-size: 15px; }
+.invitation .invite-hero :is(.ceremony-heading, .hero-photo, .hero-text) { animation: invite-unfold .62s ease-out both; }
+.invitation .invite-hero .hero-photo { animation-delay: .1s; }
 .invitation .invite-hero .hero-text { animation-delay: .2s; }
 
 .invitation .invite-section {
@@ -415,11 +412,10 @@
 }
 .invitation.palette-blue .invite-nav { background: #f4f9fff5; border-color: var(--blue-line); }
 .invitation.palette-blue .invite-nav-links a:not(:last-child) { color: #385777; }
-.invitation.palette-blue :is(.section-invitation, .section-response, .admission-ticket) { background: var(--blue-tint); }
-.invitation.palette-blue :is(.invite-section, .admission-ticket, .admission-ticket strong, .event-card, .response-recipient, .wish-card footer, .invite-nav .icon-button) {
+.invitation.palette-blue :is(.section-invitation, .section-response) { background: var(--blue-tint); }
+.invitation.palette-blue :is(.invite-section, .event-card, .response-recipient, .wish-card footer, .invite-nav .icon-button) {
   border-color: var(--blue-line);
 }
-.invitation.palette-blue .admission-ticket { color: #385777; }
 .invitation.palette-blue :is(.envelope-letter, .hero-photo, .story-image, .story-letter, .invitation-letter, .campus-map-image, .guest-form, .wish-card) {
   background: var(--blue-paper);
   border-color: var(--blue-line);
@@ -472,14 +468,11 @@
   .invitation .hero-photo .photo-placeholder { min-height: 190px; }
   .invitation .invite-hero .sparkle-one { width: 54px; left: 0; top: 25%; }
   .invitation .invite-hero .sparkle-two { width: 44px; right: 0; top: 65%; }
-  .invitation .admission-ticket { top: 10%; right: 3%; width: clamp(94px, 28%, 116px); padding: 10px 6px; gap: 6px; transform: rotate(8deg); z-index: 3; }
-  .invitation .admission-ticket>span { font-size: 8px; letter-spacing: .1px; text-wrap: balance; }
-  .invitation .admission-ticket strong { font-size: 10px; padding-top: 7px; white-space: nowrap; }
-  .invitation .admission-ticket>svg { width: 18px; height: 18px; }
+  .invitation .hero-text { gap: 13px; }
   .invitation .hero-text .eyebrow { font-size: 8px; letter-spacing: 1.3px; }
-  .invitation .invite-hero h1 { font-size: clamp(26px, 7.4vw, 34px); font-size: clamp(26px, 8cqi, 34px); line-height: 1.2; letter-spacing: -.65px; max-width: 24ch; margin-inline: auto; }
-  .invitation .hero-subtitle { font-size: 18px; }
-  .invitation .hero-text>p:not(.eyebrow):not(.hero-subtitle) { font-size: 12px; }
+  .invitation .invite-hero h1 { font-size: clamp(27px, 7.6vw, 35px); line-height: 1.2; letter-spacing: -.65px; max-width: 24ch; margin-inline: auto; }
+  .invitation .hero-subtitle { font-size: 20px; }
+  .invitation .hero-text>p:not(.eyebrow):not(.hero-subtitle) { font-size: 14px; }
   .invitation .invite-section { padding: 55px 23px; scroll-margin-top: 145px; }
   .invitation .invite-section h2 { font-size: clamp(26px, 8.5vw, 32px); }
   .invitation .invite-prose { font-size: 14px; margin-bottom: 30px; }

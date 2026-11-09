@@ -2,14 +2,13 @@ import {defaultInvitationNotes,googleMapsLink} from '@invite/contracts';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {useParams} from 'react-router-dom';
 import {useInfiniteQuery,useQuery,useQueryClient} from '@tanstack/react-query';
-import {ArrowDown,ArrowUpRight,Check,Facebook,Heart,MapPin,Music2,Phone,VolumeX,GraduationCap,Send} from 'lucide-react';
+import {ArrowUpRight,Check,Facebook,Heart,MapPin,Music2,Phone,VolumeX,GraduationCap,Send} from 'lucide-react';
 import type {Content,InvitationView,MediaView,PublicWish,Section} from '@invite/contracts';
 import {CompanionFilm} from './CompanionFilm';
 import {GraduationSchedule} from './GraduationSchedule';
 import {statusName} from '../../../constants/status';
 import {ApiError,request} from '../../../lib/api';
 import {Action,ErrorBox,Field,Loading} from '../../../components/ui/index';
-import {date} from '../../../utils/date';
 
 export default function Guest(){const {token='',guestName}=useParams(),credential=token.length===5&&guestName?token+'.'+encodeURIComponent(guestName):token;return <GuestData key={credential} token={credential}/>;}
 function useGuestData(token:string){
@@ -176,10 +175,14 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
     <div className="ceremony-heading" aria-hidden="true"><span>Graduation</span><span>Ceremony</span></div>
     <div className="hero-art">
      <PaperSparkle className="sparkle-one"/><PaperSparkle className="sparkle-two"/>
-     <div className="admission-ticket"><span>YOU'RE INVITED</span><GraduationCap size={24} strokeWidth={1}/><strong>CLASS OF {year}</strong><span>{date(c.ceremony.startAt)}</span></div>
      <figure className="hero-photo">{img(hero?.type==='hero'?hero.data.heroAssetId:null,true)}<figcaption className="photo-caption">{c.host.fullName}</figcaption></figure>
     </div>
-    <div className="hero-text"><p className="eyebrow">MỘT CHẶNG ĐƯỜNG · MỘT KHỞI ĐẦU MỚI</p><h1 tabIndex={-1}>{hero?.type==='hero'?hero.data.title:'Ngày mình tốt nghiệp.'}</h1><p className="hero-subtitle">{hero?.type==='hero'?hero.data.subtitle:''}</p><p>{c.host.university}<br/>{c.host.major}{c.host.cohort&&' · '+c.host.cohort}</p><a href="#invitation-event" className="text-button">Một lời mời dành riêng cho bạn <ArrowDown size={17}/></a></div>
+    <div className="hero-text">
+     <p className="eyebrow">MỘT CHẶNG ĐƯỜNG · MỘT KHỞI ĐẦU MỚI</p>
+     <h1 tabIndex={-1}>{hero?.type==='hero'?hero.data.title:'Ngày mình tốt nghiệp.'}</h1>
+     {hero?.type==='hero'&&hero.data.subtitle&&<p className="hero-subtitle">{hero.data.subtitle}</p>}
+     <p>{c.host.university}<br/>{c.host.major}{c.host.cohort&&' · '+c.host.cohort}</p>
+    </div>
    </section>
    <a href="#response" className="quick-rsvp"><Heart size={16}/> Gửi lời hồi đáp</a>
    {sections.filter(s=>!['opening','hero'].includes(s.type)).map(s=><section key={s.id} className={'invite-section section-'+s.type} id={s.type==='invitation'?'invitation-event':s.type==='map'?'location':s.type}><p className="eyebrow section-number">{String(s.order+1).padStart(2,'0')} / {s.type==='closing'?closingLabel:sectionLabel[s.type]}</p>{renderSection(s)}</section>)}
@@ -204,8 +207,9 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
   case 'map': {
    const location=s.data.locationSource==='MEETUP'&&c.meetup?c.meetup:c.ceremony;
    const notes=(s.data.notes??defaultInvitationNotes).split('\n').map(line=>line.trim()).filter(Boolean);
+   const title=s.data.title.trim();
    return <>
-    <h2>{s.data.title}</h2>
+    <h2>{!title||title.toLocaleLowerCase('vi')==='chúng mình gặp nhau ở đây'?'Nơi ta gặp nhau':title}</h2>
     <MapView location={location} image={media(location.mapImageAssetId)}/>
     {location.entranceNote&&<p className="invite-prose">{location.entranceNote}</p>}
     {notes.length>0&&<aside className="invitation-notes" aria-label="Lưu ý khi đến dự lễ">

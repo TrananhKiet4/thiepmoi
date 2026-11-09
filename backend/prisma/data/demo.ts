@@ -11,7 +11,7 @@ export function demoContent(heroId:string|null):Content{return {
   {id:'story',type:'story',enabled:true,order:2,data:{items:[{id:'s1',label:'Ngày đầu tiên',title:'Bắt đầu bằng một ước mơ',body:'Nội dung mẫu. Hãy kể câu chuyện của bạn tại trang quản trị.',imageAssetId:null}]}},
   {id:'gallery',type:'gallery',enabled:true,order:3,data:{items:[]}},
   {id:'invitation',type:'invitation',enabled:true,order:4,data:{title:'Hẹn bạn trong ngày đặc biệt',message:'Sự hiện diện của bạn là món quà đáng quý nhất.'}},
-  {id:'map',type:'map',enabled:true,order:5,data:{title:'Chúng mình gặp nhau ở đây',locationSource:'MEETUP',instructions:'Địa điểm minh họa, cập nhật trước khi gửi thiệp thật.'}},
+  {id:'map',type:'map',enabled:true,order:5,data:{title:'Nơi ta gặp nhau',locationSource:'MEETUP',instructions:'Địa điểm minh họa, cập nhật trước khi gửi thiệp thật.'}},
   {id:'response',type:'response',enabled:true,order:6,data:{title:'Bạn sẽ đến chứ?',rsvpIntro:'Cho mình biết để đón tiếp bạn thật chu đáo.',wishIntro:'Một vài dòng gửi lại cho ngày đáng nhớ.'}},
   {id:'closing',type:'closing',enabled:true,order:7,data:{message:'Cảm ơn vì đã là một phần trong hành trình này.',attendingMessage:'Mong chờ được gặp bạn!',declinedMessage:'Cảm ơn lời nhắn, hẹn gặp bạn vào dịp khác.'}}
  ]};}

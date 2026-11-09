@@ -223,6 +223,8 @@ test('mobile invitation balances headings and plays music on open',async({page},
   if(reducedMotion)await expect(invitation).not.toHaveAttribute('data-envelope-animated','true');
   else await expect(invitation).toHaveAttribute('data-envelope-animated','true');
   await expect(open).toHaveCount(0);
+  await expect(invitation.locator('.admission-ticket')).toHaveCount(0);
+  await expect(invitation.locator('.hero-text a[href="#invitation-event"]')).toHaveCount(0);
   await expect(invitation.locator('.hero-text h1')).toBeFocused();
   await expect.poll(()=>audio.evaluate((player:HTMLAudioElement)=>player.currentTime)).toBeGreaterThan(.05);
   await expect(page.getByRole('link',{name:'Gửi lời hồi đáp',exact:true})).toHaveCSS('position','static');
@@ -231,7 +233,7 @@ test('mobile invitation balances headings and plays music on open',async({page},
    await page.setViewportSize({width,height:760});
    const metrics=await page.locator('.invitation').evaluate(root=>{
     const outer=root.getBoundingClientRect();
-    const selectors=['.ceremony-heading span:first-child','.admission-ticket strong','.invite-nav-links'];
+    const selectors=['.ceremony-heading span:first-child','.invite-nav-links'];
     const fits=selectors.every(selector=>{
      const range=document.createRange();
      range.selectNodeContents(root.querySelector(selector)!);

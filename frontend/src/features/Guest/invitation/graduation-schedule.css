@@ -4,7 +4,7 @@
   --schedule-tint: var(--blue-tint, #f5ede1);
   --schedule-accent: var(--invite-accent, #234c7c);
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 295px), 1fr));
   align-items: start;
   gap: 32px 22px;
   margin-block: 35px 28px;
@@ -52,6 +52,9 @@
   font-weight: 600;
   text-transform: uppercase;
 }
+
+.graduation-schedule__line { display: block; }
+.graduation-schedule__line > span { display: inline-block; }
 
 .graduation-schedule__month {
   table-layout: fixed;
@@ -154,6 +157,7 @@
 
 .graduation-schedule__note dl {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   margin-block: 0 17px;
   font-size: 13px;
@@ -177,6 +181,14 @@
 
 .graduation-schedule__note dd strong {
   display: block;
+}
+
+@media (max-width: 767px) {
+  .graduation-schedule { margin-inline: -12px; }
+  .graduation-schedule__note .graduation-schedule__venue {
+    margin-inline-start: 0;
+    text-transform: none;
+  }
 }
 
 .graduation-schedule__note dd a {

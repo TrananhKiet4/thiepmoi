@@ -1,15 +1,48 @@
 import type {Content} from '@invite/contracts';
 import {CalendarDays, Clock3, MapPin, Phone} from 'lucide-react';
-import {useEffect, useState} from 'react';
+import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import './graduation-schedule.css';
 
 const timeZone = 'Asia/Ho_Chi_Minh';
-const fullDate = new Intl.DateTimeFormat('vi-VN', {dateStyle: 'full', timeZone});
+const weekdayName = new Intl.DateTimeFormat('vi-VN', {weekday: 'long', timeZone});
 const shortDate = new Intl.DateTimeFormat('vi-VN', {day: '2-digit', month: '2-digit', year: 'numeric', timeZone});
 const timeOfDay = new Intl.DateTimeFormat('vi-VN', {hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone});
 const monthAndYear = new Intl.DateTimeFormat('vi-VN', {month: 'long', year: 'numeric', timeZone});
 const dateParts = new Intl.DateTimeFormat('en', {year: 'numeric', month: '2-digit', day: '2-digit', timeZone});
 const weekdays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+function ceremonyDate(start: number) {
+  const {day, month, year} = Object.fromEntries(dateParts.formatToParts(start).map(({type, value}) => [type, value]));
+  return `${weekdayName.format(start)}, ${Number(day)} tháng ${Number(month)} năm ${year}`;
+}
+
+function ScheduleLine({text}: {text: string}) {
+  const line = useRef<HTMLSpanElement>(null);
+  const label = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const frame = line.current!, content = label.current!;
+    let active = true;
+    function fit() {
+      if (!active) return;
+      content.style.fontSize = '';
+      content.style.whiteSpace = 'nowrap';
+      const available = frame.getBoundingClientRect().width;
+      const width = content.getBoundingClientRect().width;
+      if (available > 0 && width > available) {
+        const fontSize = Number.parseFloat(getComputedStyle(frame).fontSize);
+        const fitted = Math.floor(fontSize * available / width * 10) / 10;
+        content.style.fontSize = `${Math.max(10, fitted)}px`;
+        if (fitted < 10) content.style.whiteSpace = '';
+      }
+    }
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(frame);
+    void document.fonts.ready.then(fit);
+    return () => { active = false; observer.disconnect(); };
+  }, [text]);
+  return <span className="graduation-schedule__line" ref={line}><span ref={label}>{text}</span></span>;
+}
 
 export function GraduationSchedule({ceremony, phone, facebookUrl}: {
   ceremony: Content['ceremony'];
@@ -19,6 +52,7 @@ export function GraduationSchedule({ceremony, phone, facebookUrl}: {
   const start = Date.parse(ceremony.startAt);
   const end = Date.parse(ceremony.endAt);
   const hasStart = Number.isFinite(start);
+  const date = hasStart ? ceremonyDate(start) : '';
   const hasEnd = end > start;
   const spansDays = hasEnd && shortDate.format(start) !== shortDate.format(end);
   const phoneNumber = phone?.replace(/[\s().-]/g, '') ?? '';
@@ -27,7 +61,7 @@ export function GraduationSchedule({ceremony, phone, facebookUrl}: {
     <div className="graduation-schedule__calendar">
       <p className="graduation-schedule__eyebrow">Ngày lễ tốt nghiệp</p>
       {hasStart ? <>
-        <h3 className="graduation-schedule__date"><time dateTime={ceremony.startAt}>{fullDate.format(start)}</time></h3>
+        <h3 className="graduation-schedule__date"><time dateTime={ceremony.startAt}><ScheduleLine text={date}/></time></h3>
         <MonthCalendar start={start}/>
         <Countdown key={start} start={start}/>
       </> : <p className="graduation-schedule__pending">Ngày lễ đang được cập nhật.</p>}
@@ -40,7 +74,7 @@ export function GraduationSchedule({ceremony, phone, facebookUrl}: {
         {hasStart && <>
           <div>
             <dt><CalendarDays aria-hidden="true" size={17}/> Ngày</dt>
-            <dd><time dateTime={ceremony.startAt}>{fullDate.format(start)}</time></dd>
+            <dd><time dateTime={ceremony.startAt}><ScheduleLine text={date}/></time></dd>
           </div>
           <div>
             <dt><Clock3 aria-hidden="true" size={17}/> Giờ Việt Nam</dt>
@@ -49,7 +83,11 @@ export function GraduationSchedule({ceremony, phone, facebookUrl}: {
         </>}
         <div>
           <dt><MapPin aria-hidden="true" size={17}/> Địa điểm</dt>
-          <dd>{ceremony.venueName && <strong>{ceremony.venueName}</strong>}{ceremony.address}{!ceremony.venueName && !ceremony.address && 'Đang cập nhật'}</dd>
+          <dd className="graduation-schedule__venue">
+            {ceremony.venueName && <strong><ScheduleLine text={ceremony.venueName}/></strong>}
+            {ceremony.address && <span className="schedule-address"><ScheduleLine text={ceremony.address}/></span>}
+            {!ceremony.venueName && !ceremony.address && 'Đang cập nhật'}
+          </dd>
         </div>
         {(phone || facebookUrl) && <div>
           <dt><Phone aria-hidden="true" size={17}/> Liên hệ</dt>
