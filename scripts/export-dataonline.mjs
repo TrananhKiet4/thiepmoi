@@ -1,7 +1,6 @@
 import {mkdirSync, writeFileSync} from 'node:fs';
 import {dirname, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {PrismaClient} from '@prisma/client';
 
 export const tables = ['AdminUser', 'AdminSession', 'Event', 'EventRevision', 'Guest', 'Invitation', 'InvitationLink', 'RSVP', 'Wish', 'ImportBatch', 'AuditLog', 'IdempotencyRecord', 'TemporaryObject', 'RateLimitBucket'];
 const jsonColumns = new Set(['contentJson', 'mappingJson', 'normalizedRowsJson', 'summaryJson', 'resultJson', 'metadata', 'responseJson']);
@@ -53,6 +52,7 @@ async function main() {
   const output = process.argv[2];
   if (!output || !process.env.DATABASE_URL) throw new Error('Usage: node --env-file=.env.production.local scripts/export-dataonline.mjs .data/backups/dataonline-data.sql');
   const target = resolve(output);
+  const {PrismaClient} = await import('@prisma/client');
   const client = new PrismaClient({datasources: {db: {url: process.env.DIRECT_URL || process.env.DATABASE_URL}}, log: []});
   try {
     const snapshot = await client.$transaction(async transaction => {
