@@ -166,6 +166,10 @@ jobs:
           curl --fail --silent --show-error --ssl-reqd --tlsv1.2 \
             --connect-timeout 10 --max-time 45 \
             --user "$FTPS_USERNAME:$FTPS_PASSWORD" \
+            --quote "*DELE ${FTPS_SERVER_DIR}thiepmoi-app/bootstrap/cache/config.php" \
+            --quote "*DELE ${FTPS_SERVER_DIR}thiepmoi-app/bootstrap/cache/packages.php" \
+            --quote "*DELE ${FTPS_SERVER_DIR}thiepmoi-app/bootstrap/cache/services.php" \
+            --quote "*DELE ${FTPS_SERVER_DIR}thiepmoi-app/bootstrap/cache/routes-v7.php" \
             --quote "*DELE ${FTPS_SERVER_DIR}thiepmoi-app/storage/framework/maintenance.php" \
             --list-only "ftp://${FTPS_SERVER}:${FTPS_PORT}/${FTPS_SERVER_DIR}thiepmoi-app/storage/framework/" \
             --output /dev/null

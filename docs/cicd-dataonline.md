@@ -38,6 +38,8 @@ File `.env.cicd.local` trên máy dùng để chuẩn bị thông tin và kiểm
 
 `.env`, các file `.env.*`, toàn bộ `thiepmoi-app/storage` và cache PHP trong `bootstrap/cache` nằm trong danh sách loại trừ đồng bộ. Danh mục `bootstrap/cache/invitation-media.json` được build và cập nhật cùng mã nguồn.
 
+Sau khi đồng bộ thành công, workflow xóa các file cache sinh tự động `config.php`, `packages.php`, `services.php` và `routes-v7.php` trong `bootstrap/cache` trước khi mở lại request. Laravel tạo lại các cache cần thiết từ cấu hình và mã vừa phát hành.
+
 Các thay đổi schema MariaDB cần migration riêng đã kiểm tra trước khi phát hành phần mã phụ thuộc vào chúng. Dữ liệu khách, RSVP và lời chúc được quản lý trong database của hosting.
 
 Mã nguồn được đồng bộ vào vị trí ứng dụng hiện có để sử dụng hạn mức inode của gói hosting. Website hiển thị trang bảo trì trong lúc đồng bộ. Các file media cá nhân dùng bucket đã cấu hình trên hosting.
