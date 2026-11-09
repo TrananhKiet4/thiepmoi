@@ -57,34 +57,36 @@ export async function invitationView(content:Content,event:Event,guest?:Guest,in
  const recipientAddress=address==='đại gia đình'?'cả nhà':address;
  const headingAddress=recipientAddress.replace(/^(anh|chị) hai$/u,'$1');
  const recipientGreeting=family?'Thương gửi':/^(bạn|em)(?:\s|$)/u.test(salutation)?'Thân gửi':'Kính gửi';
- const openingVars={guestName:recipientName,hostName:content.host.fullName,salutation:guest?.salutation??'bạn'};
+ const openingVars={guestName:recipientName,hostName:content.host.fullName,salutation:guest?.salutation??'bạn',
+  recipientAddress:address,headingAddress,HeadingAddress:sentenceCase(headingAddress)};
  const opening=content.sections.find(s=>s.type==='opening');
  const customOpening=card?.personalMessage||content.groupMessages[guest?.groupKey??''];
  const sharedOpening=opening?.data.messageTemplate??'';
  const invite=family?'Thương mời':senior||aunt?'Kính mời':'Thân mời';
  const speaker=salutation==='em yêu'?'anh':family||aunt?'con':senior?'em':junior?'anh':'mình';
  const sentenceSpeaker=sentenceCase(speaker);
+ const vars={...openingVars,speaker,Speaker:sentenceSpeaker,invitationGreeting:invite};
  const usePronouns=(text:string,recipient=address)=>text.replace(/(?<![\p{L}\p{M}])(?:bạn(?!\s+bè(?![\p{L}\p{M}]))|mình)(?![\p{L}\p{M}])/giu,word=>{
   const lower=word.toLocaleLowerCase('vi'),replacement=lower==='bạn'?recipient:speaker;
   return word===lower?replacement:sentenceCase(replacement);
  });
  const openingMessage=!customOpening&&sharedOpening===standardOpening
   ?`${invite} ${recipientName} đến chung vui trong lễ tốt nghiệp của ${speaker}. ${sentenceSpeaker} rất mong được gặp ${address} và chụp cùng nhau một tấm ảnh để nhớ ngày này.`
-  :personalize(customOpening||sharedOpening,openingVars);
+  :personalize(customOpening||sharedOpening,vars);
  const sections=content.sections.map(section=>{
   if(section.type==='opening'&&section.data.title==='Một lời mời dành riêng cho bạn'){
    return {...section,data:{...section.data,title:'MỘT LỜI MỜI DÀNH RIÊNG CHO'}};
   }
-  if(section.type==='response')return {...section,data:{...section.data,title:usePronouns(section.data.title,recipientAddress),wishIntro:usePronouns(section.data.wishIntro)}};
-  if(section.type==='closing')return {...section,data:{message:usePronouns(section.data.message),attendingMessage:usePronouns(section.data.attendingMessage),declinedMessage:usePronouns(section.data.declinedMessage)}};
+  if(section.type==='response')return {...section,data:{...section.data,title:personalize(usePronouns(section.data.title,recipientAddress),vars),wishIntro:personalize(usePronouns(section.data.wishIntro),vars),...(section.data.wishTitle?{wishTitle:personalize(section.data.wishTitle,vars)}:{})}};
+  if(section.type==='closing')return {...section,data:{message:personalize(usePronouns(section.data.message),vars),attendingMessage:personalize(usePronouns(section.data.attendingMessage),vars),declinedMessage:personalize(usePronouns(section.data.declinedMessage),vars)}};
   if(section.type!=='invitation')return section;
   const lead=/^\s*(?:mình\s+)?trân trọng mời bạn(?=\s|[.,!]|$)/iu;
   let message=card?.letterMessage||section.data.message;
   if(!card?.letterMessage&&lead.test(message))message=`Trân trọng mời ${address} đến chụp hình và lưu giữ những kỷ niệm trong ngày tốt nghiệp của ${speaker}.`;
-  const vars={...openingVars,salutation:address};
+  const letterVars={...vars,salutation:address};
   const standardTitle=section.data.title.toLocaleLowerCase('vi')==='hẹn bạn trong ngày đặc biệt';
-  const title=card?.letterTitle?personalize(card.letterTitle,vars):standardTitle?`Hẹn ${headingAddress} trong ngày đặc biệt`:section.data.title;
-  return {...section,data:{title,message:personalize(message,vars)}};
+  const title=card?.letterTitle?personalize(card.letterTitle,letterVars):standardTitle?`Hẹn ${headingAddress} trong ngày đặc biệt`:personalize(section.data.title,letterVars);
+  return {...section,data:{title,message:personalize(message,letterVars)}};
  });
  const previewWishes=preview&&event.wallEnabled?(await readPublicWishes(tx,event.id,6,undefined,invitation?.id)).items:undefined;
  const shared=!!invitation?.allowMultipleResponses;

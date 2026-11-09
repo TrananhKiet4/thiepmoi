@@ -125,7 +125,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
  const img=(id?:string|null,priority=false)=>{const a=media(id);return a?<AssetImage asset={a} priority={priority}/>:<div className="photo-placeholder"><GraduationCap size={70} strokeWidth={.7}/><span>MỘT CHẶNG ĐƯỜNG ĐÁNG NHỚ</span></div>;};
  const year=c.ceremony.startAt?new Intl.DateTimeFormat('vi-VN',{year:'numeric',timeZone:c.timezone}).format(new Date(c.ceremony.startAt)):'…';
  const heroTitle=hero?.type==='hero'?hero.data.title:'Ngày mình tốt nghiệp.';
- const splitHeroTitle=/^một hành trình mới bắt đầu[.!]?$/iu.test(heroTitle.trim());
+ const splitHeroTitle=/^một hành trình mới bắt đầu[.!]?$/iu.test(heroTitle.replace(/\s+/gu,' ').trim());
  const hasMusic=c.music.enabled&&!!media(c.music.assetId);
  const message=view.personalMessage||(opening?.type==='opening'?opening.data.messageTemplate:'Mời bạn cùng mình lưu giữ khoảnh khắc đáng nhớ.').replaceAll('{{guestName}}',name).replaceAll('{{hostName}}',c.host.fullName).replaceAll('{{salutation}}',view.guest.salutation||'');
  async function startMusic(){
@@ -203,7 +203,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    {(item.image||item.imageAssetId)&&<div className="story-image">{item.image?<AssetImage asset={{...item.image,id:item.id,alt:item.title,type:'IMAGE'}} priority={false}/>:img(item.imageAssetId)}</div>}<div><p className="eyebrow">{item.label||`CHƯƠNG ${i+1}`}</p><h3><em className="section-title-accent">{item.title}</em></h3><p>{item.body}</p></div>
   </article>)}</div></>;
   case 'gallery':return <>
-   <h2>Cảm ơn vì đã <em className="section-title-accent">ở trong thanh xuân của Kiệt.</em></h2>
+   <h2>{s.data.title?s.data.title.split(/\r?\n/).map((line,index)=>index===0?<span key={index}>{line}{' '}</span>:<em key={index} className="section-title-accent">{line}</em>):<>Cảm ơn vì đã <em className="section-title-accent">ở trong thanh xuân của Kiệt.</em></>}</h2>
    <CompanionFilm/>
   </>;
   case 'invitation':return <div className="invitation-letter">
@@ -342,6 +342,7 @@ function FamilyResponseForms({credential,intro,onChange}:{credential:string;intr
  </>;
 }
 function FeedbackForm({view,save,intro}:{view:InvitationView;save?:ReturnType<typeof useGuestData>['save'];intro:string}) {
+ const response=view.content.sections.find(section=>section.type==='response');
  const wish=view.wish?.deletedAt?null:view.wish;
  const [status,setStatus]=useState<'ATTENDING'|'DECLINED'|''>(view.rsvp?.status??'');
  const [body,setBody]=useState(wish?.body??'');
@@ -403,7 +404,7 @@ function FeedbackForm({view,save,intro}:{view:InvitationView;save?:ReturnType<ty
    {!view.preview&&!view.canRsvp&&<p className="muted">Hiện đã ngừng nhận xác nhận.</p>}
   </fieldset>
   <fieldset disabled={!canWish||busy}>
-   <legend>Một lời chúc dành cho Kiệt</legend>
+   <legend>{response?.type==='response'&&response.data.wishTitle||'Một lời chúc dành cho Kiệt'}</legend>
    {intro&&<p className="feedback-intro">{intro}</p>}
    <Field label="Lời chúc của bạn"><textarea value={body} maxLength={1000} rows={4} onChange={e=>setBody(e.target.value)} placeholder="Viết lời chúc nếu bạn muốn…"/></Field>
    <label className="check-label"><input type="checkbox" checked={consent} onChange={e=>changeConsent(e.target.checked)}/> Tôi đồng ý hiển thị tên và lời chúc trên thiệp.</label>

@@ -46,10 +46,10 @@ export const sectionSchema=z.discriminatedUnion('type',[
    }).nullable().optional(),
   })).max(12),
  })}),
- z.object({...sectionBase,type:z.literal('gallery'),data:z.object({items:z.array(z.object({assetId:id,caption:text(500)})).max(40)})}),
+ z.object({...sectionBase,type:z.literal('gallery'),data:z.object({title:text(200).optional(),items:z.array(z.object({assetId:id,caption:text(500)})).max(40)})}),
  z.object({...sectionBase,type:z.literal('invitation'),data:z.object({title:text(200),message:text(2000)})}),
  z.object({...sectionBase,type:z.literal('map'),data:z.object({title:text(200),locationSource:z.enum(['CEREMONY','MEETUP']),instructions:text(1000),notes:text(2400).optional()})}),
- z.object({...sectionBase,type:z.literal('response'),data:z.object({title:text(200),rsvpIntro:text(1000),wishIntro:text(1000)})}),
+ z.object({...sectionBase,type:z.literal('response'),data:z.object({title:text(200),rsvpIntro:text(1000),wishIntro:text(1000),wishTitle:text(200).optional()})}),
  z.object({...sectionBase,type:z.literal('closing'),data:z.object({message:text(2000),attendingMessage:text(1000).default(''),declinedMessage:text(1000).default('')})})
 ]);
 export const contentSchema=z.object({

@@ -280,7 +280,13 @@ final class AdminInvitations
                 $fields['notes'] = self::text($data['notes'], 2400, "$prefix.notes");
             }
         }
+        if ($type === 'response' && array_key_exists('wishTitle', $data)) {
+            $fields['wishTitle'] = self::text($data['wishTitle'], 200, "$prefix.wishTitle");
+        }
         if ($type === 'story' || $type === 'gallery') {
+            if ($type === 'gallery' && array_key_exists('title', $data)) {
+                $fields['title'] = self::text($data['title'], 200, "$prefix.title");
+            }
             if ($type === 'story') {
                 foreach (['title' => 200, 'intro' => 1000] as $key => $max) {
                     if (array_key_exists($key, $data)) {

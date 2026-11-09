@@ -34,6 +34,19 @@ assert($preview['content']['sections'][0]['data'] === ['title' => 'Hẹn chị t
 assert($preview['content']['sections'][1]['data']['wishIntro'] === 'Em mong được gặp chị hai cùng bạn bè.');
 assert($preview['canRsvp'] === false && $preview['canCreateOrEditWish'] === false && !isset($preview['previewWishes']));
 assert(json_encode($preview['media']) === '{}');
+$templates = $content;
+$templates['sections'] = [
+    ['type' => 'opening', 'data' => ['title' => 'MỘT LỜI MỜI DÀNH RIÊNG CHO', 'messageTemplate' => '{{invitationGreeting}} {{guestName}}. {{Speaker}} mong gặp {{recipientAddress}}.']],
+    ['type' => 'invitation', 'data' => ['title' => 'Hẹn {{headingAddress}} trong ngày đặc biệt', 'message' => 'Mời {{recipientAddress}} chụp ảnh cùng {{speaker}}.']],
+    ['type' => 'response', 'data' => ['title' => '{{HeadingAddress}} sẽ đến chứ?', 'wishIntro' => '{{Speaker}} mong đọc lời chúc của {{recipientAddress}}.', 'wishTitle' => 'Gửi lời chúc tới {{hostName}}']],
+    ['type' => 'closing', 'data' => ['message' => 'Cảm ơn {{recipientAddress}}. {{Speaker}} rất trân trọng.']],
+];
+$templated = InvitationViews::build($event, $templates, $guest, preview: true);
+assert($templated['personalMessage'] === 'Kính mời Khách. Em mong gặp chị hai.');
+assert($templated['content']['sections'][1]['data'] === ['title' => 'Hẹn chị trong ngày đặc biệt', 'message' => 'Mời chị hai chụp ảnh cùng em.']);
+assert($templated['content']['sections'][2]['data']['title'] === 'Chị sẽ đến chứ?');
+assert($templated['content']['sections'][2]['data']['wishTitle'] === 'Gửi lời chúc tới Người mời');
+assert($templated['content']['sections'][3]['data']['message'] === 'Cảm ơn chị hai. Em rất trân trọng.');
 $calendar = InvitationViews::calendar('fixture', $content);
 assert(str_contains($calendar, "DTSTART:20261110T010000Z\r\n"));
 assert(str_contains(str_replace("\r\n ", '', $calendar), 'A\\, B'));

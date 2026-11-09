@@ -137,7 +137,13 @@ final class InvitationViews
         $greeting = $family ? 'Thương gửi' : (preg_match('/^(bạn|em)(?:\s|$)/u', $salutation) ? 'Thân gửi' : 'Kính gửi');
         $invite = $family ? 'Thương mời' : ($senior || $aunt ? 'Kính mời' : 'Thân mời');
         $speaker = $salutation === 'em yêu' ? 'anh' : ($family || $aunt ? 'con' : ($senior ? 'em' : ($junior ? 'anh' : 'mình')));
-        $vars = ['{{guestName}}' => $recipientName, '{{hostName}}' => $content['host']['fullName'], '{{salutation}}' => $guest->salutation ?? 'bạn'];
+        $vars = [
+            '{{guestName}}' => $recipientName, '{{hostName}}' => $content['host']['fullName'],
+            '{{salutation}}' => $guest->salutation ?? 'bạn', '{{recipientAddress}}' => $address,
+            '{{headingAddress}}' => $headingAddress, '{{HeadingAddress}}' => self::sentenceCase($headingAddress),
+            '{{speaker}}' => $speaker, '{{Speaker}}' => self::sentenceCase($speaker),
+            '{{invitationGreeting}}' => $invite,
+        ];
         $sharedOpening = '';
 
         foreach ($content['sections'] as &$section) {
@@ -150,12 +156,15 @@ final class InvitationViews
                     }
                     break;
                 case 'response':
-                    $data['title'] = self::pronouns($data['title'], $speaker, $recipientAddress);
-                    $data['wishIntro'] = self::pronouns($data['wishIntro'], $speaker, $address);
+                    $data['title'] = strtr(self::pronouns($data['title'], $speaker, $recipientAddress), $vars);
+                    $data['wishIntro'] = strtr(self::pronouns($data['wishIntro'], $speaker, $address), $vars);
+                    if (isset($data['wishTitle'])) {
+                        $data['wishTitle'] = strtr($data['wishTitle'], $vars);
+                    }
                     break;
                 case 'closing':
                     foreach (['message', 'attendingMessage', 'declinedMessage'] as $key) {
-                        $data[$key] = self::pronouns($data[$key] ?? '', $speaker, $address);
+                        $data[$key] = strtr(self::pronouns($data[$key] ?? '', $speaker, $address), $vars);
                     }
                     break;
                 case 'invitation':
@@ -170,7 +179,7 @@ final class InvitationViews
                     }
                     $title = $card->letterTitle ?? '';
                     $data['title'] = $title !== '' ? strtr($title, $letterVars)
-                        : (mb_strtolower($data['title']) === 'hẹn bạn trong ngày đặc biệt' ? "Hẹn $headingAddress trong ngày đặc biệt" : $data['title']);
+                        : (mb_strtolower($data['title']) === 'hẹn bạn trong ngày đặc biệt' ? "Hẹn $headingAddress trong ngày đặc biệt" : strtr($data['title'], $letterVars));
                     $data['message'] = strtr($message, $letterVars);
                     break;
             }
