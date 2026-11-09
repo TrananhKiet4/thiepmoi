@@ -1,6 +1,6 @@
 # Deploy Data Online khi push main
 
-Workflow `.github/workflows/deploy-dataonline.yml` chạy khi push vào `main` hoặc khi chọn Run workflow trên nhánh `main` trong GitHub Actions. Website đích là `https://www.trananhkiet.id.vn`.
+Workflow `.github/workflows/deploy-dataonline.yml` chạy khi push vào `main` hoặc khi chọn Run workflow trên nhánh `main` trong GitHub Actions. Website đích là `https://trananhkiet.id.vn`.
 
 ## Cập nhật website
 

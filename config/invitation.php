@@ -4,8 +4,8 @@ $catalog = base_path('bootstrap/cache/invitation-media.json');
 $media = is_file($catalog) ? json_decode(file_get_contents($catalog), true, flags: JSON_THROW_ON_ERROR) : [];
 
 return [
-    'origin' => env('APP_ORIGIN', 'https://www.trananhkiet.id.vn'),
-    'cors_origins' => array_map('trim', explode(',', env('CORS_ORIGINS', env('APP_ORIGIN', 'https://www.trananhkiet.id.vn')))),
+    'origin' => env('APP_ORIGIN', 'https://trananhkiet.id.vn'),
+    'cors_origins' => array_map('trim', explode(',', env('CORS_ORIGINS', env('APP_ORIGIN', 'https://trananhkiet.id.vn')))),
     'admin_email' => strtolower(trim((string) env('ADMIN_BOOTSTRAP_EMAIL', ''))),
     'session_secret' => env('SESSION_SECRET'),
     'key' => env('INVITATION_KEY'),

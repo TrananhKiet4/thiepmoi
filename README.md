@@ -4,7 +4,7 @@ Laravel 13 và MariaDB phục vụ API quản trị, thiệp theo tên khách, p
 
 ## Data Online
 
-Tên miền triển khai là `https://www.trananhkiet.id.vn`. Database MariaDB trên DirectAdmin là `trananhk_thiepmoi`. Làm theo [hướng dẫn cài qua File Manager và phpMyAdmin](docs/deploy-dataonline.md).
+Tên miền triển khai là `https://trananhkiet.id.vn`. Database MariaDB trên DirectAdmin là `trananhk_thiepmoi`. Làm theo [hướng dẫn cài qua File Manager và phpMyAdmin](docs/deploy-dataonline.md).
 
 GitHub Actions hỗ trợ tự kiểm thử, build và deploy qua FTPS khi push vào `main`. Xem [hướng dẫn CI/CD](docs/cicd-dataonline.md).
 

@@ -1,6 +1,6 @@
 # Cài Laravel trên Data Online bằng File Manager
 
-Dự án dùng Laravel 13, PHP 8.3 trở lên và MariaDB. Giao diện React được build thành file tĩnh để Laravel phục vụ cùng tên miền `https://www.trananhkiet.id.vn`. Database đích là `trananhk_thiepmoi` trong DirectAdmin. phpMyAdmin dùng để quản lý database MariaDB.
+Dự án dùng Laravel 13, PHP 8.3 trở lên và MariaDB. Giao diện React được build thành file tĩnh để Laravel phục vụ cùng tên miền `https://trananhkiet.id.vn`. Database đích là `trananhk_thiepmoi` trong DirectAdmin. phpMyAdmin dùng để quản lý database MariaDB.
 
 ## 1. Kiểm tra hosting
 
@@ -8,7 +8,7 @@ Trong DirectAdmin, chọn PHP 8.3 và bật `pdo_mysql`, `mbstring`, `openssl`, 
 
 Đặt `memory_limit` ít nhất 128M, `upload_max_filesize` ít nhất 5M và `post_max_size` ít nhất 8M cho nhập Excel.
 
-Tại nơi quản lý DNS của Mắt Bão, lấy đúng IP hosting ở Data Online và trỏ bản ghi A của `trananhkiet.id.vn` về IP đó. Trỏ `www` về cùng website bằng CNAME đến `trananhkiet.id.vn` hoặc bản ghi A đến cùng IP. Tại DirectAdmin, cấp chứng chỉ SSL bao gồm cả `trananhkiet.id.vn` và `www.trananhkiet.id.vn`. Tên miền chính của ứng dụng là `https://www.trananhkiet.id.vn`. Kiểm tra HTTPS hoạt động trước khi đăng nhập và gửi phản hồi.
+Tại nơi quản lý DNS của Mắt Bão, lấy đúng IP hosting ở Data Online và trỏ bản ghi A của `trananhkiet.id.vn` về IP đó. Trỏ `www` về cùng website bằng CNAME đến `trananhkiet.id.vn` hoặc bản ghi A đến cùng IP. Tại DirectAdmin, cấp chứng chỉ SSL bao gồm cả `trananhkiet.id.vn` và `www.trananhkiet.id.vn`. Tên miền chính của ứng dụng là `https://trananhkiet.id.vn`. Kiểm tra HTTPS hoạt động trước khi đăng nhập và gửi phản hồi.
 
 ## 2. Build gói trên máy tính
 
@@ -77,9 +77,9 @@ Giữ các thiết lập sau.
 ```dotenv
 APP_ENV=production
 APP_DEBUG=false
-APP_URL=https://www.trananhkiet.id.vn
-APP_ORIGIN=https://www.trananhkiet.id.vn
-CORS_ORIGINS=https://www.trananhkiet.id.vn
+APP_URL=https://trananhkiet.id.vn
+APP_ORIGIN=https://trananhkiet.id.vn
+CORS_ORIGINS=https://trananhkiet.id.vn,https://www.trananhkiet.id.vn
 DB_CONNECTION=mariadb
 DB_DATABASE=trananhk_thiepmoi
 CACHE_STORE=file
@@ -128,7 +128,7 @@ Khi `/health/ready` trả `ok=false`, trường `reason` cho biết loại lỗi
 
 Lấy một link cá nhân và một link Đại gia đình từ quản trị. Kiểm tra ảnh, nhạc, font, gửi RSVP, tải lại trang để xem phản hồi và gửi lời chúc. Với Đại gia đình, thử hai tên người phản hồi riêng biệt. Kiểm tra nhập Excel và tải file danh sách.
 
-Các mã thiệp vẫn được giữ nhưng tên miền mới đổi thành `www.trananhkiet.id.vn`. Link cũ trên tên miền Vercel cần được gửi lại bằng tên miền mới hoặc có chuyển hướng ở hệ thống cũ. File `.htaccess` trong gói chuyển tên miền gốc sang `www`, giữ đường dẫn và query string. Thư mục hosting vẫn là `domains/trananhkiet.id.vn/` vì `www` phục vụ cùng website.
+Các mã thiệp dùng tên miền `trananhkiet.id.vn`. Link cũ trên tên miền Vercel cần được gửi lại bằng tên miền mới hoặc có chuyển hướng ở hệ thống cũ. File `.htaccess` chuyển các trang `/`, `/admin/...` và `/i/...` từ `www` về tên miền chính, giữ đường dẫn và query string. API và tài nguyên trên `www` tiếp tục phục vụ các phiên đã mở trước lúc chuyển tên miền. CORS cho phép cả hai địa chỉ của cùng website trong cấu hình triển khai. Thư mục hosting là `domains/trananhkiet.id.vn/`.
 
 ## 7. Những lần cập nhật sau
 

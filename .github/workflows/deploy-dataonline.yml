@@ -81,7 +81,7 @@ jobs:
     timeout-minutes: 360
     environment:
       name: dataonline-production
-      url: https://www.trananhkiet.id.vn
+      url: https://trananhkiet.id.vn
     env:
       FTPS_SERVER: sv66.dataonline.vn
       FTPS_PORT: '21'
@@ -219,13 +219,17 @@ jobs:
           for endpoint in live ready; do
             curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 5 \
               --connect-timeout 10 --max-time 30 \
-              "https://www.trananhkiet.id.vn/health/$endpoint" \
+              "https://trananhkiet.id.vn/health/$endpoint" \
               --output "$RUNNER_TEMP/dataonline-health.json"
             node -e 'const fs=require("node:fs");const p=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/dataonline-health.json","utf8"));if(p.ok!==true)throw new Error("Production health check failed");'
           done
           curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \
-            https://www.trananhkiet.id.vn/admin/login --output "$RUNNER_TEMP/dataonline-login.html"
+            https://trananhkiet.id.vn/admin/login --output "$RUNNER_TEMP/dataonline-login.html"
           grep -q '/assets/' "$RUNNER_TEMP/dataonline-login.html"
+          redirect=$(curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \
+            'https://www.trananhkiet.id.vn/i/ABCDE/kiem-tra?source=cicd' \
+            --output /dev/null --write-out '%{http_code} %{redirect_url}')
+          test "$redirect" = '302 https://trananhkiet.id.vn/i/ABCDE/kiem-tra?source=cicd'
       - name: Report incomplete deployment
         if: failure()
         run: echo '::error::Deployment failed. If code synchronization had started, rerun this workflow on main to complete it. The deployment maintenance page is kept when synchronization fails.'

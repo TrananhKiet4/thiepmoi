@@ -45,7 +45,7 @@ async function main() {
   const port = Number(settings.FTPS_PORT || 21);
   assert(Number.isInteger(port) && port > 0 && port < 65536, 'Invalid FTPS port');
   const base = `ftp://${settings.FTPS_SERVER}:${port}/${settings.FTPS_SERVER_DIR}`;
-  const origin = 'https://www.trananhkiet.id.vn/';
+  const origin = 'https://trananhkiet.id.vn/';
   const staging = resolve('.data/dataonline/photo-upload');
   mkdirSync(staging, {recursive: true});
 
