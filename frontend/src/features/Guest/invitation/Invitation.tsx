@@ -97,7 +97,7 @@ function EnvelopeName({name}:{name:string}) {
  },[name]);
  return <h1 ref={heading}><span ref={text}>{name}</span></h1>;
 }
-export function Invitation({view,token,save}: {view:InvitationView;token?:string;save?:(path:string,method:string,body?:unknown)=>Promise<any>}) {
+export function Invitation({view,token,save}: {view:InvitationView;token?:string;save?:ReturnType<typeof useGuestData>['save']}) {
  const [phase,setPhase]=useState<'closed'|'opening'|'opened'>('closed');
  const envelope=useRef<HTMLElement>(null);
  const opened=phase==='opened';
@@ -187,11 +187,11 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
   </>}
  </main>;
  function renderSection(s:Section){switch(s.type){
-  case 'story':return <><h2>Mỗi chặng đường,<br/><em>một điều để nhớ.</em></h2><div className="story-list">{s.data.items.map((item,i)=><article key={item.id} className={'story-item'+(item.imageAssetId?'':' story-letter')}>
+  case 'story':return <><h2>Mỗi chặng đường, <em className="section-title-accent">một điều để nhớ.</em></h2><div className="story-list">{s.data.items.map((item,i)=><article key={item.id} className={'story-item'+(item.imageAssetId?'':' story-letter')}>
    {item.imageAssetId&&<div className="story-image">{img(item.imageAssetId)}</div>}<div><p className="eyebrow">{item.label||`CHƯƠNG ${i+1}`}</p><h3>{item.title}</h3><p>{item.body}</p></div>
   </article>)}</div></>;
   case 'gallery':return <>
-   <h2>Cảm ơn vì đã<br/><em>ở trong thanh xuân của Kiệt.</em></h2>
+   <h2>Cảm ơn vì đã <em className="section-title-accent">ở trong thanh xuân của Kiệt.</em></h2>
    <CompanionFilm/>
   </>;
   case 'invitation':return <div className="invitation-letter">
@@ -257,7 +257,7 @@ const sectionLabel:Record<string,string>={opening:'LỜI MỞ',hero:'KHOẢNH KH
 function AssetImage({asset,priority,sizes='(max-width: 767px) 86vw, 42vw'}:{asset:MediaView;priority:boolean;sizes?:string}){const [failed,setFailed]=useState(false);useEffect(()=>setFailed(false),[asset.url]);return failed?<div className="photo-placeholder" role="img" aria-label={asset.alt||'Khoảnh khắc đang được cập nhật'}><GraduationCap size={50} strokeWidth={1}/><span>Ảnh tạm thời không hiển thị</span></div>:<img src={asset.url} alt={asset.alt} width={asset.width||1200} height={asset.height||1500} srcSet={asset.srcSet} sizes={sizes} loading={priority?'eager':'lazy'} fetchPriority={priority?'high':'auto'} onError={()=>setFailed(true)}/>;}
 function MapView({location,image}:{location:Content['ceremony'];image?:MediaView}){return <div className="map-card">{image&&<div className="campus-map-image"><a href={image.url} target="_blank" rel="noopener noreferrer" aria-label="Mở ảnh sơ đồ trường đầy đủ"><AssetImage asset={image} priority={false} sizes="90vw"/></a></div>}<h3>{location.venueName}</h3><p>{location.address}</p><div className="row map-actions"><Action run={()=>navigator.clipboard.writeText(location.address)}>Sao chép địa chỉ</Action><a className="button secondary" href={googleMapsLink(location)} target="_blank" rel="noopener noreferrer">Mở Google Maps <ArrowUpRight size={17}/></a></div></div>;}
 function FeedbackForms({view,token,save,intro}:{view:InvitationView;token?:string;save?:ReturnType<typeof useGuestData>['save'];intro:string}){
- return <><Response view={view} save={save}/><p className="invite-prose">{intro}</p><WishForm view={view} save={save}/>{(token&&view.wallEnabled!==false||view.previewWishes!==undefined)&&<Wall key={token} token={token} previewItems={view.previewWishes}/>}</>;
+ return <><FeedbackForm view={view} save={save} intro={intro}/>{(token&&view.wallEnabled!==false||view.previewWishes!==undefined)&&<Wall key={token} token={token} previewItems={view.previewWishes}/>}</>;
 }
 function FamilyReply({view,token,intro}:{view:InvitationView;token?:string;intro:string}){
  const storageKey=`graduation.family.${token}`;
@@ -309,7 +309,6 @@ function FamilyResponseForms({credential,intro,onChange}:{credential:string;intr
  const unauthorized=error instanceof ApiError&&[401,404].includes(error.status);
  return <>
   <div className="row wrap" style={{justifyContent:'center',marginBottom:16}}>
-   {query.data?.responderName&&!blocked&&<p>Người phản hồi <strong>{query.data.responderName}</strong></p>}
    <button type="button" className="button secondary" onClick={onChange}>Đổi người phản hồi</button>
   </div>
   <ErrorBox error={error}/>
@@ -318,57 +317,81 @@ function FamilyResponseForms({credential,intro,onChange}:{credential:string;intr
   {query.data&&!blocked&&!unauthorized&&<FeedbackForms view={query.data} token={credential} save={save} intro={intro}/>}
  </>;
 }
-function Response({view,save}: {view:InvitationView;save?:any}) {
- const [status,setStatus]=useState(view.rsvp?.status||'ATTENDING'),[error,setError]=useState<unknown>(null),[busy,setBusy]=useState(false),[done,setDone]=useState(false);
- return <form className="guest-form" onSubmit={async e=>{
-  e.preventDefault();if(!save)return;setBusy(true);setError(null);setDone(false);
-  try{await save('/guest/rsvp','PUT',{status,note:view.rsvp?.note??'',expectedVersion:view.rsvp?.version||0});setDone(true);}catch(e){setError(e);}finally{setBusy(false);}
- }}><fieldset disabled={!view.canRsvp||view.preview||busy}>
-  <legend className="sr-only">Xác nhận tham dự</legend>
-  <p className="response-recipient">{view.responderName?'Người phản hồi':'Khách mời'}<strong>{view.responderName||view.guest.recipientName||view.guest.displayName||view.guest.fullName||'Bạn'}</strong></p>
-  <div className="radio-cards"><label><input type="radio" name="rsvp" checked={status==='ATTENDING'} onChange={()=>setStatus('ATTENDING')}/><Check size={20}/> Mình sẽ đến</label><label><input type="radio" name="rsvp" checked={status==='DECLINED'} onChange={()=>setStatus('DECLINED')}/><Heart size={20}/> Hẹn một dịp khác</label></div>
-  <button className="button" disabled={busy}><Send size={16}/>{busy?'Đang gửi…':'Gửi xác nhận'}</button>
- </fieldset>{!view.canRsvp&&<p className="muted">Hiện đã ngừng nhận xác nhận.</p>}<ErrorBox error={error}/>{done&&<p role="status" className="success">Đã lưu lời hồi đáp của bạn. Cảm ơn bạn!</p>}</form>;
-}
-function WishForm({view,save}:{view:InvitationView;save?:any}) {
+function FeedbackForm({view,save,intro}:{view:InvitationView;save?:ReturnType<typeof useGuestData>['save'];intro:string}) {
  const wish=view.wish?.deletedAt?null:view.wish;
+ const [status,setStatus]=useState<'ATTENDING'|'DECLINED'|''>(view.rsvp?.status??'');
  const [body,setBody]=useState(wish?.body??'');
  const [consent,setConsent]=useState(!!wish?.consentPublic);
  const [attendanceConsent,setAttendanceConsent]=useState(!!wish?.consentAttendancePublic);
  const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[done,setDone]=useState('');
+ const canRsvp=!!save&&!view.preview&&view.canRsvp;
+ const canWish=!!save&&!view.preview&&view.canCreateOrEditWish;
+ const message=body.trim();
+ const sendRsvp=canRsvp&&!!status&&status!==view.rsvp?.status;
+ const sendWish=canWish&&!!message&&(message!==wish?.body||consent!==!!wish?.consentPublic||attendanceConsent!==!!wish?.consentAttendancePublic);
  function changeConsent(checked:boolean){
   setConsent(checked);
   if(!checked)setAttendanceConsent(false);
  }
- return <form className="guest-form" onSubmit={async e=>{
+ async function withdraw(remove:boolean){
+  if(!save||!wish||busy)return;
+  setBusy(true);
+  setDone('');
+  setError(null);
+  try{
+   if(remove){
+    await save('/guest/wish','DELETE',{expectedVersion:wish.version});
+    setBody('');
+   }else{
+    await save('/guest/wish/visibility','PATCH',{consentPublic:false,expectedVersion:wish.version});
+   }
+   changeConsent(false);
+  }finally{setBusy(false);}
+ }
+ return <form className="guest-form feedback-form" onSubmit={async e=>{
   e.preventDefault();
-  if(!save)return;
+  if(!save||busy||(!sendRsvp&&!sendWish))return;
   setBusy(true);
   setError(null);
   setDone('');
+  let rsvpSaved=false;
   try{
-   const saved=await save('/guest/wish','PUT',{body,consentPublic:consent,consentAttendancePublic:consent&&attendanceConsent,expectedVersion:view.wish?.version??0});
-   setDone(saved?.moderationStatus==='APPROVED'&&view.wallEnabled!==false
-    ?'Lời chúc đã được đăng. Cảm ơn bạn!'
-    :'Lời chúc đã được lưu. Cảm ơn bạn!');
+   if(sendRsvp){
+    await save('/guest/rsvp','PUT',{status,note:view.rsvp?.note??'',expectedVersion:view.rsvp?.version??0});
+    rsvpSaved=true;
+   }
+   if(sendWish){
+    const saved=await save('/guest/wish','PUT',{body:message,consentPublic:consent,consentAttendancePublic:consent&&attendanceConsent,expectedVersion:view.wish?.version??0});
+    const published=saved?.moderationStatus==='APPROVED'&&view.wallEnabled!==false;
+    if(rsvpSaved)setDone(published?'Đã lưu xác nhận tham dự và đăng lời chúc. Cảm ơn bạn!':'Đã lưu xác nhận tham dự và lời chúc. Cảm ơn bạn!');
+    else setDone(published?'Lời chúc đã được đăng. Cảm ơn bạn!':'Lời chúc đã được lưu. Cảm ơn bạn!');
+   }else setDone('Đã lưu lời hồi đáp của bạn. Cảm ơn bạn!');
   }catch(e){
-   if(e instanceof ApiError&&e.status===409)changeConsent(false);
+   if(rsvpSaved)setDone('Đã lưu xác nhận tham dự. Bạn có thể gửi lại lời chúc.');
+   if(sendWish&&(!sendRsvp||rsvpSaved)&&e instanceof ApiError&&e.status===409)changeConsent(false);
    setError(e);
   }finally{setBusy(false);}
  }}>
-  <fieldset disabled={!view.canCreateOrEditWish||view.preview||busy}>
+  <p className="response-recipient">{view.responderName?'Người phản hồi':'Khách mời'}<strong>{view.responderName||view.guest.recipientName||view.guest.displayName||view.guest.fullName||'Bạn'}</strong></p>
+  <fieldset disabled={!canRsvp||busy}>
+   <legend>Xác nhận tham dự</legend>
+   <div className="radio-cards"><label><input type="radio" name="rsvp" checked={status==='ATTENDING'} onChange={()=>setStatus('ATTENDING')}/><Check size={20}/> Mình sẽ đến</label><label><input type="radio" name="rsvp" checked={status==='DECLINED'} onChange={()=>setStatus('DECLINED')}/><Heart size={20}/> Hẹn một dịp khác</label></div>
+   {!view.preview&&!view.canRsvp&&<p className="muted">Hiện đã ngừng nhận xác nhận.</p>}
+  </fieldset>
+  <fieldset disabled={!canWish||busy}>
    <legend>Một lời chúc dành cho Kiệt</legend>
-   <Field label="Lời chúc của bạn"><textarea value={body} required maxLength={1000} rows={5} onChange={e=>setBody(e.target.value)} placeholder="Viết một điều bạn muốn gửi gắm…"/></Field>
+   {intro&&<p className="feedback-intro">{intro}</p>}
+   <Field label="Lời chúc của bạn"><textarea value={body} maxLength={1000} rows={4} onChange={e=>setBody(e.target.value)} placeholder="Viết lời chúc nếu bạn muốn…"/></Field>
    <label className="check-label"><input type="checkbox" checked={consent} onChange={e=>changeConsent(e.target.checked)}/> Tôi đồng ý hiển thị tên và lời chúc trên thiệp.</label>
    {consent&&<label className="check-label"><input type="checkbox" checked={attendanceConsent} onChange={e=>setAttendanceConsent(e.target.checked)}/> Hiển thị trạng thái tham dự cùng lời chúc</label>}
-   <button className="button" disabled={busy}><Heart size={16}/>{busy?'Đang gửi…':'Gửi lời chúc'}</button>
+   {!view.preview&&!view.canCreateOrEditWish&&<p className="muted">Hiện đã ngừng nhận lời chúc mới.</p>}
   </fieldset>
+  <button type="submit" className="button feedback-submit" disabled={busy||(!sendRsvp&&!sendWish)}><Send size={16}/>{busy?'Đang xử lý…':'Gửi lời hồi đáp'}</button>
   <ErrorBox error={error}/>
   {done&&<p role="status" className="success">{done}</p>}
-  {!view.preview&&!view.canCreateOrEditWish&&<p className="muted">Hiện đã ngừng nhận lời chúc mới.</p>}
-  {view.canWithdrawWish&&!view.preview&&<div className="row wrap">
-   {wish?.consentPublic&&<Action run={async()=>{await save('/guest/wish/visibility','PATCH',{consentPublic:false,expectedVersion:wish.version});changeConsent(false);setDone('');}}>Rút đồng ý công khai</Action>}
-   <Action confirm="Bạn muốn xóa lời chúc này?" run={async()=>{await save('/guest/wish','DELETE',{expectedVersion:view.wish.version});setBody('');changeConsent(false);setDone('');}}>Xóa lời chúc</Action>
+  {save&&view.canWithdrawWish&&!view.preview&&<div className="row wrap">
+   {wish?.consentPublic&&<Action disabled={busy} run={()=>withdraw(false)}>Rút đồng ý công khai</Action>}
+   <Action disabled={busy} confirm="Bạn muốn xóa lời chúc này?" run={()=>withdraw(true)}>Xóa lời chúc</Action>
   </div>}
  </form>;
 }

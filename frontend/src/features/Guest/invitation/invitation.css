@@ -133,6 +133,16 @@
 .invitation .section-number { font-size: 9px; margin-bottom: 27px; }
 .invitation .invite-section h2 { font-size: clamp(30px, 3.8vw, 47px); line-height: 1.25; margin-bottom: 30px; }
 .invitation .invite-section h2 em { color: #6e8194; }
+.invitation .section-title-accent { display: block; }
+.invitation :is(.hero-text h1, .invite-section h2, .invite-section h3, .photo-caption, .hero-subtitle, .guest-form legend) {
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+.invitation :is(.envelope-message, .hero-text>p:not(.eyebrow), .invite-prose, .story-item>div>p:last-child, .invitation-notes li, .map-card>p, .feedback-intro, .feedback-form .success, .wish-card p, .closing>p:not(.signature)) {
+  overflow-wrap: break-word;
+  white-space: pre-line;
+  text-wrap: pretty;
+}
 .invitation .invite-prose { font-size: 15px; color: #625c5a; line-height: 1.9; }
 .invitation .story-list { gap: 55px; max-width: 1100px; margin: 40px auto 0; }
 .invitation .story-item { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 55px; }
@@ -238,6 +248,13 @@
 .invitation .guest-form .field>label { color: #625c5a; }
 .invitation .guest-form .field input, .invitation .guest-form .field textarea { font-size: 15px; border-color: #ddd1c0; background: #fffdfa; }
 .invitation .guest-form .check-label { font-size: 12px; color: #625c5a; }
+.invitation .feedback-form { text-transform: none; }
+.invitation .feedback-form fieldset + fieldset { margin-top: 24px; }
+.invitation .feedback-form legend { font-size: 22px; margin-bottom: 12px; }
+.invitation .feedback-form .radio-cards { margin-bottom: 0; }
+.invitation .feedback-intro { margin-bottom: 16px; color: #625c5a; font-size: 14px; line-height: 1.65; }
+.invitation .feedback-submit { margin-top: 20px; min-height: 44px; }
+.invitation .feedback-form .check-label input { flex: none; }
 .invitation .wish-wall { max-width: 1050px; min-width: 0; margin: 36px auto 0; }
 .invitation .wish-wall > h3 { font-size: 30px; }
 .invitation .wish-strip {
@@ -415,7 +432,7 @@
 @keyframes invite-unfold { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }
 @media (max-width: 767px) {
   .invitation :is(.envelope, .invite-hero) { container-type: inline-size; }
-  .invitation :is(h1, h2, h3, .photo-caption, .hero-subtitle) { text-wrap: balance; }
+  .invitation .section-title-accent { display: inline; }
   .invitation .envelope { padding: 38px 20px 28px; }
   .invitation .envelope-heading { margin-bottom: 24px; }
   .invitation .envelope-heading span { font-size: clamp(42px, 14vw, 66px); font-size: clamp(37px, 16.5cqi, 66px); letter-spacing: -2px; white-space: nowrap; }
@@ -485,6 +502,9 @@
   .invitation .event-card p { font-size: 13px; }
   .invitation .guest-form { padding: 28px 23px; }
   .invitation .guest-form legend { font-size: 24px; }
+  .invitation .feedback-form { padding-inline: 18px; }
+  .invitation .feedback-form legend { font-size: 20px; }
+  .invitation .feedback-submit { width: 100%; }
   .invitation .guest-form .field input, .invitation .guest-form .field textarea { font-size: 16px; }
   .invitation .radio-cards label { font-size: 13px; padding: 13px; }
   .invitation .radio-cards svg { display: block; width: 18px; }
