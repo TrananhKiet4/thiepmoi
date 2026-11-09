@@ -95,7 +95,13 @@ Route::get('/invitation-assets/{key}', [TransferController::class, 'asset'])->wh
 $spa = static function () {
     $index = public_path('index.html');
     abort_unless(is_file($index), 503, 'Chưa build giao diện thiệp');
-    return response()->file($index, ['Cache-Control' => 'no-cache']);
+    $headers = ['Cache-Control' => 'no-cache'];
+    $font = '/invitation-assets/fonts/fz-alpha-brights-f5918661.woff2';
+    if (request()->is('i/*') && is_file(public_path(ltrim($font, '/')))) {
+        $headers['Link'] = '<'.$font.'>; rel=preload; as=font; type="font/woff2"; crossorigin=anonymous';
+    }
+
+    return response()->file($index, $headers);
 };
 Route::get('/', $spa);
 Route::get('/admin/{path?}', $spa)->where('path', '.*');

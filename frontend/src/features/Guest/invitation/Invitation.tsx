@@ -1,5 +1,5 @@
 import {defaultInvitationNotes,googleMapsLink} from '@invite/contracts';
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {useParams} from 'react-router-dom';
 import {useInfiniteQuery,useQuery,useQueryClient} from '@tanstack/react-query';
 import {ArrowDown,ArrowUpRight,Check,Facebook,Heart,MapPin,Music2,Phone,VolumeX,GraduationCap,Send} from 'lucide-react';
@@ -73,6 +73,30 @@ function GuestData({token}:{token:string}) {
   }
   return <><ErrorBox error={query.error}/><Invitation view={query.data!} token={token} save={save}/></>;
 }
+function EnvelopeName({name}:{name:string}) {
+ const heading=useRef<HTMLHeadingElement>(null);
+ const text=useRef<HTMLSpanElement>(null);
+ useLayoutEffect(()=>{
+  const box=heading.current!,label=text.current!;
+  let active=true;
+  function fit(){
+   if(!active)return;
+   label.style.fontSize='';
+   const width=label.getBoundingClientRect().width;
+   const available=box.getBoundingClientRect().width;
+   if(available>0&&width>available){
+    const size=Number.parseFloat(getComputedStyle(box).fontSize);
+    label.style.fontSize=`${Math.floor(size*available/width*10)/10}px`;
+   }
+  }
+  fit();
+  const observer=new ResizeObserver(fit);
+  observer.observe(box);
+  void document.fonts.load('400 1em "Fz Alpha Brights"',name).then(fit,fit);
+  return()=>{active=false;observer.disconnect();};
+ },[name]);
+ return <h1 ref={heading}><span ref={text}>{name}</span></h1>;
+}
 export function Invitation({view,token,save}: {view:InvitationView;token?:string;save?:(path:string,method:string,body?:unknown)=>Promise<any>}) {
  const [phase,setPhase]=useState<'closed'|'opening'|'opened'>('closed');
  const envelope=useRef<HTMLElement>(null);
@@ -133,7 +157,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    <p className="envelope-heading" aria-hidden="true"><span>Graduation</span><em>Invitation</em></p>
    <p className="eyebrow envelope-school">{c.host.university}</p>
    <div className="paper-envelope">
-    <div className="envelope-letter"><p className="eyebrow">{opening?.type==='opening'?opening.data.title:'MỘT LỜI MỜI DÀNH RIÊNG CHO'}</p><h1>{name}</h1></div>
+    <div className="envelope-letter"><p className="eyebrow">{opening?.type==='opening'?opening.data.title:'MỘT LỜI MỜI DÀNH RIÊNG CHO'}</p><EnvelopeName name={name}/></div>
     <div className="envelope-fold" aria-hidden="true"/>
     <button className="wax-seal" aria-label="Mở thiệp" aria-disabled={phase==='opening'} onClick={open}><GraduationCap size={30} strokeWidth={1}/><span>Mở thiệp</span></button>
    </div>

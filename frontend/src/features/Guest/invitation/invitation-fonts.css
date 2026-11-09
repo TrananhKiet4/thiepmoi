@@ -1,7 +1,8 @@
 /* Self-hosted Google Fonts. License files are in public/fonts. */
 @font-face {
   font-family: "Fz Alpha Brights";
-  src: url(/invitation-assets/fonts/fz-alpha-brights-b89b193c.otf) format('opentype');
+  src: url(/invitation-assets/fonts/fz-alpha-brights-f5918661.woff2) format('woff2'),
+       url(/invitation-assets/fonts/fz-alpha-brights-b89b193c.otf) format('opentype');
   font-style: normal;
   font-weight: 400;
   font-display: swap;

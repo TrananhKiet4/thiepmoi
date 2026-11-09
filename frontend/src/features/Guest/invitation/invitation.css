@@ -53,6 +53,7 @@
 .invitation .envelope-letter { position: relative; padding: 26px 20px 30px; background: #fffdf8; border: 1px solid #ddd4c4; outline: 1px dashed #dbd0bd; outline-offset: -8px; min-height: 190px; }
 .invitation .envelope-letter .eyebrow { font-size: 9px; letter-spacing: 1.4px; margin-bottom: 18px; }
 .invitation .envelope h1 { font-family: "Fz Alpha Brights", var(--invite-heading); font-size: clamp(34px, 5vw, 56px); line-height: 1.25; margin-bottom: 18px; color: var(--invite-accent); }
+.invitation .envelope h1 span { display: inline-block; padding-inline: .16em; white-space: nowrap; }
 .invitation .envelope-fold { position: absolute; inset: 49% 0 0; background: linear-gradient(25deg, #e8decd 48%, #f3ecdf 50%); clip-path: polygon(0 0, 50% 42%, 100% 0, 100% 100%, 0 100%); border-bottom: 1px solid #d7cdbc; pointer-events: none; }
 .invitation .wax-seal { position: absolute; left: 50%; bottom: 37px; transform: translateX(-50%) rotate(-7deg); border: 5px double #d0bd95; color: #67583d; background: radial-gradient(circle at 35% 28%, #f5e6c8, #c6b087 85%); border-radius: 49% 45% 48% 44%; width: 86px; height: 86px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 2px 4px 7px #7360463b, inset 0 0 0 3px #e5d4b5; transition: transform .2s; }
 .invitation .wax-seal span { font-size: 11px; margin-top: 2px; }
