@@ -7,6 +7,7 @@ import {useAdmin} from '../../../contexts/AdminContext';
 import {Action,Badge,ErrorBox,Field,Modal,PageHead} from '../../../components/ui/index';
 import {Invitation} from '../../Guest/invitation/Invitation';
 import {MapImageField} from './MapImageField';
+import {StoryImageField} from './StoryImageField';
 
 const images=Object.values(staticMedia).filter(asset=>asset.type==='IMAGE');
 const audio=Object.values(staticMedia).filter(asset=>asset.type==='AUDIO');
@@ -69,14 +70,22 @@ return <><PageHead eyebrow="TỪNG CHI TIẾT, MỘT CHÚT THƯƠNG" title="Kể
   </div>
   {section.type==='gallery'&&<p className="small muted">Chặng này hiển thị 30 ảnh cố định theo thứ tự tên tệp.</p>}
   {section.type==='story'&&<div className="items-editor">
-   {section.data.items.map((item,i)=><div className="item-editor" key={i}>
+   <Field label="Tiêu đề chặng"><input maxLength={200} value={section.data.title??''} onChange={e=>updateSection(index,{...section,data:{...section.data,title:e.target.value}})}/></Field>
+   <Field label="Lời dẫn chặng"><textarea rows={3} maxLength={1000} value={section.data.intro??''} onChange={e=>updateSection(index,{...section,data:{...section.data,intro:e.target.value}})}/></Field>
+   {section.data.items.map((item,i)=><div className="item-editor" key={item.id}>
     <div className="row between">
      <strong>Mục {i+1}</strong>
-     <button className="icon-button danger" aria-label={'Xóa mục '+(i+1)} onClick={()=>updateSection(index,{...section,data:{items:section.data.items.filter((_,n)=>n!==i)}})}><Trash2 size={17}/></button>
+     <button className="icon-button danger" aria-label={'Xóa mục '+(i+1)} onClick={()=>updateSection(index,{...section,data:{...section.data,items:section.data.items.filter((_,n)=>n!==i)}})}><Trash2 size={17}/></button>
     </div>
-    <EditObject value={item} onChange={next=>updateSection(index,{...section,data:{items:section.data.items.map((entry,n)=>n===i?next:entry)}})}/>
+    <EditObject value={Object.fromEntries(Object.entries(item).filter(([key])=>key!=='image'))} onChange={next=>updateSection(index,{...section,data:{...section.data,items:section.data.items.map((entry,n)=>n===i?{...next,image:next.imageAssetId!==entry.imageAssetId?null:entry.image}:entry)}})}/>
+    <StoryImageField eventId={event.id} value={item.image??null} onChange={image=>{
+     setSaved(false);setError(null);
+     setContent(current=>({...current,sections:current.sections.map(entry=>entry.id===section.id&&entry.type==='story'
+      ?{...entry,data:{...entry.data,items:entry.data.items.map(story=>story.id===item.id?{...story,image,imageAssetId:image?null:story.imageAssetId}:story)}}
+      :entry)}));
+    }}/>
    </div>)}
-   <button className="button secondary" disabled={section.data.items.length>=12} onClick={()=>updateSection(index,{...section,data:{items:[...section.data.items,{id:crypto.randomUUID(),label:'',title:'',body:'',imageAssetId:null}]}})}><Plus size={16}/> Thêm câu chuyện</button>
+   <button className="button secondary" disabled={section.data.items.length>=12} onClick={()=>updateSection(index,{...section,data:{...section.data,items:[...section.data.items,{id:crypto.randomUUID(),label:'',title:'',body:'',imageAssetId:null}]}})}><Plus size={16}/> Thêm câu chuyện</button>
   </div>}
   {section.type!=='gallery'&&section.type!=='story'&&<EditObject value={section.data} onChange={data=>updateSection(index,{...section,data})}/>}
  </section>)}

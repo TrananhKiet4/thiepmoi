@@ -181,7 +181,44 @@ try {
     } finally {
         unlink($uploadFile);
     }
-    $call('PATCH', '/api/v1/admin/events/'.$eventId.'/draft', ['content' => $fixture], extra: ['HTTP_IF_MATCH' => '1']);
+    $sourceImage = tempnam(sys_get_temp_dir(), 'story-image-test-');
+    try {
+        file_put_contents($sourceImage, 'This is not an image');
+        $uploadImage = fn () => ['file' => new Illuminate\Http\UploadedFile($sourceImage, 'source.php', test: true)];
+        $call('POST', '/api/v1/admin/events/'.$eventId.'/story-images', extra: ['HTTP_X_CSRF_TOKEN' => 'wrong'], expected: 403, files: $uploadImage());
+        $call('POST', '/api/v1/admin/events/'.$eventId.'/story-images', expected: 422, files: $uploadImage());
+        $pixels = imagecreatetruecolor(2048, 1024);
+        imagepng($pixels, $sourceImage);
+        imagedestroy($pixels);
+        $storyImage = $call('POST', '/api/v1/admin/events/'.$eventId.'/story-images', expected: 201, files: $uploadImage());
+        $storyImagePath = public_path(ltrim($storyImage['url'], '/'));
+        check($storyImage['width'] === 1600 && $storyImage['height'] === 800, 'Image resized with original proportions');
+        check(getimagesize($storyImagePath)[2] === IMAGETYPE_WEBP, 'Upload is re-encoded as WebP');
+    } finally {
+        unlink($sourceImage);
+    }
+    foreach ($fixture['sections'] as &$section) {
+        if ($section['type'] === 'story') {
+            $section['data'] = [
+                'title' => 'THANH XUÂN ẤY, CHÚNG TA ĐÃ CÓ NHAU',
+                'intro' => 'Những người đã cùng ta đi qua.',
+                'items' => array_map(fn ($i) => ['id' => 'story-'.$i, 'label' => (string) $i, 'title' => 'Chặng '.$i, 'body' => 'Kỷ niệm '.$i, 'imageAssetId' => null, 'image' => $storyImage], range(1, 11)),
+            ];
+        }
+    }
+    unset($section);
+    $foreign = $fixture;
+    foreach ($foreign['sections'] as &$section) {
+        if ($section['type'] === 'story') {
+            $section['data']['items'][0]['image']['url'] = str_replace($eventId, (string) Str::uuid(), $storyImage['url']);
+        }
+    }
+    unset($section);
+    $call('PATCH', '/api/v1/admin/events/'.$eventId.'/draft', ['content' => $foreign], extra: ['HTTP_IF_MATCH' => '1'], expected: 422);
+    $draft = $call('PATCH', '/api/v1/admin/events/'.$eventId.'/draft', ['content' => $fixture], extra: ['HTTP_IF_MATCH' => '1']);
+    $savedStory = array_column($draft['draft']['contentJson']['sections'], 'data', 'type')['story'];
+    check(count($savedStory['items']) === 11 && $savedStory['title'] === $fixture['sections'][2]['data']['title'], 'Story header and all chapters survive save');
+    check($savedStory['items'][0]['image'] === $storyImage, 'Uploaded image survives content validation');
     $call('POST', '/api/v1/admin/events/'.$eventId.'/publish', ['expectedVersion' => 2]);
     $call('DELETE', '/api/v1/admin/guests/'.$guest['id'], ['expectedVersion' => 1], expected: 204);
     $call('GET', '/api/v1/guest/invitation', token: $token, expected: 401);
@@ -192,6 +229,10 @@ try {
     fwrite(STDERR, $error->getMessage().PHP_EOL);
     $failed = true;
 } finally {
+    if (isset($storyImagePath) && is_file($storyImagePath)) {
+        unlink($storyImagePath);
+        rmdir(dirname($storyImagePath));
+    }
     if (isset($app)) {
         $app['db']->disconnect();
     }

@@ -73,6 +73,7 @@ Route::prefix('api/v1')->middleware('api')->group(function () {
             Route::post('/imports/{id}/commit', [TransferController::class, 'commit']);
             Route::get('/events/{id}/exports/{kind}', [TransferController::class, 'export']);
             Route::post('/events/{id}/uploads', [TransferController::class, 'upload']);
+            Route::post('/events/{id}/story-images', [TransferController::class, 'storyImage']);
         });
     });
     Route::prefix('guest')->middleware('invitation.access:guest')->group(function () {

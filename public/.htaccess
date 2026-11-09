@@ -29,6 +29,12 @@
 </IfModule>
 
 <IfModule mod_headers.c>
+    <FilesMatch "^[a-f0-9-]{36}\.webp$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+        Header set X-Robots-Tag "noindex, nofollow"
+        Header set X-Content-Type-Options "nosniff"
+        Header set Referrer-Policy "no-referrer"
+    </FilesMatch>
     <Files "fz-alpha-brights-f5918661.woff2">
         Header set Cache-Control "public, max-age=31536000, immutable"
         Header set X-Robots-Tag "noindex, nofollow"

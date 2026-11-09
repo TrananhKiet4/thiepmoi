@@ -156,7 +156,7 @@
 .invitation .story-item h3 { font-size: 30px; }
 .invitation .story-item>div>p:last-child { font-size: 15px; color: #625c5a; }
 .invitation .story-image { height: auto; padding: 13px; background: #fffdf8; border-color: #ded2bd; box-shadow: 4px 8px 20px #67533810; }
-.invitation .story-image>img { aspect-ratio: 4/5; height: auto; }
+.invitation .story-image>img { aspect-ratio: auto; height: auto; object-fit: contain; }
 .invitation .story-letter { display: block; width: min(780px, 100%); margin: auto; padding: 45px; background: #fffdf8; border: 1px solid #d9cfbf; outline: 1px dashed #ddd1c0; outline-offset: -10px; box-shadow: 4px 8px 20px #6753380b; }
 .invitation .companion-gallery {
   --film-height: 176px;

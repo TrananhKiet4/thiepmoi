@@ -199,6 +199,7 @@ jobs:
             thiepmoi-app/bootstrap/cache/*.php
             public_html/invitation-assets/photos/**/*.webp
             public_html/invitation-assets/fonts/*.woff2
+            public_html/invitation-assets/story/**
       - name: Resume requests
         shell: bash
         run: |

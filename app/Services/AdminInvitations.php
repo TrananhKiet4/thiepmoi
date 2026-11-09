@@ -281,6 +281,13 @@ final class AdminInvitations
             }
         }
         if ($type === 'story' || $type === 'gallery') {
+            if ($type === 'story') {
+                foreach (['title' => 200, 'intro' => 1000] as $key => $max) {
+                    if (array_key_exists($key, $data)) {
+                        $fields[$key] = self::text($data[$key], $max, "$prefix.$key");
+                    }
+                }
+            }
             $items = self::items($data['items'] ?? null, $type === 'story' ? 12 : 40, "$prefix.items");
             foreach ($items as $i => $item) {
                 $path = "$prefix.items.$i";
@@ -291,6 +298,19 @@ final class AdminInvitations
                     $items[$i] = self::texts($item, ['id' => 80, 'label' => 100, 'title' => 200, 'body' => 3000], [], $path);
                     if (array_key_exists('imageAssetId', $item)) {
                         $items[$i]['imageAssetId'] = isset($item['imageAssetId']) ? self::uuid($item['imageAssetId'], "$path.imageAssetId") : null;
+                    }
+                    if (isset($item['image'])) {
+                        $image = self::object($item['image'], "$path.image");
+                        self::strict($image, ['url', 'width', 'height']);
+                        $url = self::text($image['url'] ?? null, 200, "$path.image.url", 1);
+                        if (!preg_match('~^/invitation-assets/story/[a-f0-9-]{36}/[a-f0-9-]{36}\.webp$~D', $url)) {
+                            self::invalid("$path.image.url", 'Đường dẫn ảnh không hợp lệ');
+                        }
+                        $items[$i]['image'] = [
+                            'url' => $url,
+                            'width' => self::integer($image['width'] ?? null, "$path.image.width", 1, 1600),
+                            'height' => self::integer($image['height'] ?? null, "$path.image.height", 1, 1600),
+                        ];
                     }
                 }
             }

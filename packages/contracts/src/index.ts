@@ -36,7 +36,16 @@ const sectionBase={id:z.string().min(1).max(80),enabled:z.boolean(),order:z.numb
 export const sectionSchema=z.discriminatedUnion('type',[
  z.object({...sectionBase,type:z.literal('opening'),data:z.object({title:text(200),messageTemplate:text(1000),coverAssetId:optionalId})}),
  z.object({...sectionBase,type:z.literal('hero'),data:z.object({title:text(200),subtitle:text(500).default(''),heroAssetId:optionalId})}),
- z.object({...sectionBase,type:z.literal('story'),data:z.object({items:z.array(z.object({id:text(80),label:text(100),title:text(200),body:text(3000),imageAssetId:optionalId})).max(12)})}),
+ z.object({...sectionBase,type:z.literal('story'),data:z.object({
+  title:text(200).optional(),intro:text(1000).optional(),
+  items:z.array(z.object({
+   id:text(80),label:text(100),title:text(200),body:text(3000),imageAssetId:optionalId,
+   image:z.object({
+    url:z.string().regex(/^\/invitation-assets\/story\/[a-f0-9-]{36}\/[a-f0-9-]{36}\.webp$/),
+    width:z.number().int().min(1).max(1600),height:z.number().int().min(1).max(1600),
+   }).nullable().optional(),
+  })).max(12),
+ })}),
  z.object({...sectionBase,type:z.literal('gallery'),data:z.object({items:z.array(z.object({assetId:id,caption:text(500)})).max(40)})}),
  z.object({...sectionBase,type:z.literal('invitation'),data:z.object({title:text(200),message:text(2000)})}),
  z.object({...sectionBase,type:z.literal('map'),data:z.object({title:text(200),locationSource:z.enum(['CEREMONY','MEETUP']),instructions:text(1000),notes:text(2400).optional()})}),

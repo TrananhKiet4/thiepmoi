@@ -110,7 +110,7 @@ final class AdminController
             Api::lockEvent($id);
             $event = Api::event($request, $id);
             $this->checkVersion($event->version, $expected);
-            $this->validateMedia($content, false);
+            $this->validateMedia($content, false, $id);
             $revisionId = (string) Str::uuid();
             $revisionNo = DB::table('EventRevision')->where('eventId', $id)->max('revisionNo');
             DB::table('EventRevision')->insert([
@@ -506,7 +506,7 @@ final class AdminController
                 }
                 $content = AdminInvitations::content(json_decode($revision->contentJson));
                 $this->validatePublication($content);
-                $this->validateMedia($content, true);
+                $this->validateMedia($content, true, $id);
                 $publishedRevisionId = $revision->id;
             }
             $this->update('Event', $id, $expected, ['publishedRevisionId' => $publishedRevisionId, 'publishedAt' => $publish ? Api::now() : null]);
@@ -564,8 +564,20 @@ final class AdminController
         }
     }
 
-    private function validateMedia(array $content, bool $publish): void
+    private function validateMedia(array $content, bool $publish, string $eventId): void
     {
+        foreach ($content['sections'] as $section) {
+            if ($section['type'] !== 'story') {
+                continue;
+            }
+            foreach ($section['data']['items'] as $item) {
+                $image = $item['image'] ?? null;
+                if ($image && (!str_starts_with($image['url'], "/invitation-assets/story/$eventId/")
+                    || !is_file(public_path(ltrim($image['url'], '/'))))) {
+                    Api::fail(422, 'INVALID_MEDIA', 'Ảnh câu chuyện không thuộc sự kiện hoặc không còn tồn tại');
+                }
+            }
+        }
         $media = InvitationViews::media($content);
         if (array_diff(InvitationViews::mediaIds($content), array_keys($media))) {
             Api::fail(422, 'INVALID_MEDIA', 'Media không có sẵn trong bộ tệp của thiệp');

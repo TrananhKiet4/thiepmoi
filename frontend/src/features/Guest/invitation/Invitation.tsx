@@ -195,8 +195,10 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
   </>}
  </main>;
  function renderSection(s:Section){switch(s.type){
-  case 'story':return <><h2>Mỗi chặng đường, <em className="section-title-accent">một điều để nhớ.</em></h2><div className="story-list">{s.data.items.map((item,i)=><article key={item.id} className={'story-item'+(item.imageAssetId?'':' story-letter')}>
-   {item.imageAssetId&&<div className="story-image">{img(item.imageAssetId)}</div>}<div><p className="eyebrow">{item.label||`CHƯƠNG ${i+1}`}</p><h3>{item.title}</h3><p>{item.body}</p></div>
+  case 'story':return <><h2>{s.data.title||<>Mỗi chặng đường, <em className="section-title-accent">một điều để nhớ.</em></>}</h2>
+  {s.data.intro&&<p className="invite-prose story-intro">{s.data.intro}</p>}
+  <div className="story-list">{s.data.items.map((item,i)=><article key={item.id} className={'story-item'+(item.image||item.imageAssetId?'':' story-letter')}>
+   {(item.image||item.imageAssetId)&&<div className="story-image">{item.image?<AssetImage asset={{...item.image,id:item.id,alt:item.title,type:'IMAGE'}} priority={false}/>:img(item.imageAssetId)}</div>}<div><p className="eyebrow">{item.label||`CHƯƠNG ${i+1}`}</p><h3>{item.title}</h3><p>{item.body}</p></div>
   </article>)}</div></>;
   case 'gallery':return <>
    <h2>Cảm ơn vì đã <em className="section-title-accent">ở trong thanh xuân của Kiệt.</em></h2>

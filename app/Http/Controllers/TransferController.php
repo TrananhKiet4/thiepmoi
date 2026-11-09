@@ -39,6 +39,67 @@ final class TransferController
         return Api::ok($this->storage->createUpload($request->attributes->get('admin')->id, $event->id, $name, $size));
     }
 
+    public function storyImage(Request $request, string $id): JsonResponse
+    {
+        $event = Api::event($request, AdminInvitations::uuid($id));
+        $file = $request->file('file');
+        if (!$file instanceof UploadedFile || !$file->isValid()) {
+            Api::fail(422, 'INVALID_IMAGE', 'Vui lòng chọn ảnh JPG, PNG hoặc WebP');
+        }
+        if ($file->getSize() > 5 * 1024 * 1024) {
+            Api::fail(413, 'IMAGE_TOO_LARGE', 'Ảnh tối đa 5 MB');
+        }
+        $info = @getimagesize($file->getPathname());
+        if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)
+            || $info[0] * $info[1] > 16_000_000 || max($info[0], $info[1]) > 8192) {
+            Api::fail(422, 'INVALID_IMAGE', 'Ảnh phải là JPG, PNG hoặc WebP, tối đa 16 megapixel');
+        }
+        if (!function_exists('imagewebp')) {
+            Api::fail(503, 'IMAGE_UNAVAILABLE', 'Hosting chưa bật xử lý ảnh WebP');
+        }
+        $image = @imagecreatefromstring(file_get_contents($file->getPathname()));
+        if (!$image) {
+            Api::fail(422, 'INVALID_IMAGE', 'Không đọc được ảnh đã chọn');
+        }
+        $orientation = $info[2] === IMAGETYPE_JPEG && function_exists('exif_read_data')
+            ? (int) ((@exif_read_data($file->getPathname()))['Orientation'] ?? 1) : 1;
+        $angle = match ($orientation) { 3, 4 => 180, 5, 6 => 270, 7, 8 => 90, default => 0 };
+        if ($angle) {
+            $rotated = imagerotate($image, $angle, 0);
+            imagedestroy($image);
+            $image = $rotated;
+        }
+        if (in_array($orientation, [2, 4, 5, 7], true)) {
+            imageflip($image, IMG_FLIP_HORIZONTAL);
+        }
+        $scale = min(1, 1600 / max(imagesx($image), imagesy($image)));
+        $width = max(1, (int) round(imagesx($image) * $scale));
+        $height = max(1, (int) round(imagesy($image) * $scale));
+        $output = imagecreatetruecolor($width, $height);
+        imagealphablending($output, false);
+        imagesavealpha($output, true);
+        imagecopyresampled($output, $image, 0, 0, 0, 0, $width, $height, imagesx($image), imagesy($image));
+        imagedestroy($image);
+        $url = '/invitation-assets/story/'.$event->id.'/'.Str::uuid().'.webp';
+        $target = public_path(ltrim($url, '/'));
+        $temporary = $target.'.tmp';
+        try {
+            if (!is_dir(dirname($target)) && !mkdir(dirname($target), 0755, true) && !is_dir(dirname($target))) {
+                throw new RuntimeException('Cannot create story image directory');
+            }
+            if (!imagewebp($output, $temporary, 82) || !rename($temporary, $target)) {
+                throw new RuntimeException('Cannot store story image');
+            }
+        } finally {
+            imagedestroy($output);
+            if (is_file($temporary)) {
+                unlink($temporary);
+            }
+        }
+
+        return Api::ok(compact('url', 'width', 'height'), 201);
+    }
+
     public function template(Request $request): Response
     {
         $book = $this->workbook();
@@ -299,6 +360,12 @@ final class TransferController
 
     public function asset(Request $request, string $key): Response
     {
+        if (preg_match('~^story/[a-f0-9-]{36}/[a-f0-9-]{36}\.webp$~D', $key)) {
+            if ($file = $this->assetFile('invitation-assets/'.$key)) {
+                return response()->file($file, ['Cache-Control' => 'public, max-age=31536000, immutable', 'Content-Type' => 'image/webp']);
+            }
+            Api::fail(404, 'NOT_FOUND', 'Không tìm thấy ảnh');
+        }
         $path = '/invitation-assets/'.$key;
         $paths = config('invitation.companion_paths', []);
         foreach (config('invitation.media', []) as $asset) {
