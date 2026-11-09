@@ -69,6 +69,7 @@ export function googleMapsLink(location:Pick<Content['ceremony'],'googleMapsUrl'
 }
 export type Section=Content['sections'][number];
 export const guestSchema=z.object({guestCode:z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9_-]+$/).transform(s=>s.toUpperCase()),fullName:text(120).min(1),displayName:text(80).default(''),groupKey:text(60).transform(normalizeGroupKey).default(''),salutation:text(40).default(''),email:z.union([z.string().trim().email().max(254),z.literal('')]).default(''),phone:text(30).default(''),personalMessage:text(1000).default('')}).strict();
+export const guestCreateSchema=guestSchema.partial({guestCode:true});
 export const rsvpSchema=z.object({status:z.enum(['ATTENDING','DECLINED']),note:text(500).default(''),expectedVersion:z.number().int().min(0)}).strict();
 export const wishSchema=z.object({body:text(1000).min(1),consentPublic:z.boolean(),consentAttendancePublic:z.boolean().optional(),expectedVersion:z.number().int().min(0)}).strict();
 export const versionSchema=z.object({expectedVersion:z.number().int().min(1)}).strict();

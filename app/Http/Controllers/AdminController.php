@@ -229,7 +229,7 @@ final class AdminController
     public function createGuest(Request $request, string $id): JsonResponse
     {
         AdminInvitations::uuid($id);
-        $data = $this->guestInput($this->body($request));
+        $data = $this->guestInput($this->body($request), requireCode: false);
         $personalMessage = $data['personalMessage'];
         unset($data['personalMessage']);
 
@@ -239,7 +239,7 @@ final class AdminController
             $guestId = (string) Str::uuid();
             $invitationId = (string) Str::uuid();
             $now = Api::now();
-            DB::table('Guest')->insert($data + ['id' => $guestId, 'eventId' => $id, 'updatedAt' => $now]);
+            DB::table('Guest')->insert($data + ['id' => $guestId, 'eventId' => $id, 'guestCode' => 'G-'.strtoupper($guestId), 'updatedAt' => $now]);
             DB::table('Invitation')->insert($this->tokenFields($invitationId) + [
                 'id' => $invitationId, 'eventId' => $id, 'guestId' => $guestId, 'personalMessage' => $personalMessage, 'updatedAt' => $now,
             ]);
@@ -585,15 +585,19 @@ final class AdminController
         }
     }
 
-    private function guestInput(array $input): array
+    private function guestInput(array $input, bool $requireCode = true): array
     {
         $optional = ['displayName' => 80, 'groupKey' => 60, 'salutation' => 40, 'email' => 254, 'phone' => 30, 'personalMessage' => 1000];
         AdminInvitations::strict($input, ['guestCode', 'fullName', ...array_keys($optional)]);
-        $code = AdminInvitations::text($input['guestCode'] ?? null, 40, 'guestCode', 1);
-        if (!preg_match('/^[A-Za-z0-9_-]+$/D', $code)) {
-            AdminInvitations::invalid('guestCode');
+        $data = [];
+        if ($requireCode || array_key_exists('guestCode', $input)) {
+            $code = AdminInvitations::text($input['guestCode'] ?? null, 40, 'guestCode', 1);
+            if (!preg_match('/^[A-Za-z0-9_-]+$/D', $code)) {
+                AdminInvitations::invalid('guestCode');
+            }
+            $data['guestCode'] = strtoupper($code);
         }
-        $data = ['guestCode' => strtoupper($code), 'fullName' => AdminInvitations::text($input['fullName'] ?? null, 120, 'fullName', 1)]
+        $data += ['fullName' => AdminInvitations::text($input['fullName'] ?? null, 120, 'fullName', 1)]
             + AdminInvitations::texts($input, [], $optional);
         $data['groupKey'] = AdminInvitations::normalizeGroupKey($data['groupKey']);
         $data['email'] = $this->email($data['email']);

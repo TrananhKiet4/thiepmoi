@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
 import type {Prisma} from '@prisma/client';
-import {guestSchema,invitationContentSchema,rsvpSchema,versionSchema} from '../../../packages/contracts/src/index.js';
+import {guestCreateSchema,guestSchema,invitationContentSchema,rsvpSchema,versionSchema} from '../../../packages/contracts/src/index.js';
 import {withTransaction} from '../config/database.js';
 import {config} from '../config/env.js';
 import {AppError} from '../errors/app-error.js';
@@ -17,8 +17,14 @@ export const getAdminEventsGuests:RequestHandler=async(req,res)=>{
  ok(res,await withTransaction(async tx=>{await ownedEvent(req,eventId,tx);const where=guestFilter(req,eventId),[items,total]=await Promise.all([tx.guest.findMany({where,include,skip,take:pageSize,orderBy:[{[sort.replace(/^-/,'')]:sort.startsWith('-')?'desc':'asc'},{id:'asc'}]}),tx.guest.count({where})]);return {items:items.map(safeGuest),total,page,pageSize};}));
 };
 export const postAdminEventsGuests:RequestHandler=async(req,res)=>{
- const eventId=uuid.parse(req.params.id),{personalMessage,...data}=guestSchema.parse(req.body);
- ok(res,await withTransaction(async tx=>{await lockEvent(tx,eventId);await ownedEvent(req,eventId,tx);const id=randomUUID(),{token,...encrypted}=createInvitationToken(id);const guest=await tx.guest.create({data:{eventId,...data,invitation:{create:{id,eventId,personalMessage,...encrypted}}},include});await audit(tx,req,'GUEST_CREATED',eventId,'Guest',guest.id);return safeGuest(guest);}),201);
+ const eventId=uuid.parse(req.params.id),{personalMessage,guestCode,...data}=guestCreateSchema.parse(req.body);
+ ok(res,await withTransaction(async tx=>{
+  await lockEvent(tx,eventId);await ownedEvent(req,eventId,tx);
+  const guestId=randomUUID(),id=randomUUID(),{token,...encrypted}=createInvitationToken(id);
+  const guest=await tx.guest.create({data:{id:guestId,eventId,...data,guestCode:guestCode??'G-'+guestId.toUpperCase(),invitation:{create:{id,eventId,personalMessage,...encrypted}}},include});
+  await audit(tx,req,'GUEST_CREATED',eventId,'Guest',guest.id);
+  return safeGuest(guest);
+ }),201);
 };
 export const patchAdminGuests:RequestHandler=async(req,res)=>{
  const id=uuid.parse(req.params.id),{expectedVersion,expectedInvitationVersion,personalMessage,...data}=guestSchema.extend({expectedVersion:z.number().int().min(1),expectedInvitationVersion:z.number().int().min(1)}).parse(req.body);

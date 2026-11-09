@@ -72,13 +72,22 @@ test('admin edits a guest letter and previews it on the existing link',async({pa
  const headers={Origin:process.env.APP_ORIGIN!,'X-CSRF-Token':admin.csrfToken};
  const name='Khách sửa thiệp '+crypto.randomUUID().slice(0,8);
  const displayName='Em yêu '+name;
- const created=await page.request.post(`/api/v1/admin/events/${event.id}/guests`,{headers,data:{guestCode:'EDIT-'+crypto.randomUUID().slice(0,8),fullName:name,displayName,salutation:'Em yêu'}});
+ await page.goto('/admin/guests');
+ await page.getByRole('button',{name:'Thêm khách mời',exact:true}).click();
+ const form=page.getByRole('dialog',{name:'Thêm khách mời'});
+ await expect(form.getByLabel('Mã khách mời',{exact:true})).toHaveCount(0);
+ await form.getByLabel('Họ và tên',{exact:true}).fill(name);
+ await form.getByLabel('Tên hiển thị',{exact:true}).fill(displayName);
+ await form.getByLabel('Xưng hô',{exact:true}).fill('Em yêu');
+ const saved=page.waitForResponse(res=>res.request().method()==='POST'&&new URL(res.url()).pathname===`/api/v1/admin/events/${event.id}/guests`);
+ await form.getByRole('button',{name:'Lưu khách mời',exact:true}).click();
+ const created=await saved;
  expect(created.status()).toBe(201);
  const row=(await created.json()).data;
  const guestPage=await context.newPage();
  try{
   const {data:{url}}=await (await page.request.get(`/api/v1/admin/invitations/${row.invitation.id}/link`)).json();
-  await page.goto('/admin/guests');
+  await expect(form).toHaveCount(0);
   await page.getByLabel('Tìm khách mời').fill(name);
   const edit=page.getByRole('button',{name:'Nội dung thiệp của '+displayName,exact:true});
   await edit.click();

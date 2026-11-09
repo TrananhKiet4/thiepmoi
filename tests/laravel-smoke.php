@@ -126,7 +126,8 @@ try {
     check($call('GET', '/api/v1/guest/invitation', token: $legacy['token'])['guest']['fullName'] === 'Khách cũ', 'Node token works in Laravel');
     $call('GET', '/api/v1/guest/invitation', token: 'Ab123.khach-cu');
     check(str_ends_with($call('GET', '/api/v1/admin/invitations/'.$legacy['invitationId'].'/link')['url'], '/i/Ab123/khach-cu'), 'Existing encrypted short code is reused');
-    $guest = $create('G001', 'Khách thử');
+    $guest = $call('POST', '/api/v1/admin/events/'.$eventId.'/guests', ['fullName' => 'Khách thử'], expected: 201);
+    check(preg_match('/^G-[0-9A-F-]{36}$/D', $guest['guestCode']) === 1, 'Manual creation assigns an internal guest code');
     $invitation = DB::table('Invitation')->where('guestId', $guest['id'])->first();
     $link = $call('GET', '/api/v1/admin/invitations/'.$invitation->id.'/link');
     $url = $link['url'] ?? $link['link'] ?? null;
@@ -145,6 +146,7 @@ try {
     $wish = $call('PUT', '/api/v1/guest/wish', ['body' => 'Chúc mừng tốt nghiệp 🎓', 'consentPublic' => true, 'expectedVersion' => 0], $token, ['HTTP_IDEMPOTENCY_KEY' => 'wish-one']);
     check($wish['moderationStatus'] === 'APPROVED', 'Wish publishes immediately');
     $family = $create('FAMILY', 'Đại gia đình thương yêu');
+    check($family['guestCode'] === 'FAMILY', 'Explicit codes still work for existing callers');
     $familyInvitation = DB::table('Invitation')->where('guestId', $family['id'])->first();
     DB::table('Invitation')->where('id', $familyInvitation->id)->update(['allowMultipleResponses' => true]);
     $familyToken = InvitationTokens::decrypt($familyInvitation->id, $familyInvitation->tokenCiphertext, $familyInvitation->keyVersion);
