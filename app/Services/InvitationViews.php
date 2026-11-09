@@ -165,10 +165,7 @@ final class InvitationViews
                         $lead = '/^\s*(?:mình\s+)?trân trọng mời bạn(?=\s|[.,!]|$)/iu';
                         $message = $data['message'];
                         if (preg_match($lead, $message)) {
-                            $message = preg_replace_callback($lead, fn () => "Trân trọng mời $address", $message);
-                            $message = str_replace('nếu bạn có thời gian', "nếu $address có thời gian", $message);
-                            $message = str_replace('mình rất muốn gặp bạn để', "$speaker rất muốn gặp $address để", $message);
-                            $message = str_replace('gặp bạn để', "gặp $address để", $message);
+                            $message = "Trân trọng mời $address đến chụp hình và lưu giữ những kỷ niệm trong ngày tốt nghiệp của $speaker.";
                         }
                     }
                     $title = $card->letterTitle ?? '';

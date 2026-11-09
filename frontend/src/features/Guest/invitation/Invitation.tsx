@@ -6,6 +6,7 @@ import {ArrowUpRight,Check,Facebook,Heart,MapPin,Music2,Phone,VolumeX,Graduation
 import type {Content,InvitationView,MediaView,PublicWish,Section} from '@invite/contracts';
 import {CompanionFilm} from './CompanionFilm';
 import {GraduationSchedule} from './GraduationSchedule';
+import {FittedLine} from './FittedLine';
 import {statusName} from '../../../constants/status';
 import {ApiError,request} from '../../../lib/api';
 import {Action,ErrorBox,Field,Loading} from '../../../components/ui/index';
@@ -123,6 +124,8 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
  const media=(id?:string|null)=>id?view.media[id]:undefined;
  const img=(id?:string|null,priority=false)=>{const a=media(id);return a?<AssetImage asset={a} priority={priority}/>:<div className="photo-placeholder"><GraduationCap size={70} strokeWidth={.7}/><span>MỘT CHẶNG ĐƯỜNG ĐÁNG NHỚ</span></div>;};
  const year=c.ceremony.startAt?new Intl.DateTimeFormat('vi-VN',{year:'numeric',timeZone:c.timezone}).format(new Date(c.ceremony.startAt)):'…';
+ const heroTitle=hero?.type==='hero'?hero.data.title:'Ngày mình tốt nghiệp.';
+ const splitHeroTitle=/^một hành trình mới bắt đầu[.!]?$/iu.test(heroTitle.trim());
  const hasMusic=c.music.enabled&&!!media(c.music.assetId);
  const message=view.personalMessage||(opening?.type==='opening'?opening.data.messageTemplate:'Mời bạn cùng mình lưu giữ khoảnh khắc đáng nhớ.').replaceAll('{{guestName}}',name).replaceAll('{{hostName}}',c.host.fullName).replaceAll('{{salutation}}',view.guest.salutation||'');
  async function startMusic(){
@@ -179,7 +182,9 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
     </div>
     <div className="hero-text">
      <p className="eyebrow">MỘT CHẶNG ĐƯỜNG · MỘT KHỞI ĐẦU MỚI</p>
-     <h1 tabIndex={-1}>{hero?.type==='hero'?hero.data.title:'Ngày mình tốt nghiệp.'}</h1>
+     <h1 tabIndex={-1} className={splitHeroTitle?'hero-title-lines':undefined}>{splitHeroTitle
+      ? <><FittedLine text="Một hành trình mới"/>{' '}<strong className="hero-title-highlight">Bắt đầu</strong></>
+      : heroTitle}</h1>
      {hero?.type==='hero'&&hero.data.subtitle&&<p className="hero-subtitle">{hero.data.subtitle}</p>}
      <p>{c.host.university}<br/>{c.host.major}{c.host.cohort&&' · '+c.host.cohort}</p>
     </div>
@@ -199,7 +204,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
   </>;
   case 'invitation':return <div className="invitation-letter">
    <PaperSparkle className="letter-sparkle"/>
-   <h2>{s.data.title}</h2>
+   <h2><FittedLine text={s.data.title}/></h2>
    <p className="guest-recipient"><span>{view.guest.recipientGreeting??'Kính gửi'}</span><strong>{view.guest.salutation&&<span className="recipient-salutation">{view.guest.salutation} </span>}<span className="recipient-name">{name}</span></strong></p>
    <p className="invite-prose">{s.data.message}</p>
    <GraduationSchedule ceremony={c.ceremony} phone={c.contact?.phone} facebookUrl={c.contact?.facebookUrl}/>
@@ -230,7 +235,7 @@ function InvitationFooter({content,year,mapImage}:{content:Content;year:string;m
   <div className="footer-details">
    <div>
     <GraduationCap className="footer-emblem" size={34} strokeWidth={1.3} aria-hidden="true"/>
-    <h2>{host.university}</h2>
+    <h2 className="footer-school"><FittedLine text={host.university}/></h2>
     <address>{ceremony.address}</address>
    </div>
    <div>
@@ -259,7 +264,18 @@ function PaperSparkle({className}:{className:string}){
 }
 const sectionLabel:Record<string,string>={opening:'LỜI MỞ',hero:'KHOẢNH KHẮC',story:'CHẶNG ĐƯỜNG',gallery:'NGƯỜI ĐỒNG HÀNH',invitation:'MỘT LỜI HẸN',map:'ĐIỂM HẸN',response:'LỜI HỒI ĐÁP'};
 function AssetImage({asset,priority,sizes='(max-width: 767px) 86vw, 42vw'}:{asset:MediaView;priority:boolean;sizes?:string}){const [failed,setFailed]=useState(false);useEffect(()=>setFailed(false),[asset.url]);return failed?<div className="photo-placeholder" role="img" aria-label={asset.alt||'Khoảnh khắc đang được cập nhật'}><GraduationCap size={50} strokeWidth={1}/><span>Ảnh tạm thời không hiển thị</span></div>:<img src={asset.url} alt={asset.alt} width={asset.width||1200} height={asset.height||1500} srcSet={asset.srcSet} sizes={sizes} loading={priority?'eager':'lazy'} fetchPriority={priority?'high':'auto'} onError={()=>setFailed(true)}/>;}
-function MapView({location,image}:{location:Content['ceremony'];image?:MediaView}){return <div className="map-card">{image&&<div className="campus-map-image"><a href={image.url} target="_blank" rel="noopener noreferrer" aria-label="Mở ảnh sơ đồ trường đầy đủ"><AssetImage asset={image} priority={false} sizes="90vw"/></a></div>}<h3>{location.venueName}</h3><p>{location.address}</p><div className="row map-actions"><Action run={()=>navigator.clipboard.writeText(location.address)}>Sao chép địa chỉ</Action><a className="button secondary" href={googleMapsLink(location)} target="_blank" rel="noopener noreferrer">Mở Google Maps <ArrowUpRight size={17}/></a></div></div>;}
+function MapView({location,image}:{location:Content['ceremony'];image?:MediaView}){
+ const venue=location.venueName.trim().match(/^(khu d\s*[-–]\s*trường đại học)\s+(công nghệ sài gòn)$/iu);
+ return <div className="map-card">
+  {image&&<div className="campus-map-image"><a href={image.url} target="_blank" rel="noopener noreferrer" aria-label="Mở ảnh sơ đồ trường đầy đủ"><AssetImage asset={image} priority={false} sizes="90vw"/></a></div>}
+  <h3 className="map-venue">{venue?<><FittedLine text={venue[1]}/>{' '}<FittedLine text={venue[2]}/></>:location.venueName}</h3>
+  <p className="map-address"><FittedLine text={location.address}/></p>
+  <div className="row map-actions">
+   <Action run={()=>navigator.clipboard.writeText(location.address)}>Sao chép địa chỉ</Action>
+   <a className="button secondary" href={googleMapsLink(location)} target="_blank" rel="noopener noreferrer">Mở Google Maps <ArrowUpRight size={17}/></a>
+  </div>
+ </div>;
+}
 function FeedbackForms({view,token,save,intro}:{view:InvitationView;token?:string;save?:ReturnType<typeof useGuestData>['save'];intro:string}){
  return <><FeedbackForm view={view} save={save} intro={intro}/>{(token&&view.wallEnabled!==false||view.previewWishes!==undefined)&&<Wall key={token} token={token} previewItems={view.previewWishes}/>}</>;
 }

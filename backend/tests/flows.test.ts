@@ -79,7 +79,7 @@ describe('published invitation and immutable content',()=>{
    const letter=response.body.data.content.sections.find((section:{type:string})=>section.type==='invitation').data;
    expect(letter.title).toBe(`Hẹn ${headingAddress} trong ngày đặc biệt`);
    expect(letter.message)
-    .toBe(`Trân trọng mời ${address} đến dự lễ tốt nghiệp. Sau buổi lễ, nếu ${address} có thời gian, ${speaker} rất muốn gặp ${address} để chụp ảnh cùng bạn bè.`);
+    .toBe(`Trân trọng mời ${address} đến chụp hình và lưu giữ những kỷ niệm trong ngày tốt nghiệp của ${speaker}.`);
    const responseSection=response.body.data.content.sections.find((section:{type:string})=>section.type==='response').data;
    const responseAddress=address==='đại gia đình'?'cả nhà':address;
    expect(responseSection.title).toBe(`${responseAddress.charAt(0).toUpperCase()+responseAddress.slice(1)} sẽ đến chứ?`);

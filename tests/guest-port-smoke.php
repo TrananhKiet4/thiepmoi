@@ -30,7 +30,7 @@ $content = [
 
 $preview = InvitationViews::build($event, $content, $guest, preview: true);
 assert($preview['guest']['recipientName'] === 'Khách');
-assert($preview['content']['sections'][0]['data'] === ['title' => 'Hẹn chị trong ngày đặc biệt', 'message' => 'Trân trọng mời chị hai, nếu chị hai có thời gian.']);
+assert($preview['content']['sections'][0]['data'] === ['title' => 'Hẹn chị trong ngày đặc biệt', 'message' => 'Trân trọng mời chị hai đến chụp hình và lưu giữ những kỷ niệm trong ngày tốt nghiệp của em.']);
 assert($preview['content']['sections'][1]['data']['wishIntro'] === 'Em mong được gặp chị hai cùng bạn bè.');
 assert($preview['canRsvp'] === false && $preview['canCreateOrEditWish'] === false && !isset($preview['previewWishes']));
 assert(json_encode($preview['media']) === '{}');

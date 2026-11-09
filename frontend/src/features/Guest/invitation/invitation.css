@@ -111,6 +111,16 @@
 .invitation .hero-text .eyebrow { font-size: 10px; }
 .invitation .invite-hero h1 { font-size: clamp(30px, 4vw, 50px); color: var(--invite-accent); line-height: 1.2; }
 .invitation .hero-text h1:focus { outline: none; }
+.invitation .hero-title-lines { width: 100%; text-transform: uppercase; }
+.invitation .hero-title-highlight {
+  display: table;
+  margin: 10px auto 0;
+  padding-inline: .12em;
+  background: linear-gradient(transparent 61%, var(--invite-blue) 61% 88%, transparent 88%);
+  font-weight: 700;
+}
+.invitation .invite-fitted-line { display: block; max-width: 100%; font-size: inherit; letter-spacing: inherit; }
+.invitation .invite-fitted-line > span { display: inline-block; font-size: inherit; letter-spacing: inherit; }
 .invitation .hero-subtitle { font-family: var(--invite-heading); font-size: 23px; color: #72605d; }
 .invitation .hero-text>p:not(.eyebrow):not(.hero-subtitle) { color: #67636a; font-size: 15px; }
 .invitation .invite-hero :is(.ceremony-heading, .hero-photo, .hero-text) { animation: invite-unfold .62s ease-out both; }
@@ -230,6 +240,8 @@
 .invitation .campus-map-image { padding: 12px; background: #fffdf8; border: 1px solid #d9cfbf; box-shadow: 3px 7px 15px #67533810; margin-bottom: 30px; }
 .invitation .map-card h3 { font-size: 27px; }
 .invitation .map-card>p { color: #625c5a; font-size: 14px; }
+.invitation .map-card .map-venue { line-height: 1.3; }
+.invitation .map-card .map-address { text-transform: none; margin-top: 10px; }
 .invitation .map-actions { gap: 15px; }
 .invitation .section-response { background: #f0e9df50; }
 .invitation .guest-form { max-width: 590px; padding: 38px; background: #fffdf8; border-color: #d9cfbf; outline: 1px dashed #ddd1c0; outline-offset: -10px; box-shadow: 4px 8px 20px #6753380b; }
@@ -380,6 +392,7 @@
 .invitation .footer-emblem { margin-bottom: 12px; color: var(--invite-accent); }
 .invitation .footer-details address { font-style: normal; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
 .invitation .footer-details span { color: inherit; font-size: 14px; letter-spacing: normal; }
+.invitation .footer-school .invite-fitted-line, .invitation .footer-school .invite-fitted-line > span { font-size: inherit; }
 .invitation .footer-details a { display: flex; align-items: center; gap: 8px; min-height: 44px; color: var(--invite-accent); overflow-wrap: anywhere; }
 .invitation .footer-details .footer-map { display: grid; gap: 8px; }
 .invitation .footer-map img { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--blue-line, #ded2bd); }

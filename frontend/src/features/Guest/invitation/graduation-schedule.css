@@ -53,9 +53,6 @@
   text-transform: uppercase;
 }
 
-.graduation-schedule__line { display: block; }
-.graduation-schedule__line > span { display: inline-block; }
-
 .graduation-schedule__month {
   table-layout: fixed;
   text-align: center;

@@ -80,10 +80,7 @@ export async function invitationView(content:Content,event:Event,guest?:Guest,in
   if(section.type!=='invitation')return section;
   const lead=/^\s*(?:mình\s+)?trân trọng mời bạn(?=\s|[.,!]|$)/iu;
   let message=card?.letterMessage||section.data.message;
-  if(!card?.letterMessage&&lead.test(message))message=message.replace(lead,()=>`Trân trọng mời ${address}`)
-   .replaceAll('nếu bạn có thời gian',()=>`nếu ${address} có thời gian`)
-   .replaceAll('mình rất muốn gặp bạn để',()=>`${speaker} rất muốn gặp ${address} để`)
-   .replaceAll('gặp bạn để',()=>`gặp ${address} để`);
+  if(!card?.letterMessage&&lead.test(message))message=`Trân trọng mời ${address} đến chụp hình và lưu giữ những kỷ niệm trong ngày tốt nghiệp của ${speaker}.`;
   const vars={...openingVars,salutation:address};
   const standardTitle=section.data.title.toLocaleLowerCase('vi')==='hẹn bạn trong ngày đặc biệt';
   const title=card?.letterTitle?personalize(card.letterTitle,vars):standardTitle?`Hẹn ${headingAddress} trong ngày đặc biệt`:section.data.title;

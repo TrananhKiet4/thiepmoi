@@ -239,14 +239,17 @@ test('mobile invitation balances headings and plays music on open',async({page},
      range.selectNodeContents(root.querySelector(selector)!);
      return Array.from(range.getClientRects()).every(rect=>rect.left>=outer.left-1&&rect.right<=outer.right+1);
     });
-    const heading=root.querySelector('.hero-text h1')!.firstChild!;
+    const heading=root.querySelector('.hero-text h1')!;
     const lines=new Map<number,number>();
-    for(const word of heading.textContent!.matchAll(/\S+/g)){
-     const range=document.createRange();
-     range.setStart(heading,word.index!);
-     range.setEnd(heading,word.index!+word[0].length);
-     const top=Math.round(range.getBoundingClientRect().top);
-     lines.set(top,(lines.get(top)??0)+1);
+    const texts=document.createTreeWalker(heading,NodeFilter.SHOW_TEXT);
+    for(let node=texts.nextNode();node;node=texts.nextNode()){
+     for(const word of node.textContent!.matchAll(/\S+/g)){
+      const range=document.createRange();
+      range.setStart(node,word.index!);
+      range.setEnd(node,word.index!+word[0].length);
+      const top=Math.round(range.getBoundingClientRect().top);
+      lines.set(top,(lines.get(top)??0)+1);
+     }
     }
     return {fits,lineCount:lines.size,lastLineWords:[...lines.values()].at(-1)};
    });
