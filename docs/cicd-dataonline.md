@@ -22,7 +22,9 @@ Job deploy kiểm tra thư mục FTP bằng `thiepmoi-app/composer.json`, bật 
 
 Các lần deploy được xếp hàng trong cùng nhóm `dataonline-production`. Một lần push mới sẽ chờ lần đang đồng bộ kết thúc. [Điều khiển deployment trong GitHub Actions](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments)
 
-FTPS dùng TLS và xác minh chứng chỉ. Các lần chạy sau sử dụng file trạng thái `.dataonline-sync-state.json` để xác định file thay đổi. Lần đầu thiết lập cần đồng bộ nhiều file hơn. [Tài liệu FTP Deploy Action](https://github.com/SamKirkland/FTP-Deploy-Action/blob/v4.4.0/README.md)
+FTPS dùng TLS và xác minh chứng chỉ. Trước khi đồng bộ, workflow so sánh các phiên bản và reference trong `composer.lock` với metadata thư viện đã cài trên hosting, cùng danh sách dịch vụ AWS được giữ lại. Khi khớp, bộ thư viện hiện có được tái sử dụng và metadata autoload được cập nhật cùng mã nguồn. Khi dependency thay đổi, bước riêng đồng bộ `vendor` trước phần ứng dụng.
+
+File trạng thái `.dataonline-app-sync.json` theo dõi mã ứng dụng và `.dataonline-vendor-sync.json` theo dõi thư viện. Lần đầu cần gửi dependency mới có thể mất nhiều thời gian hơn vì FTPS truyền từng file. [Tài liệu FTP Deploy Action](https://github.com/SamKirkland/FTP-Deploy-Action/blob/v4.4.0/README.md)
 
 ## Cấu hình GitHub
 

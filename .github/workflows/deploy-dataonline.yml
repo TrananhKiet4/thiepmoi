@@ -58,6 +58,7 @@ jobs:
           php -d zend.assertions=1 -d assert.exception=1 tests/guest-port-smoke.php
           php tests/storage-package-smoke.php
           node tests/dataonline-export.test.mjs
+          node tests/dataonline-sync.test.mjs
           node tests/dataonline-import-smoke.mjs
           node tests/laravel-smoke.mjs
           npm exec -w @invite/web -- tsc --noEmit
@@ -76,7 +77,7 @@ jobs:
     needs: build
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 360
     environment:
       name: dataonline-production
       url: https://www.trananhkiet.id.vn
@@ -87,11 +88,15 @@ jobs:
       FTPS_USERNAME: ${{ secrets.FTPS_USERNAME }}
       FTPS_PASSWORD: ${{ secrets.FTPS_PASSWORD }}
     steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: dataonline-${{ github.sha }}
           path: ${{ runner.temp }}/dataonline
       - name: Validate destination and unpack package
+        id: prepare
         shell: bash
         run: |
           set -euo pipefail
@@ -116,8 +121,19 @@ jobs:
             "${ftp_base}thiepmoi-app/composer.json" \
             --output "$RUNNER_TEMP/dataonline-remote-composer.json"
           node -e 'const fs=require("node:fs");const p=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/dataonline-remote-composer.json","utf8"));if(p.name!=="trananhkiet4/thiepmoi")throw new Error("FTP destination does not match this application");'
+          if curl --fail --silent --show-error --ssl-reqd --tlsv1.2 \
+            --connect-timeout 10 --max-time 45 \
+            --user "$FTPS_USERNAME:$FTPS_PASSWORD" \
+            "${ftp_base}thiepmoi-app/vendor/composer/installed.json" \
+            --output "$RUNNER_TEMP/dataonline-remote-installed.json"; then
+            echo 'Installation metadata retrieved'
+          else
+            code=$?
+            if [[ "$code" != 78 ]]; then exit "$code"; fi
+          fi
           mkdir -p "$RUNNER_TEMP/dataonline/release"
           unzip -q "$RUNNER_TEMP/dataonline/thiepmoi-dataonline.zip" -d "$RUNNER_TEMP/dataonline/release"
+          node scripts/prepare-dataonline-sync.mjs
       - name: Pause requests during code synchronization
         shell: bash
         run: |
@@ -136,6 +152,27 @@ jobs:
             --user "$FTPS_USERNAME:$FTPS_PASSWORD" \
             --upload-file "$RUNNER_TEMP/dataonline-maintenance.php" \
             "ftp://${FTPS_SERVER}:${FTPS_PORT}/${FTPS_SERVER_DIR}thiepmoi-app/storage/framework/maintenance.php"
+      - name: Synchronize changed dependencies
+        if: steps.prepare.outputs.dependencies_changed == 'true'
+        uses: SamKirkland/FTP-Deploy-Action@110f9186c050f71550953127052e77650219c287 # v4.4.0
+        with:
+          server: ${{ env.FTPS_SERVER }}
+          port: ${{ env.FTPS_PORT }}
+          protocol: ftps
+          security: strict
+          username: ${{ secrets.FTPS_USERNAME }}
+          password: ${{ secrets.FTPS_PASSWORD }}
+          local-dir: ${{ runner.temp }}/dataonline/vendor/
+          server-dir: ${{ env.FTPS_SERVER_DIR }}thiepmoi-app/vendor/
+          state-name: .dataonline-vendor-sync.json
+          dangerous-clean-slate: false
+          timeout: 60000
+          log-level: minimal
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.env
+            **/.env.*
       - name: Synchronize application and frontend
         uses: SamKirkland/FTP-Deploy-Action@110f9186c050f71550953127052e77650219c287 # v4.4.0
         with:
@@ -147,7 +184,7 @@ jobs:
           password: ${{ secrets.FTPS_PASSWORD }}
           local-dir: ${{ runner.temp }}/dataonline/release/
           server-dir: ${{ env.FTPS_SERVER_DIR }}
-          state-name: .dataonline-sync-state.json
+          state-name: .dataonline-app-sync.json
           dangerous-clean-slate: false
           timeout: 60000
           log-level: minimal
