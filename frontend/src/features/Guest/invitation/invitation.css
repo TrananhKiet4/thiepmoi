@@ -111,13 +111,13 @@
 .invitation .hero-text .eyebrow { font-size: 10px; }
 .invitation .invite-hero h1 { font-size: clamp(30px, 4vw, 50px); color: var(--invite-accent); line-height: 1.2; }
 .invitation .hero-text h1:focus { outline: none; }
-.invitation .hero-title-lines { width: 100%; text-transform: uppercase; white-space: normal; }
+.invitation .hero-title-lines { width: 100%; font-family: "Times New Roman", serif; text-transform: uppercase; white-space: normal; }
 .invitation .hero-title-highlight {
   display: table;
   margin: 10px auto 0;
-  padding-inline: .12em;
-  background: linear-gradient(transparent 61%, var(--invite-blue) 61% 88%, transparent 88%);
-  font-weight: 700;
+  color: #6e8194;
+  font-style: italic;
+  font-weight: 400;
 }
 .invitation .invite-fitted-line { display: block; max-width: 100%; font-size: inherit; letter-spacing: inherit; }
 .invitation .invite-fitted-line > span { display: inline-block; font-size: inherit; letter-spacing: inherit; }
