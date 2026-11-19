@@ -120,7 +120,7 @@ final class GuestController
 
     public function wish(Request $request)
     {
-        $body = $this->body($request, ['body', 'consentPublic', 'consentAttendancePublic', 'expectedVersion'], $errors);
+        $body = $this->body($request, ['body', 'consentPublic', 'consentAttendancePublic', 'expectedVersion', 'imageId'], $errors);
         $body['body'] = $this->text($body, 'body', 1, 1000, $errors);
         foreach (['consentPublic', 'consentAttendancePublic'] as $key) {
             if (($key === 'consentPublic' || array_key_exists($key, $body)) && !is_bool($body[$key] ?? null)) {
@@ -128,6 +128,9 @@ final class GuestController
             }
         }
         $body['expectedVersion'] = $this->integer($body, 'expectedVersion', 0, $errors);
+        if (isset($body['imageId']) && (!is_string($body['imageId']) || !Str::isUuid($body['imageId']))) {
+            $errors['imageId'] = 'Ảnh đính kèm không hợp lệ';
+        }
         $this->validate($errors);
 
         return Api::ok(Api::idempotent($request, 'guest.wish', $this->actor($request), $body, function () use ($request, $body) {
@@ -138,16 +141,23 @@ final class GuestController
             }
             $wish = DB::table('Wish')->where('invitationId', $invitation->id)->first();
             $this->assertVersion($wish, $body['expectedVersion']);
+            $imageId = array_key_exists('imageId', $body) ? $body['imageId'] : ($wish->imageId ?? null);
+            if ($imageId && !is_file(\App\Services\WishImages::path($invitation->id, $imageId))) {
+                Api::fail(422, 'INVALID_IMAGE', 'Ảnh không còn khả dụng, vui lòng tải ảnh lên lại');
+            }
             $status = ($wish->moderationStatus ?? null) === 'HIDDEN' ? 'HIDDEN' : ($body['consentPublic'] ? 'APPROVED' : 'NONE');
             $now = Api::now();
             $fields = [
-                'body' => $body['body'], 'consentPublic' => $body['consentPublic'],
+                'body' => $body['body'], 'imageId' => $imageId, 'consentPublic' => $body['consentPublic'],
                 'consentAttendancePublic' => $body['consentPublic'] && ($body['consentAttendancePublic'] ?? false),
                 'moderationStatus' => $status, 'isPinned' => false, 'approvedAt' => $status === 'APPROVED' ? $now : null,
                 'approvedBy' => null, 'deletedAt' => null, 'updatedAt' => $now,
             ];
             if (!$wish) {
                 $fields['createdAt'] = $now;
+            }
+            if (($wish->imageId ?? null) && $wish->imageId !== $imageId) {
+                DB::afterCommit(fn () => \App\Services\WishImages::forget($invitation->id, $wish->imageId));
             }
 
             return InvitationViews::wishView($this->save('Wish', $invitation->id, $wish, $fields));
@@ -340,10 +350,13 @@ final class GuestController
             }
             $this->assertVersion($wish, $version);
             $now = Api::now();
-            $fields = $delete ? ['deletedAt' => $now] : [
+            $fields = $delete ? ['deletedAt' => $now, 'imageId' => null] : [
                 'consentPublic' => false, 'consentAttendancePublic' => false,
                 'moderationStatus' => $wish->moderationStatus === 'HIDDEN' ? 'HIDDEN' : 'NONE', 'approvedAt' => null, 'approvedBy' => null,
             ];
+            if ($delete) {
+                DB::afterCommit(fn () => \App\Services\WishImages::forget($invitation->id, $wish->imageId));
+            }
 
             return InvitationViews::wishView($this->save('Wish', $invitation->id, $wish, $fields + ['isPinned' => false, 'updatedAt' => $now]));
         }, 3);

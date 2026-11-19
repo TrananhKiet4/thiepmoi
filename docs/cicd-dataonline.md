@@ -46,6 +46,8 @@ Sau khi đồng bộ thành công, workflow xóa các file cache sinh tự độ
 
 Các thay đổi schema MariaDB cần migration riêng đã kiểm tra trước khi phát hành phần mã phụ thuộc vào chúng. Dữ liệu khách, RSVP và lời chúc được quản lý trong database của hosting.
 
+Chức năng ảnh kèm lời chúc cần chạy `database/updates/20261119_wish_image.sql` trong phpMyAdmin trước khi phát hành. Câu lệnh chỉ thêm cột `Wish.imageId`, giữ nguyên các lời chúc hiện có. Ảnh được nén thành WebP và lưu ở `thiepmoi-app/storage/app/private/wish-images/`, nằm ngoài thư mục công khai và được giữ qua các lần deploy. Khách có thể đính kèm một ảnh JPG/PNG/WebP tối đa 5 MB từ thiết bị. Ảnh chỉ xuất hiện trên lưu bút chung khi khách đồng ý công khai; rút đồng ý hoặc xóa lời chúc sẽ thu hồi đường dẫn ảnh công khai. Bảo trì định kỳ dọn ảnh tải lên nhưng chưa gắn vào lời chúc sau 24 giờ.
+
 Mã nguồn được đồng bộ vào vị trí ứng dụng hiện có để sử dụng hạn mức inode của gói hosting. Website hiển thị trang bảo trì trong lúc đồng bộ. Ảnh được phục vụ trực tiếp từ thư mục ảnh trên hosting. Nhạc, font và tệp Excel tạm sử dụng các biến `STORAGE_*` đã cấu hình trên hosting.
 
 ## Khi deploy bị lỗi hoặc bị hủy

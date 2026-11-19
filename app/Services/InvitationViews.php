@@ -35,6 +35,7 @@ final class InvitationViews
             'approvedAt' => Api::iso($wish->approvedAt), 'deletedAt' => Api::iso($wish->deletedAt),
             'version' => (int) $wish->version, 'createdAt' => Api::iso($wish->createdAt),
             'updatedAt' => Api::iso($wish->updatedAt),
+            'image' => $wish->deletedAt ? null : WishImages::view($wish->invitationId, $wish->imageId ?? null),
         ] : null;
     }
 
@@ -98,9 +99,10 @@ final class InvitationViews
         }
 
         $rows = $query->orderByDesc('w.isPinned')->orderByDesc('w.approvedAt')->orderByDesc('w.id')->limit($limit + 1)
-            ->get(['w.id', 'w.body', 'w.approvedAt', 'w.isPinned', 'w.consentAttendancePublic', 'g.displayName', 'g.fullName', 'r.status']);
+            ->get(['w.id', 'w.body', 'w.imageId', 'w.invitationId', 'w.approvedAt', 'w.isPinned', 'w.consentAttendancePublic', 'g.displayName', 'g.fullName', 'r.status']);
         $items = $rows->take($limit)->map(fn ($row) => [
             'id' => $row->id, 'displayName' => self::displayName($row), 'body' => $row->body,
+            'image' => WishImages::view($row->invitationId, $row->imageId, 'public'),
             'approvedAt' => Api::iso($row->approvedAt), 'isPinned' => (bool) $row->isPinned,
             'attendanceStatus' => $row->consentAttendancePublic && in_array($row->status, ['ATTENDING', 'DECLINED'], true) ? $row->status : null,
         ]);

@@ -3,10 +3,11 @@ import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {useParams} from 'react-router-dom';
 import {useInfiniteQuery,useQuery,useQueryClient} from '@tanstack/react-query';
 import {ArrowUpRight,Check,Facebook,Heart,MapPin,Music2,Phone,VolumeX,GraduationCap,Send} from 'lucide-react';
-import type {Content,InvitationView,MediaView,PublicWish,Section,UploadedImage} from '@invite/contracts';
+import type {Content,InvitationView,MediaView,PublicWish,Section,UploadedImage,WishImage} from '@invite/contracts';
 import {CompanionFilm} from './CompanionFilm';
 import {GraduationSchedule} from './GraduationSchedule';
 import {FittedLine} from './FittedLine';
+import {WishImageField} from './WishImageField';
 import {statusName} from '../../../constants/status';
 import {ApiError,request} from '../../../lib/api';
 import {Action,ErrorBox,Field,Loading} from '../../../components/ui/index';
@@ -211,7 +212,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    <PaperSparkle className="letter-sparkle"/>
    <h2><FittedLine text={s.data.title}/></h2>
    <p className="guest-recipient"><span>{view.guest.recipientGreeting??'Kính gửi'}</span><strong>{view.guest.salutation&&<span className="recipient-salutation">{view.guest.salutation} </span>}<span className="recipient-name">{name}</span></strong></p>
-   <p className="invite-prose">{s.data.message}</p>
+   <p className="invite-prose invitation-message"><FittedLine text={s.data.message} minimumFontSize={1}/></p>
    <GraduationSchedule ceremony={c.ceremony} phone={c.contact?.phone} facebookUrl={c.contact?.facebookUrl}/>
   </div>;
   case 'map': {
@@ -282,7 +283,7 @@ function MapView({location,image}:{location:Content['ceremony'];image?:MediaView
  </div>;
 }
 function FeedbackForms({view,token,save,intro}:{view:InvitationView;token?:string;save?:ReturnType<typeof useGuestData>['save'];intro:string}){
- return <><FeedbackForm view={view} save={save} intro={intro}/>{(token&&view.wallEnabled!==false||view.previewWishes!==undefined)&&<Wall key={token} token={token} previewItems={view.previewWishes}/>}</>;
+ return <><FeedbackForm view={view} token={token} save={save} intro={intro}/>{(token&&view.wallEnabled!==false||view.previewWishes!==undefined)&&<Wall key={token} token={token} previewItems={view.previewWishes}/>}</>;
 }
 function FamilyReply({view,token,intro}:{view:InvitationView;token?:string;intro:string}){
  const storageKey=`graduation.family.${token}`;
@@ -320,7 +321,7 @@ function FamilyReply({view,token,intro}:{view:InvitationView;token?:string;intro
     try{sessionStorage.removeItem(pendingKey);}catch{}
    }catch(error){setError(error);}finally{setBusy(false);}
   }}>
-   <Field label="Người phản hồi"><input value={name} onChange={e=>setName(e.target.value)} maxLength={120} autoComplete="name" required disabled={!canRegister||busy} placeholder="Nhập tên của bạn"/></Field>
+   <Field label="Quan hệ với Kiệt"><input value={name} onChange={e=>setName(e.target.value)} maxLength={120} autoComplete="off" required disabled={!canRegister||busy} placeholder="Ví dụ: Ba, Mẹ, Em trai…"/></Field>
    <button type="submit" className="button" disabled={!canRegister||busy||!name.trim()}>{busy?'Đang chuẩn bị…':'Tiếp tục'}</button>
    {!view.preview&&!canRegister&&<p className="muted">Hiện đã ngừng nhận phản hồi mới.</p>}
    <ErrorBox error={error}/>
@@ -342,11 +343,12 @@ function FamilyResponseForms({credential,intro,onChange}:{credential:string;intr
   {query.data&&!blocked&&!unauthorized&&<FeedbackForms view={query.data} token={credential} save={save} intro={intro}/>}
  </>;
 }
-function FeedbackForm({view,save,intro}:{view:InvitationView;save?:ReturnType<typeof useGuestData>['save'];intro:string}) {
+function FeedbackForm({view,token,save,intro}:{view:InvitationView;token?:string;save?:ReturnType<typeof useGuestData>['save'];intro:string}) {
  const response=view.content.sections.find(section=>section.type==='response');
  const wish=view.wish?.deletedAt?null:view.wish;
  const [status,setStatus]=useState<'ATTENDING'|'DECLINED'|''>(view.rsvp?.status??'');
  const [body,setBody]=useState(wish?.body??'');
+ const [image,setImage]=useState<WishImage|null>(wish?.image??null),[uploading,setUploading]=useState(false);
  const [consent,setConsent]=useState(!!wish?.consentPublic);
  const [attendanceConsent,setAttendanceConsent]=useState(!!wish?.consentAttendancePublic);
  const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[done,setDone]=useState('');
@@ -354,13 +356,14 @@ function FeedbackForm({view,save,intro}:{view:InvitationView;save?:ReturnType<ty
  const canWish=!!save&&!view.preview&&view.canCreateOrEditWish;
  const message=body.trim();
  const sendRsvp=canRsvp&&!!status&&status!==view.rsvp?.status;
- const sendWish=canWish&&!!message&&(message!==wish?.body||consent!==!!wish?.consentPublic||attendanceConsent!==!!wish?.consentAttendancePublic);
+ const imageChanged=(image?.id??null)!==(wish?.image?.id??null);
+ const sendWish=canWish&&!!message&&(message!==wish?.body||consent!==!!wish?.consentPublic||attendanceConsent!==!!wish?.consentAttendancePublic||imageChanged);
  function changeConsent(checked:boolean){
   setConsent(checked);
   if(!checked)setAttendanceConsent(false);
  }
  async function withdraw(remove:boolean){
-  if(!save||!wish||busy)return;
+  if(!save||!wish||busy||uploading)return;
   setBusy(true);
   setDone('');
   setError(null);
@@ -368,6 +371,7 @@ function FeedbackForm({view,save,intro}:{view:InvitationView;save?:ReturnType<ty
    if(remove){
     await save('/guest/wish','DELETE',{expectedVersion:wish.version});
     setBody('');
+    setImage(null);
    }else{
     await save('/guest/wish/visibility','PATCH',{consentPublic:false,expectedVersion:wish.version});
    }
@@ -376,7 +380,7 @@ function FeedbackForm({view,save,intro}:{view:InvitationView;save?:ReturnType<ty
  }
  return <form className="guest-form feedback-form" onSubmit={async e=>{
   e.preventDefault();
-  if(!save||busy||(!sendRsvp&&!sendWish))return;
+  if(!save||busy||uploading||(!sendRsvp&&!sendWish))return;
   setBusy(true);
   setError(null);
   setDone('');
@@ -387,7 +391,8 @@ function FeedbackForm({view,save,intro}:{view:InvitationView;save?:ReturnType<ty
     rsvpSaved=true;
    }
    if(sendWish){
-    const saved=await save('/guest/wish','PUT',{body:message,consentPublic:consent,consentAttendancePublic:consent&&attendanceConsent,expectedVersion:view.wish?.version??0});
+    const saved=await save('/guest/wish','PUT',{body:message,consentPublic:consent,consentAttendancePublic:consent&&attendanceConsent,expectedVersion:view.wish?.version??0,...(imageChanged?{imageId:image?.id??null}:{})});
+    setImage(saved?.image??null);
     const published=saved?.moderationStatus==='APPROVED'&&view.wallEnabled!==false;
     if(rsvpSaved)setDone(published?'Đã lưu xác nhận tham dự và đăng lời chúc. Cảm ơn bạn!':'Đã lưu xác nhận tham dự và lời chúc. Cảm ơn bạn!');
     else setDone(published?'Lời chúc đã được đăng. Cảm ơn bạn!':'Lời chúc đã được lưu. Cảm ơn bạn!');
@@ -408,16 +413,17 @@ function FeedbackForm({view,save,intro}:{view:InvitationView;save?:ReturnType<ty
    <legend>{response?.type==='response'&&response.data.wishTitle||'Một lời chúc dành cho Kiệt'}</legend>
    {intro&&<p className="feedback-intro">{intro}</p>}
    <Field label="Lời chúc của bạn"><textarea value={body} maxLength={1000} rows={4} onChange={e=>setBody(e.target.value)} placeholder="Viết lời chúc nếu bạn muốn…"/></Field>
-   <label className="check-label"><input type="checkbox" checked={consent} onChange={e=>changeConsent(e.target.checked)}/> Tôi đồng ý hiển thị tên và lời chúc trên thiệp.</label>
+   <WishImageField token={token} value={image} onChange={setImage} onBusy={setUploading} disabled={!canWish||busy}/>
+   <label className="check-label"><input type="checkbox" checked={consent} onChange={e=>changeConsent(e.target.checked)}/> Tôi đồng ý hiển thị tên, lời chúc và ảnh đính kèm trên thiệp.</label>
    {consent&&<label className="check-label"><input type="checkbox" checked={attendanceConsent} onChange={e=>setAttendanceConsent(e.target.checked)}/> Hiển thị trạng thái tham dự cùng lời chúc</label>}
    {!view.preview&&!view.canCreateOrEditWish&&<p className="muted">Hiện đã ngừng nhận lời chúc mới.</p>}
   </fieldset>
-  <button type="submit" className="button feedback-submit" disabled={busy||(!sendRsvp&&!sendWish)}><Send size={16}/>{busy?'Đang xử lý…':'Gửi lời hồi đáp'}</button>
+  <button type="submit" className="button feedback-submit" disabled={busy||uploading||(!sendRsvp&&!sendWish)}><Send size={16}/>{busy||uploading?'Đang xử lý…':'Gửi lời hồi đáp'}</button>
   <ErrorBox error={error}/>
   {done&&<p role="status" className="success">{done}</p>}
   {save&&view.canWithdrawWish&&!view.preview&&<div className="row wrap">
-   {wish?.consentPublic&&<Action disabled={busy} run={()=>withdraw(false)}>Rút đồng ý công khai</Action>}
-   <Action disabled={busy} confirm="Bạn muốn xóa lời chúc này?" run={()=>withdraw(true)}>Xóa lời chúc</Action>
+   {wish?.consentPublic&&<Action disabled={busy||uploading} run={()=>withdraw(false)}>Rút đồng ý công khai</Action>}
+   <Action disabled={busy||uploading} confirm="Bạn muốn xóa lời chúc này?" run={()=>withdraw(true)}>Xóa lời chúc</Action>
   </div>}
  </form>;
 }
@@ -444,9 +450,9 @@ function Wall({token,previewItems}:{token?:string;previewItems?:PublicWish[]}) {
  const publicWishes=previewItems??[...new Map(items.map(item=>[item.id,item])).values()];
  return <div className="wish-wall">
   <h3>Lưu bút & lời chúc</h3>
-  <p className="muted small">Vuốt hoặc cuộn ngang để xem thêm</p>
   <div className="wish-strip" role="region" tabIndex={0} aria-label="Lời chúc của khách mời">
    {publicWishes.map(w=><blockquote className="wish-card" key={w.id}>
+    {w.image&&<a className="wish-photo" href={w.image.url} target="_blank" rel="noopener noreferrer" aria-label={`Xem ảnh trong lời chúc của ${w.displayName}`}><img src={w.image.url} alt={`Ảnh kèm lời chúc của ${w.displayName}`} loading="lazy"/></a>}
     <p>{w.body}</p>
     {w.isPinned&&<span className="small muted wish-pin">Lời chúc được ghim</span>}
     <footer>

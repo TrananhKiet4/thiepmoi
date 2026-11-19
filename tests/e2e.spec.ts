@@ -40,7 +40,7 @@ test('two people reply independently on the same family link',async({page,browse
    await expect(visitor.locator('.envelope-letter .signature')).toHaveCount(0);
    await visitor.getByRole('button',{name:'Mở thiệp',exact:true}).click();
    await expect(visitor.getByRole('button',{name:'Gửi lời hồi đáp',exact:true})).toHaveCount(0);
-   await visitor.getByLabel('Người phản hồi',{exact:true}).fill(`Người thử ${index+1}`);
+   await visitor.getByLabel('Quan hệ với Kiệt',{exact:true}).fill(`Người thử ${index+1}`);
    await visitor.getByRole('button',{name:'Tiếp tục',exact:true}).click();
    await expect(visitor.locator('.response-recipient strong')).toHaveText(`Người thử ${index+1}`);
    await visitor.getByRole('radio',{name:index?'Hẹn một dịp khác':'Mình sẽ đến',exact:true}).check();

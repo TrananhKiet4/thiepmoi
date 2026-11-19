@@ -107,5 +107,6 @@ export type MediaView={id:string;url:string;alt:string;type:string;width?:number
 export {demoMediaId,staticMedia} from './static-media.js';
 export {companionPhotos} from './companion-photos.js';
 export const companionPhotoPath=(file:string)=>'/invitation-assets/photos/companions/'+file;
-export type PublicWish={id:string;displayName:string;body:string;approvedAt:string;attendanceStatus:'ATTENDING'|'DECLINED'|null;isPinned:boolean};
+export type WishImage={id:string;url:string};
+export type PublicWish={id:string;displayName:string;body:string;image?:WishImage|null;approvedAt:string;attendanceStatus:'ATTENDING'|'DECLINED'|null;isPinned:boolean};
 export type InvitationView={content:Content;media:Record<string,MediaView>;guest:{displayName:string;recipientName?:string;fullName?:string;salutation?:string;recipientGreeting?:'Thương gửi'|'Kính gửi'|'Thân gửi';recipientAddress?:string};personalMessage:string;rsvp:any;wish:any;canRsvp:boolean;canCreateOrEditWish:boolean;canWithdrawWish:boolean;eventId:string;wallEnabled?:boolean;preview?:boolean;previewWishes?:PublicWish[];familyReply?:{canRegister:boolean};responderName?:string};

@@ -149,6 +149,7 @@ CREATE TABLE `Wish` (
     `id` CHAR(36) NOT NULL,
     `invitationId` CHAR(36) NOT NULL,
     `body` VARCHAR(1000) NOT NULL,
+    `imageId` CHAR(36) NULL,
     `consentPublic` BOOLEAN NOT NULL DEFAULT false,
     `consentAttendancePublic` BOOLEAN NOT NULL DEFAULT false,
     `moderationStatus` VARCHAR(191) NOT NULL DEFAULT 'NONE',

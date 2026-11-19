@@ -58,11 +58,11 @@ DB::unprepared(<<<'SQL'
 CREATE TABLE Guest (id TEXT PRIMARY KEY, displayName TEXT, fullName TEXT, archivedAt TEXT);
 CREATE TABLE Invitation (id TEXT PRIMARY KEY, eventId TEXT, guestId TEXT, revokedAt TEXT, familyParentId TEXT);
 CREATE TABLE RSVP (invitationId TEXT, status TEXT);
-CREATE TABLE Wish (id TEXT PRIMARY KEY, invitationId TEXT, body TEXT, approvedAt TEXT, deletedAt TEXT, isPinned INTEGER, consentPublic INTEGER, moderationStatus TEXT, consentAttendancePublic INTEGER);
+CREATE TABLE Wish (imageId TEXT, id TEXT PRIMARY KEY, invitationId TEXT, body TEXT, approvedAt TEXT, deletedAt TEXT, isPinned INTEGER, consentPublic INTEGER, moderationStatus TEXT, consentAttendancePublic INTEGER);
 INSERT INTO Guest (id, displayName, fullName) VALUES ('guest1', '', 'Khách A'), ('guest2', 'Khách B', 'B'), ('guest3', '', 'Khách C');
 INSERT INTO Invitation (id, eventId, guestId) VALUES ('i1', 'fixture', 'guest1'), ('i2', 'fixture', 'guest2'), ('i3', 'fixture', 'guest3');
 INSERT INTO RSVP VALUES ('i1', 'DECLINED'), ('i2', 'ATTENDING');
-INSERT INTO Wish VALUES
+INSERT INTO Wish (id, invitationId, body, approvedAt, deletedAt, isPinned, consentPublic, moderationStatus, consentAttendancePublic) VALUES
  ('00000000-0000-4000-8000-000000000003', 'i1', 'First', '2026-11-10 01:00:00.000', NULL, 1, 1, 'APPROVED', 0),
  ('00000000-0000-4000-8000-000000000002', 'i2', 'Second', '2026-11-10 01:00:00.000', NULL, 1, 1, 'APPROVED', 1),
  ('00000000-0000-4000-8000-000000000001', 'i3', 'Third', '2026-11-10 01:00:00.000', NULL, 0, 1, 'APPROVED', 0);

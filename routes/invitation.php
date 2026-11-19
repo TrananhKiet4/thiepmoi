@@ -82,6 +82,7 @@ Route::prefix('api/v1')->middleware('api')->group(function () {
         Route::post('/family-responders', [GuestController::class, 'register']);
         Route::put('/rsvp', [GuestController::class, 'rsvp']);
         Route::put('/wish', [GuestController::class, 'wish']);
+        Route::post('/wish-image', [\App\Services\WishImages::class, 'upload']);
         Route::patch('/wish/visibility', [GuestController::class, 'visibility']);
         Route::delete('/wish', [GuestController::class, 'deleteWish']);
         Route::get('/wishes', [GuestController::class, 'wishes']);
@@ -90,6 +91,7 @@ Route::prefix('api/v1')->middleware('api')->group(function () {
 });
 
 Route::get('/api/maintenance', [TransferController::class, 'maintenance']);
+Route::get('/wish-images/{invitation}/{image}', [\App\Services\WishImages::class, 'show'])->name('wish-image');
 Route::get('/invitation-assets/fonts/fz-alpha-brights-b89b193c.otf', [TransferController::class, 'font']);
 Route::get('/invitation-assets/{key}', [TransferController::class, 'asset'])->where('key', '.*');
 

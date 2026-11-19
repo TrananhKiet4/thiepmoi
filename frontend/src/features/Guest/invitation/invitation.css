@@ -121,7 +121,7 @@
 .invitation .invite-fitted-line { display: block; max-width: 100%; font-size: inherit; letter-spacing: inherit; }
 .invitation .invite-fitted-line > span { display: inline-block; font-size: inherit; letter-spacing: inherit; }
 .invitation .invite-section .invite-fitted-line .section-title-accent { display: inline; }
-.invitation .hero-subtitle { font-family: var(--invite-heading); font-size: 23px; color: #72605d; }
+.invitation .hero-subtitle { font-family: "Times New Roman", serif; font-size: 23px; color: #72605d; }
 .invitation .hero-text>p:not(.eyebrow):not(.hero-subtitle) { color: #67636a; font-size: 15px; }
 .invitation .invite-hero :is(.ceremony-heading, .hero-photo, .hero-text) { animation: invite-unfold .62s ease-out both; }
 .invitation .invite-hero .hero-photo { animation-delay: .1s; }
@@ -151,6 +151,11 @@
   text-wrap: pretty;
 }
 .invitation .invite-prose { font-size: 15px; color: #625c5a; line-height: 1.9; }
+.invitation .invitation-message { max-width: none; width: 100%; }
+.invitation .wish-image-field { margin: 20px 0; text-transform: none; }
+.invitation .wish-image-preview { display: block; width: auto; max-width: 100%; max-height: 240px; object-fit: contain; margin: 12px 0; }
+.invitation .wish-photo { display: block; margin-bottom: 18px; }
+.invitation .wish-photo img { display: block; width: 100%; height: 210px; object-fit: contain; border-radius: 4px; }
 .invitation .story-list { gap: 55px; max-width: 1100px; margin: 40px auto 0; }
 .invitation .story-item { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 55px; }
 .invitation .story-item h3 { font-size: 30px; }

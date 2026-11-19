@@ -40,6 +40,7 @@ try {
     $app = require $appRoot.'/bootstrap/app.php';
     $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
     $app['config']->set('app.env', 'testing');
+    $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('s', 32)));
     $app['config']->set('database.default', 'mariadb');
     $app['config']->set('database.connections.mariadb', array_replace($app['config']->get('database.connections.mariadb'), [
         'url' => null,
@@ -80,7 +81,7 @@ try {
         $request = Request::create('http://localhost:4319'.$path, $method, $files ? ($body ?? []) : [], $cookie, $files, $extra + $headers, !$files && $body !== null ? json_encode($body === [] ? (object) [] : $body, JSON_THROW_ON_ERROR) : null);
         $response = $kernel->handle($request);
         $requests++;
-        $payload = json_decode($response->getContent(), true);
+        $payload = json_decode($response->getContent() ?: '', true);
         check($response->getStatusCode() === $expected, $method.' '.$path.' got '.$response->getStatusCode().' '.($payload['error']['code'] ?? ''));
         foreach ($response->headers->getCookies() as $saved) {
             $cookie[$saved->getName()] = $saved->getValue();
@@ -182,11 +183,14 @@ try {
         unlink($uploadFile);
     }
     $sourceImage = tempnam(sys_get_temp_dir(), 'story-image-test-');
+    $wishImageFiles = [];
     try {
         file_put_contents($sourceImage, 'This is not an image');
         $uploadImage = fn () => ['file' => new Illuminate\Http\UploadedFile($sourceImage, 'source.php', test: true)];
         $call('POST', '/api/v1/admin/events/'.$eventId.'/story-images', extra: ['HTTP_X_CSRF_TOKEN' => 'wrong'], expected: 403, files: $uploadImage());
         $call('POST', '/api/v1/admin/events/'.$eventId.'/story-images', expected: 422, files: $uploadImage());
+        $call('POST', '/api/v1/guest/wish-image', token: 'invalid', expected: 401, files: $uploadImage());
+        $call('POST', '/api/v1/guest/wish-image', token: $token, expected: 422, files: $uploadImage());
         $limited = $call('POST', '/api/v1/admin/events/'.$eventId.'/story-images', expected: 413, files: [
             'file' => new Illuminate\Http\UploadedFile($sourceImage, 'too-large.png', 'image/png', UPLOAD_ERR_INI_SIZE, true),
         ]);
@@ -198,6 +202,55 @@ try {
         $storyImagePath = public_path(ltrim($storyImage['url'], '/'));
         check($storyImage['width'] === 1600 && $storyImage['height'] === 800, 'Image resized with original proportions');
         check(getimagesize($storyImagePath)[2] === IMAGETYPE_WEBP, 'Upload is re-encoded as WebP');
+        $attachment = $call('POST', '/api/v1/guest/wish-image', token: $token, expected: 201, files: $uploadImage());
+        $wishImageFiles[] = App\Services\WishImages::path($invitation->id, $attachment['id']);
+        check(getimagesize(end($wishImageFiles))[2] === IMAGETYPE_WEBP, 'Guest photo is re-encoded in private storage');
+        $call('GET', $attachment['url']);
+        $call('GET', str_replace('scope=pending', 'scope=public', $attachment['url']), expected: 404);
+        $call('GET', strtok($attachment['url'], '?'), expected: 404);
+        $call('PUT', '/api/v1/guest/wish', ['body' => 'Foreign image', 'imageId' => $attachment['id'], 'consentPublic' => true, 'expectedVersion' => 0], $responder['token'], ['HTTP_IDEMPOTENCY_KEY' => 'foreign-image'], 422);
+        $wish = $call('PUT', '/api/v1/guest/wish', ['body' => 'Chúc mừng tốt nghiệp 🎓', 'imageId' => $attachment['id'], 'consentPublic' => true, 'expectedVersion' => 1], $token, ['HTTP_IDEMPOTENCY_KEY' => 'wish-photo']);
+        $reloaded = $call('GET', '/api/v1/guest/invitation', token: $token);
+        check($reloaded['wish']['image']['id'] === $attachment['id'], 'Photo survives reload');
+        $call('GET', $reloaded['wish']['image']['url']);
+        $wall = $call('GET', '/api/v1/guest/wishes', token: $responder['token']);
+        $publicImageUrl = $wall['items'][0]['image']['url'];
+        $call('GET', $publicImageUrl);
+        $adminWishes = $call('GET', '/api/v1/admin/events/'.$eventId.'/wishes');
+        check($adminWishes['items'][0]['image']['id'] === $attachment['id'], 'Admin can view attachment');
+        $call('PATCH', '/api/v1/guest/wish/visibility', ['consentPublic' => false, 'expectedVersion' => $wish['version']], $token);
+        $call('GET', $publicImageUrl, expected: 404);
+        $call('GET', $reloaded['wish']['image']['url']);
+        $wish = $call('GET', '/api/v1/guest/invitation', token: $token)['wish'];
+        $wish = $call('PUT', '/api/v1/guest/wish', ['body' => 'Chúc mừng tốt nghiệp 🎓', 'consentPublic' => true, 'expectedVersion' => $wish['version']], $token, ['HTTP_IDEMPOTENCY_KEY' => 'wish-old-client']);
+        check($wish['image']['id'] === $attachment['id'], 'Old clients preserve current photo when imageId is omitted');
+        $call('PUT', '/api/v1/guest/wish', ['body' => 'Chúc mừng tốt nghiệp 🎓', 'imageId' => null, 'consentPublic' => true, 'expectedVersion' => $wish['version']], $token, ['HTTP_IDEMPOTENCY_KEY' => 'wish-remove-image']);
+        $call('GET', $attachment['url'], expected: 404);
+        check(!is_file(end($wishImageFiles)), 'Removing a photo deletes the old file after commit');
+        for ($i = 0; $i < 6; $i++) {
+            $wishImageFiles[] = App\Services\WishImages::path($invitation->id, (string) Str::uuid());
+            copy($storyImagePath, end($wishImageFiles));
+        }
+        $call('POST', '/api/v1/guest/wish-image', token: $token, expected: 429, files: $uploadImage());
+        touch(end($wishImageFiles), time() - 7200);
+        $pending = $call('POST', '/api/v1/guest/wish-image', token: $token, expected: 201, files: $uploadImage());
+        check(!is_file(end($wishImageFiles)), 'Expired pending upload is removed before accepting another');
+        $wishImageFiles[] = App\Services\WishImages::path($invitation->id, $pending['id']);
+        touch(end($wishImageFiles), time() - 90000);
+        App\Services\WishImages::cleanup();
+        check(!is_file(end($wishImageFiles)), 'Maintenance removes stale unattached photos');
+        $attachment = $call('POST', '/api/v1/guest/wish-image', token: $responder['token'], expected: 201, files: $uploadImage());
+        $familyResponder = DB::table('Invitation')->where('tokenHash', InvitationTokens::hash($responder['token']))->first();
+        $wishImageFiles[] = App\Services\WishImages::path($familyResponder->id, $attachment['id']);
+        $familyWish = $call('PUT', '/api/v1/guest/wish', ['body' => 'Gia đình chúc mừng', 'imageId' => $attachment['id'], 'consentPublic' => false, 'expectedVersion' => 0], $responder['token'], ['HTTP_IDEMPOTENCY_KEY' => 'family-photo']);
+        $call('GET', $familyWish['image']['url']);
+        check(count($call('GET', '/api/v1/guest/wishes', token: $token)['items']) === 0, 'Private family photo stays off public wall');
+        $call('DELETE', '/api/v1/guest/wish', ['expectedVersion' => $familyWish['version']], $responder['token'], expected: 204);
+        $call('GET', $familyWish['image']['url'], expected: 404);
+        $call('POST', '/api/v1/guest/wish-image', token: $familyToken, expected: 422, files: $uploadImage());
+        DB::table('Event')->where('id', $eventId)->update(['wishesEnabled' => false]);
+        $call('POST', '/api/v1/guest/wish-image', token: $token, expected: 422, files: $uploadImage());
+        DB::table('Event')->where('id', $eventId)->update(['wishesEnabled' => true]);
     } finally {
         unlink($sourceImage);
     }
@@ -246,6 +299,12 @@ try {
     fwrite(STDERR, $error->getMessage().PHP_EOL);
     $failed = true;
 } finally {
+    foreach ($wishImageFiles ?? [] as $file) {
+        if (is_file($file)) unlink($file);
+    }
+    foreach (array_unique(array_map('dirname', $wishImageFiles ?? [])) as $directory) {
+        if (is_dir($directory)) rmdir($directory);
+    }
     if (isset($storyImagePath) && is_file($storyImagePath)) {
         unlink($storyImagePath);
         rmdir(dirname($storyImagePath));
