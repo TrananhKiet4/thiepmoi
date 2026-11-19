@@ -2,6 +2,11 @@ import { z } from 'zod';
 const text=(max:number)=>z.string().trim().max(max);
 const id=z.string().uuid();
 const optionalId=id.nullable().optional();
+const uploadedImageSchema=z.object({
+ url:z.string().regex(/^\/invitation-assets\/story\/[a-f0-9-]{36}\/[a-f0-9-]{36}\.webp$/),
+ width:z.number().int().min(1).max(1600),height:z.number().int().min(1).max(1600),
+});
+export type UploadedImage=z.infer<typeof uploadedImageSchema>;
 const date=z.string().datetime({offset:true});
 const draftDate=z.union([date,z.literal('')]);
 export const normalizeGroupKey=(value:string)=>value.normalize('NFD').replace(/\p{M}/gu,'').replace(/[đĐ]/g,'d').toLowerCase().trim().replace(/[^a-z0-9_-]+/g,'_').replace(/^_+|_+$/g,'');
@@ -14,7 +19,7 @@ function validGoogleMapsUrl(value:string){
   return ['google.com','www.google.com','google.com.vn','www.google.com.vn'].includes(url.hostname)&&/^\/maps(?:\/|$)/.test(url.pathname);
  }catch{return false;}
 }
-export const locationSchema=z.object({startAt:draftDate,endAt:draftDate,venueName:text(200),address:text(500),googleMapsUrl:text(2048).refine(validGoogleMapsUrl,'Nhập link Google Maps HTTPS hợp lệ').default(''),mapImageAssetId:id.nullable().default(null),entranceNote:text(1000).default('')});
+export const locationSchema=z.object({startAt:draftDate,endAt:draftDate,venueName:text(200),address:text(500),googleMapsUrl:text(2048).refine(validGoogleMapsUrl,'Nhập link Google Maps HTTPS hợp lệ').default(''),mapImageAssetId:id.nullable().default(null),mapImage:uploadedImageSchema.nullable().optional(),entranceNote:text(1000).default('')});
 function validFacebookUrl(value:string){
  if(!value)return true;
  try{
@@ -34,16 +39,13 @@ export const defaultInvitationNotes=[
 ].join('\n');
 const sectionBase={id:z.string().min(1).max(80),enabled:z.boolean(),order:z.number().int().min(0).max(100)};
 export const sectionSchema=z.discriminatedUnion('type',[
- z.object({...sectionBase,type:z.literal('opening'),data:z.object({title:text(200),messageTemplate:text(1000),coverAssetId:optionalId})}),
- z.object({...sectionBase,type:z.literal('hero'),data:z.object({title:text(200),subtitle:text(500).default(''),heroAssetId:optionalId})}),
+ z.object({...sectionBase,type:z.literal('opening'),data:z.object({title:text(200),messageTemplate:text(1000),coverAssetId:optionalId,coverImage:uploadedImageSchema.nullable().optional()})}),
+ z.object({...sectionBase,type:z.literal('hero'),data:z.object({title:text(200),subtitle:text(500).default(''),heroAssetId:optionalId,heroImage:uploadedImageSchema.nullable().optional()})}),
  z.object({...sectionBase,type:z.literal('story'),data:z.object({
   title:text(200).optional(),intro:text(1000).optional(),
   items:z.array(z.object({
    id:text(80),label:text(100),title:text(200),body:text(3000),imageAssetId:optionalId,
-   image:z.object({
-    url:z.string().regex(/^\/invitation-assets\/story\/[a-f0-9-]{36}\/[a-f0-9-]{36}\.webp$/),
-    width:z.number().int().min(1).max(1600),height:z.number().int().min(1).max(1600),
-   }).nullable().optional(),
+   image:uploadedImageSchema.nullable().optional(),
   })).max(12),
  })}),
  z.object({...sectionBase,type:z.literal('gallery'),data:z.object({title:text(200).optional(),items:z.array(z.object({assetId:id,caption:text(500)})).max(40)})}),
@@ -96,7 +98,7 @@ export function publicationErrors(content:Content):Record<string,string>{
  for(const k of ['fullName','university','major'] as const)if(!content.host[k])errors[`host.${k}`]='Vui lòng điền thông tin';
  for(const [name,loc] of [['ceremony',content.ceremony],['meetup',content.meetup]] as const){if(!loc)continue;if(!loc.venueName||!loc.address)errors[name]='Thiếu tên hoặc địa chỉ địa điểm';if(Date.parse(loc.endAt)<=Date.parse(loc.startAt))errors[`${name}.endAt`]='Giờ kết thúc phải sau giờ bắt đầu';}
  if(content.rsvpDeadline!==null&&Date.parse(content.rsvpDeadline)>Date.parse((content.meetup??content.ceremony).startAt))errors.rsvpDeadline='Hạn phản hồi không được sau giờ gặp/lễ';
- const hero=content.sections.find(s=>s.type==='hero');if(!hero||!(hero.data as any).heroAssetId)errors['sections.hero.heroAssetId']='Vui lòng chọn ảnh chính';
+ const hero=content.sections.find(s=>s.type==='hero');if(!hero||(!hero.data.heroAssetId&&!hero.data.heroImage))errors['sections.hero.heroAssetId']='Vui lòng chọn ảnh chính';
  if(content.music.enabled&&!content.music.assetId)errors['music.assetId']='Vui lòng chọn file nhạc';
  if(content.sections.some(s=>s.type==='map'&&s.data.locationSource==='MEETUP')&&!content.meetup)errors.meetup='Bản đồ giờ gặp cần thông tin giờ gặp';
  return errors;

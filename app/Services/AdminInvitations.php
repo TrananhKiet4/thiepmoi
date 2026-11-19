@@ -225,6 +225,24 @@ final class AdminInvitations
         return $url;
     }
 
+    private static function uploadedImage(mixed $value, string $field): ?array
+    {
+        if ($value === null) {
+            return null;
+        }
+        $image = self::object($value, $field);
+        self::strict($image, ['url', 'width', 'height']);
+        $url = self::text($image['url'] ?? null, 200, "$field.url", 1);
+        if (!preg_match('~^/invitation-assets/story/[a-f0-9-]{36}/[a-f0-9-]{36}\.webp$~D', $url)) {
+            self::invalid("$field.url", 'Đường dẫn ảnh không hợp lệ');
+        }
+        return [
+            'url' => $url,
+            'width' => self::integer($image['width'] ?? null, "$field.width", 1, 1600),
+            'height' => self::integer($image['height'] ?? null, "$field.height", 1, 1600),
+        ];
+    }
+
     private static function location(mixed $value, string $field): array
     {
         $data = self::object($value, $field);
@@ -244,6 +262,9 @@ final class AdminInvitations
             }
         }
 
+        if (array_key_exists('mapImage', $data)) {
+            $fields['mapImage'] = self::uploadedImage($data['mapImage'], "$field.mapImage");
+        }
         return $fields + [
             'startAt' => self::date($data['startAt'] ?? null, "$field.startAt", true),
             'endAt' => self::date($data['endAt'] ?? null, "$field.endAt", true),
@@ -273,6 +294,10 @@ final class AdminInvitations
         };
         if ($asset && array_key_exists($asset, $data)) {
             $fields[$asset] = isset($data[$asset]) ? self::uuid($data[$asset], "$prefix.$asset") : null;
+        }
+        $imageField = match ($type) { 'opening' => 'coverImage', 'hero' => 'heroImage', default => null };
+        if ($imageField && array_key_exists($imageField, $data)) {
+            $fields[$imageField] = self::uploadedImage($data[$imageField], "$prefix.$imageField");
         }
         if ($type === 'map') {
             $fields['locationSource'] = self::choice($data['locationSource'] ?? null, ['CEREMONY', 'MEETUP'], "$prefix.locationSource");
@@ -305,18 +330,8 @@ final class AdminInvitations
                     if (array_key_exists('imageAssetId', $item)) {
                         $items[$i]['imageAssetId'] = isset($item['imageAssetId']) ? self::uuid($item['imageAssetId'], "$path.imageAssetId") : null;
                     }
-                    if (isset($item['image'])) {
-                        $image = self::object($item['image'], "$path.image");
-                        self::strict($image, ['url', 'width', 'height']);
-                        $url = self::text($image['url'] ?? null, 200, "$path.image.url", 1);
-                        if (!preg_match('~^/invitation-assets/story/[a-f0-9-]{36}/[a-f0-9-]{36}\.webp$~D', $url)) {
-                            self::invalid("$path.image.url", 'Đường dẫn ảnh không hợp lệ');
-                        }
-                        $items[$i]['image'] = [
-                            'url' => $url,
-                            'width' => self::integer($image['width'] ?? null, "$path.image.width", 1, 1600),
-                            'height' => self::integer($image['height'] ?? null, "$path.image.height", 1, 1600),
-                        ];
+                    if (array_key_exists('image', $item)) {
+                        $items[$i]['image'] = self::uploadedImage($item['image'], "$path.image");
                     }
                 }
             }

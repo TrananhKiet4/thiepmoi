@@ -20,7 +20,7 @@ final class InvitationHeaders
         $endpoint = config('invitation.storage.endpoint');
         $host = $endpoint ? parse_url($endpoint, PHP_URL_HOST) : null;
         $storage = $host ? ' https://'.$host : '';
-        $response->headers->set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:".$storage."; media-src 'self'".$storage."; connect-src 'self'".$storage."; font-src 'self' data:; frame-src https://www.google.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'");
+        $response->headers->set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:".$storage."; media-src 'self'".$storage."; connect-src 'self'".$storage."; font-src 'self' data:; frame-src https://www.google.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'");
         if ($request->isSecure()) {
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000');
         }

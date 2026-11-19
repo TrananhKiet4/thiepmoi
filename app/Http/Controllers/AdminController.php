@@ -550,7 +550,7 @@ final class AdminController
             }
         }
         $sections = array_column($content['sections'], 'data', 'type');
-        if (empty($sections['hero']['heroAssetId'])) {
+        if (empty($sections['hero']['heroAssetId']) && empty($sections['hero']['heroImage'])) {
             $errors['sections.hero.heroAssetId'] = 'Vui lòng chọn ảnh chính';
         }
         if ($content['music']['enabled'] && empty($content['music']['assetId'])) {
@@ -566,16 +566,18 @@ final class AdminController
 
     private function validateMedia(array $content, bool $publish, string $eventId): void
     {
+        $uploaded = [$content['ceremony']['mapImage'] ?? null, $content['meetup']['mapImage'] ?? null];
         foreach ($content['sections'] as $section) {
-            if ($section['type'] !== 'story') {
-                continue;
+            $uploaded[] = $section['data']['coverImage'] ?? null;
+            $uploaded[] = $section['data']['heroImage'] ?? null;
+            foreach ($section['data']['items'] ?? [] as $item) {
+                $uploaded[] = $item['image'] ?? null;
             }
-            foreach ($section['data']['items'] as $item) {
-                $image = $item['image'] ?? null;
-                if ($image && (!str_starts_with($image['url'], "/invitation-assets/story/$eventId/")
-                    || !is_file(public_path(ltrim($image['url'], '/'))))) {
-                    Api::fail(422, 'INVALID_MEDIA', 'Ảnh câu chuyện không thuộc sự kiện hoặc không còn tồn tại');
-                }
+        }
+        foreach (array_filter($uploaded) as $image) {
+            if (!str_starts_with($image['url'], "/invitation-assets/story/$eventId/")
+                || !is_file(public_path(ltrim($image['url'], '/')))) {
+                Api::fail(422, 'INVALID_MEDIA', 'Ảnh không thuộc sự kiện hoặc không còn tồn tại');
             }
         }
         $media = InvitationViews::media($content);

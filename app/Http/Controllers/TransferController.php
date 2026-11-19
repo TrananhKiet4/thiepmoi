@@ -43,7 +43,16 @@ final class TransferController
     {
         $event = Api::event($request, AdminInvitations::uuid($id));
         $file = $request->file('file');
-        if (!$file instanceof UploadedFile || !$file->isValid()) {
+        if ($file instanceof UploadedFile && !$file->isValid()) {
+            if (in_array($file->getError(), [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+                Api::fail(413, 'IMAGE_TOO_LARGE', 'Ảnh vượt giới hạn nhận file của hosting. Vui lòng tải lại để hệ thống nén ảnh trước khi gửi.');
+            }
+            Api::fail(422, 'UPLOAD_FAILED', 'Tải file chưa hoàn tất, vui lòng chọn ảnh và thử lại');
+        }
+        if (!$file instanceof UploadedFile) {
+            if ((int) $request->header('Content-Length') > 0 && !$request->all()) {
+                Api::fail(413, 'IMAGE_TOO_LARGE', 'Hosting chưa nhận được file ảnh. Vui lòng tải lại bằng nút Tải ảnh lên.');
+            }
             Api::fail(422, 'INVALID_IMAGE', 'Vui lòng chọn ảnh JPG, PNG hoặc WebP');
         }
         if ($file->getSize() > 5 * 1024 * 1024) {

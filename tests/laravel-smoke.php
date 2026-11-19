@@ -187,6 +187,10 @@ try {
         $uploadImage = fn () => ['file' => new Illuminate\Http\UploadedFile($sourceImage, 'source.php', test: true)];
         $call('POST', '/api/v1/admin/events/'.$eventId.'/story-images', extra: ['HTTP_X_CSRF_TOKEN' => 'wrong'], expected: 403, files: $uploadImage());
         $call('POST', '/api/v1/admin/events/'.$eventId.'/story-images', expected: 422, files: $uploadImage());
+        $limited = $call('POST', '/api/v1/admin/events/'.$eventId.'/story-images', expected: 413, files: [
+            'file' => new Illuminate\Http\UploadedFile($sourceImage, 'too-large.png', 'image/png', UPLOAD_ERR_INI_SIZE, true),
+        ]);
+        check($limited['error']['code'] === 'IMAGE_TOO_LARGE', 'PHP size error is reported as a size limit');
         $pixels = imagecreatetruecolor(2048, 1024);
         imagepng($pixels, $sourceImage);
         imagedestroy($pixels);
@@ -198,6 +202,14 @@ try {
         unlink($sourceImage);
     }
     foreach ($fixture['sections'] as &$section) {
+        if ($section['type'] === 'opening') {
+            $section['data']['coverImage'] = $storyImage;
+            $section['data']['coverAssetId'] = null;
+        }
+        if ($section['type'] === 'hero') {
+            $section['data']['heroImage'] = $storyImage;
+            $section['data']['heroAssetId'] = null;
+        }
         if ($section['type'] === 'story') {
             $section['data'] = [
                 'title' => 'THANH XUÂN ẤY, CHÚNG TA ĐÃ CÓ NHAU',
@@ -207,6 +219,8 @@ try {
         }
     }
     unset($section);
+    $fixture['ceremony']['mapImage'] = $storyImage;
+    $fixture['ceremony']['mapImageAssetId'] = null;
     $foreign = $fixture;
     foreach ($foreign['sections'] as &$section) {
         if ($section['type'] === 'story') {
@@ -219,6 +233,9 @@ try {
     $savedStory = array_column($draft['draft']['contentJson']['sections'], 'data', 'type')['story'];
     check(count($savedStory['items']) === 11 && $savedStory['title'] === $fixture['sections'][2]['data']['title'], 'Story header and all chapters survive save');
     check($savedStory['items'][0]['image'] === $storyImage, 'Uploaded image survives content validation');
+    $sections = array_column($draft['draft']['contentJson']['sections'], 'data', 'type');
+    check($sections['opening']['coverImage'] === $storyImage && $sections['hero']['heroImage'] === $storyImage, 'Cover and hero uploads survive save');
+    check($draft['draft']['contentJson']['ceremony']['mapImage'] === $storyImage, 'Map upload survives save');
     $call('POST', '/api/v1/admin/events/'.$eventId.'/publish', ['expectedVersion' => 2]);
     $call('DELETE', '/api/v1/admin/guests/'.$guest['id'], ['expectedVersion' => 1], expected: 204);
     $call('GET', '/api/v1/guest/invitation', token: $token, expected: 401);

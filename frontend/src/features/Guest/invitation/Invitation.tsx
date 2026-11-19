@@ -3,7 +3,7 @@ import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {useParams} from 'react-router-dom';
 import {useInfiniteQuery,useQuery,useQueryClient} from '@tanstack/react-query';
 import {ArrowUpRight,Check,Facebook,Heart,MapPin,Music2,Phone,VolumeX,GraduationCap,Send} from 'lucide-react';
-import type {Content,InvitationView,MediaView,PublicWish,Section} from '@invite/contracts';
+import type {Content,InvitationView,MediaView,PublicWish,Section,UploadedImage} from '@invite/contracts';
 import {CompanionFilm} from './CompanionFilm';
 import {GraduationSchedule} from './GraduationSchedule';
 import {FittedLine} from './FittedLine';
@@ -122,7 +122,8 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
  const sections=[...c.sections].filter(s=>s.enabled).sort((a,b)=>a.order-b.order),opening=sections.find(s=>s.type==='opening'),hero=sections.find(s=>s.type==='hero'),name=view.guest.recipientName||view.guest.displayName||view.guest.fullName||'Bạn';
  const closingLabel=`Hẹn gặp ${view.guest.recipientAddress||'bạn'}`.toLocaleUpperCase('vi');
  const media=(id?:string|null)=>id?view.media[id]:undefined;
- const img=(id?:string|null,priority=false)=>{const a=media(id);return a?<AssetImage asset={a} priority={priority}/>:<div className="photo-placeholder"><GraduationCap size={70} strokeWidth={.7}/><span>MỘT CHẶNG ĐƯỜNG ĐÁNG NHỚ</span></div>;};
+ const picture=(id?:string|null,image?:UploadedImage|null):MediaView|undefined=>image?{...image,id:id??image.url,alt:'Ảnh trên thiệp',type:'IMAGE'}:media(id);
+ const img=(id?:string|null,priority=false,image?:UploadedImage|null)=>{const a=picture(id,image);return a?<AssetImage asset={a} priority={priority}/>:<div className="photo-placeholder"><GraduationCap size={70} strokeWidth={.7}/><span>MỘT CHẶNG ĐƯỜNG ĐÁNG NHỚ</span></div>;};
  const year=c.ceremony.startAt?new Intl.DateTimeFormat('vi-VN',{year:'numeric',timeZone:c.timezone}).format(new Date(c.ceremony.startAt)):'…';
  const heroTitle=hero?.type==='hero'?hero.data.title:'Ngày mình tốt nghiệp.';
  const splitHeroTitle=/^một hành trình mới bắt đầu[.!]?$/iu.test(heroTitle.replace(/\s+/gu,' ').trim());
@@ -165,7 +166,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    </div>
    <p className="envelope-hint">CHẠM VÀO CON DẤU ĐỂ MỞ THIỆP</p>
    <p className="envelope-message">{message}</p>
-   {opening?.type==='opening'&&opening.data.coverAssetId&&<div className="envelope-cover">{img(opening.data.coverAssetId,true)}</div>}
+   {opening?.type==='opening'&&(opening.data.coverAssetId||opening.data.coverImage)&&<div className="envelope-cover">{img(opening.data.coverAssetId,true,opening.data.coverImage)}</div>}
    <span className="envelope-year">CLASS OF {year}</span>
   </section>:<>
    <nav className="invite-nav" aria-label="Các phần của thiệp">
@@ -178,7 +179,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
     <div className="ceremony-heading" aria-hidden="true"><span>Graduation</span><span>Ceremony</span></div>
     <div className="hero-art">
      <PaperSparkle className="sparkle-one"/><PaperSparkle className="sparkle-two"/>
-     <figure className="hero-photo">{img(hero?.type==='hero'?hero.data.heroAssetId:null,true)}<figcaption className="photo-caption">{c.host.fullName}</figcaption></figure>
+     <figure className="hero-photo">{img(hero?.type==='hero'?hero.data.heroAssetId:null,true,hero?.type==='hero'?hero.data.heroImage:null)}<figcaption className="photo-caption">{c.host.fullName}</figcaption></figure>
     </div>
     <div className="hero-text">
      <p className="eyebrow">MỘT CHẶNG ĐƯỜNG · MỘT KHỞI ĐẦU MỚI</p>
@@ -191,7 +192,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    </section>
    <a href="#response" className="quick-rsvp"><Heart size={16}/> Gửi lời hồi đáp</a>
    {sections.filter(s=>!['opening','hero'].includes(s.type)).map(s=><section key={s.id} className={'invite-section section-'+s.type} id={s.type==='invitation'?'invitation-event':s.type==='map'?'location':s.type}><p className="eyebrow section-number">{String(s.order+1).padStart(2,'0')} / {s.type==='closing'?closingLabel:sectionLabel[s.type]}</p>{renderSection(s)}</section>)}
-   <InvitationFooter content={c} year={year} mapImage={media(c.ceremony.mapImageAssetId)}/>
+   <InvitationFooter content={c} year={year} mapImage={picture(c.ceremony.mapImageAssetId,c.ceremony.mapImage)}/>
   </>}
  </main>;
  function renderSection(s:Section){switch(s.type){
@@ -219,7 +220,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    const title=s.data.title.trim();
    return <>
     <h2><FittedLine text={!title||title.toLocaleLowerCase('vi')==='chúng mình gặp nhau ở đây'?'Nơi ta gặp nhau':title}/></h2>
-    <MapView location={location} image={media(location.mapImageAssetId)}/>
+    <MapView location={location} image={picture(location.mapImageAssetId,location.mapImage)}/>
     {location.entranceNote&&<p className="invite-prose">{location.entranceNote}</p>}
     {notes.length>0&&<aside className="invitation-notes" aria-label="Lưu ý khi đến dự lễ">
      <p className="eyebrow">THÔNG TIN CẦN BIẾT</p>
