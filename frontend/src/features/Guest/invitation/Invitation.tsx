@@ -74,11 +74,15 @@ function GuestData({token}:{token:string}) {
   }
   return <><ErrorBox error={query.error}/><Invitation view={query.data!} token={token} save={save}/></>;
 }
-function EnvelopeName({name,salutation=''}:{name:string;salutation?:string}) {
+function recipientNameParts(name:string,salutation='') {
  const title=salutation.normalize('NFC').replace(/\s+/gu,' ').trim();
  const fullName=name.normalize('NFC').replace(/\s+/gu,' ').trim();
  const recipient=title&&fullName.toLocaleLowerCase('vi').startsWith(title.toLocaleLowerCase('vi')+' ')?fullName.slice(title.length+1):fullName;
- const showTitle=!!title&&recipient.toLocaleLowerCase('vi')!=='ánh tuyết'&&recipient.toLocaleLowerCase('vi')!==title.toLocaleLowerCase('vi');
+ return {name:recipient,salutation:recipient.toLocaleLowerCase('vi')===title.toLocaleLowerCase('vi')?'':title};
+}
+function EnvelopeName({name,salutation=''}:{name:string;salutation?:string}) {
+ const {name:recipient,salutation:title}=recipientNameParts(name,salutation);
+ const showTitle=!!title&&recipient.toLocaleLowerCase('vi')!=='ánh tuyết';
  const displayName=showTitle?`${title} ${recipient}`:recipient;
  const heading=useRef<HTMLHeadingElement>(null);
  const text=useRef<HTMLSpanElement>(null);
@@ -346,6 +350,8 @@ function FamilyResponseForms({credential,intro,onChange}:{credential:string;intr
  </>;
 }
 function FeedbackForm({view,token,save,intro}:{view:InvitationView;token?:string;save?:ReturnType<typeof useGuestData>['save'];intro:string}) {
+ const {name,salutation}=recipientNameParts(view.guest.recipientName||view.guest.displayName||view.guest.fullName||'Bạn',view.guest.salutation);
+ const responseName=view.responderName||(salutation?`${salutation} ${name}`:name);
  const response=view.content.sections.find(section=>section.type==='response');
  const wish=view.wish?.deletedAt?null:view.wish;
  const [status,setStatus]=useState<'ATTENDING'|'DECLINED'|''>(view.rsvp?.status??'');
@@ -405,7 +411,7 @@ function FeedbackForm({view,token,save,intro}:{view:InvitationView;token?:string
    setError(e);
   }finally{setBusy(false);}
  }}>
-  <p className="response-recipient">{view.responderName?'Người phản hồi':'Khách mời'}<strong>{view.responderName||view.guest.recipientName||view.guest.displayName||view.guest.fullName||'Bạn'}</strong></p>
+  <p className="response-recipient">{view.responderName?'Người phản hồi':'Khách mời'}<strong>{responseName}</strong></p>
   <fieldset disabled={!canRsvp||busy}>
    <legend>Xác nhận tham dự</legend>
    <div className="radio-cards"><label><input type="radio" name="rsvp" checked={status==='ATTENDING'} onChange={()=>setStatus('ATTENDING')}/><Check size={20}/> Mình sẽ đến</label><label><input type="radio" name="rsvp" checked={status==='DECLINED'} onChange={()=>setStatus('DECLINED')}/><Heart size={20}/> Hẹn một dịp khác</label></div>

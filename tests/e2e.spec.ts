@@ -119,7 +119,7 @@ test('admin edits a guest letter and previews it on the existing link',async({pa
   await expect(guestPage.locator('.envelope-message, .envelope-cover, .envelope-year')).toHaveCount(0);
   await guestPage.getByRole('button',{name:'Mở thiệp',exact:true}).click();
   await expect(guestPage.locator('.invitation-letter .invite-prose')).toHaveText('Hẹn gặp bạn ở lễ tốt nghiệp.');
-  await expect(guestPage.locator('.response-recipient strong')).toHaveText(name);
+  await expect(guestPage.locator('.response-recipient strong')).toHaveText(displayName);
  }finally{
   await guestPage.close();
   await page.request.delete(`/api/v1/admin/guests/${row.id}`,{headers,data:{expectedVersion:row.version}});
@@ -191,17 +191,20 @@ test('blue invitation preview renders both new Vietnamese fonts',async({page},te
  }
 });
 
-test('envelope includes the guest salutation except for Ánh Tuyết',async({page})=>{
+test('guest salutations appear on the envelope and response with the Ánh Tuyết cover exception',async({page})=>{
  const content=demoContent(null);
  const errors:string[]=[];
  page.on('pageerror',error=>errors.push(error.message));
  let guest:any;
- await page.route('**/api/v1/guest/invitation',route=>route.fulfill({json:{data:{content,media:{},guest,wallEnabled:false}}}));
- for(const [name,salutation,expected] of [
+ let responderName:string|undefined;
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.route('**/api/v1/guest/invitation',route=>route.fulfill({json:{data:{content,media:{},guest,responderName,wallEnabled:false}}}));
+ await page.route('**/api/v1/guest/opened',route=>route.fulfill({json:{data:{}}}));
+ for(const [name,salutation,expected,responseName=expected] of [
   ['Quang Minh','Anh','Anh Quang Minh'],
   ['Chị hai Bích Trâm','Chị hai','Chị hai Bích Trâm'],
-  ['Em yêu Ánh Tuyết','Em yêu','Ánh Tuyết'],
-  ['Ánh Tuyết','Em yêu','Ánh Tuyết'],
+  ['Em yêu Ánh Tuyết','Em yêu','Ánh Tuyết','Em yêu Ánh Tuyết'],
+  ['Ánh Tuyết','Em yêu','Ánh Tuyết','Em yêu Ánh Tuyết'],
   ['Minh Anh','Em yêu','Em yêu Minh Anh'],
   ['Đại gia đình thương yêu','','Đại gia đình thương yêu'],
   ['Thím iu','Thím iu','Thím iu'],
@@ -219,7 +222,16 @@ test('envelope includes the guest salutation except for Ánh Tuyết',async({pag
   }
   if(expected==='Anh Quang Minh')await expect(heading.locator('.envelope-salutation')).toHaveCSS('font-family',/^"?Times New Roman"?, serif$/);
   if(expected==='Ánh Tuyết')await expect(heading.locator('.envelope-salutation')).toHaveCount(0);
+  await page.setViewportSize({width:390,height:850});
+  await page.getByRole('button',{name:'Mở thiệp',exact:true}).click();
+  await expect(page.locator('.response-recipient strong')).toHaveText(responseName);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  }
+ responderName='Mẹ';
+ guest={recipientName:'Đại gia đình thương yêu',salutation:''};
+ await page.goto('/i/'+'x'.repeat(43));
+ await page.getByRole('button',{name:'Mở thiệp',exact:true}).click();
+ await expect(page.locator('.response-recipient strong')).toHaveText('Mẹ');
  expect(errors).toEqual([]);
 });
 
