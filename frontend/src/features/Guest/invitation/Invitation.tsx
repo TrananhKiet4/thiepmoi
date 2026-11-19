@@ -327,7 +327,7 @@ function FamilyReply({view,token,intro}:{view:InvitationView;token?:string;intro
     try{sessionStorage.removeItem(pendingKey);}catch{}
    }catch(error){setError(error);}finally{setBusy(false);}
   }}>
-   <Field label="Quan hệ với Kiệt"><input value={name} onChange={e=>setName(e.target.value)} maxLength={120} autoComplete="off" required disabled={!canRegister||busy} placeholder="Ví dụ: Ba, Mẹ, Em trai…"/></Field>
+   <Field label="Quan hệ với Kiệt"><input value={name} onChange={e=>setName(e.target.value)} maxLength={120} autoComplete="off" required disabled={!canRegister||busy}/></Field>
    <button type="submit" className="button" disabled={!canRegister||busy||!name.trim()}>{busy?'Đang chuẩn bị…':'Tiếp tục'}</button>
    {!view.preview&&!canRegister&&<p className="muted">Hiện đã ngừng nhận phản hồi mới.</p>}
    <ErrorBox error={error}/>
