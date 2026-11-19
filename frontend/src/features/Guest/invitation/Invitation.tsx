@@ -102,7 +102,7 @@ function EnvelopeName({name,salutation=''}:{name:string;salutation?:string}) {
   void document.fonts.load('400 1em "Fz Alpha Brights"',displayName).then(fit,fit);
   return()=>{active=false;observer.disconnect();cancelAnimationFrame(resizeFrame);};
  },[displayName]);
- return <h1 ref={heading}><span ref={text}>{showTitle&&<span className="envelope-salutation">{title} </span>}{recipient}</span></h1>;
+ return <h1 ref={heading}><span ref={text}>{showTitle&&<><span className="envelope-salutation">{title}</span>{' '}</>}{recipient}</span></h1>;
 }
 export function Invitation({view,token,save}: {view:InvitationView;token?:string;save?:ReturnType<typeof useGuestData>['save']}) {
  const [phase,setPhase]=useState<'closed'|'opening'|'opened'>('closed');

@@ -209,7 +209,7 @@ test('envelope includes the guest salutation except for Ánh Tuyết',async({pag
   guest={displayName:name,salutation};
   await page.goto('/i/'+'x'.repeat(43));
   const heading=page.locator('.envelope-letter h1');
-  await expect(heading).toHaveText(expected);
+  await expect(heading).toHaveJSProperty('innerText',expected);
   for(const width of [320,390,768,1440]){
    await page.setViewportSize({width,height:900});
    await expect.poll(()=>heading.evaluate(element=>{
