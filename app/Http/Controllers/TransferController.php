@@ -445,6 +445,9 @@ final class TransferController
                 $guestChanges[$key] = $value;
             }
         }
+        if (!$invitation->familyParentId && !$invitation->allowMultipleResponses && AdminInvitations::sharedRecipientType($values['fullName'] ?? $guest->fullName) !== null) {
+            $invitationChanges['allowMultipleResponses'] = true;
+        }
 
         return [$guestChanges, $invitationChanges];
     }
@@ -461,6 +464,7 @@ final class TransferController
         DB::table('Guest')->insert($values + ['id' => $guestId, 'eventId' => $eventId, 'updatedAt' => $now]);
         DB::table('Invitation')->insert($encrypted + [
             'id' => $invitationId, 'eventId' => $eventId, 'guestId' => $guestId, 'personalMessage' => $personalMessage, 'updatedAt' => $now,
+            'allowMultipleResponses' => AdminInvitations::sharedRecipientType($values['fullName']) !== null,
         ]);
     }
 

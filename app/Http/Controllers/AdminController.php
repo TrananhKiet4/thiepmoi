@@ -242,6 +242,7 @@ final class AdminController
             DB::table('Guest')->insert($data + ['id' => $guestId, 'eventId' => $id, 'guestCode' => 'G-'.strtoupper($guestId), 'updatedAt' => $now]);
             DB::table('Invitation')->insert($this->tokenFields($invitationId) + [
                 'id' => $invitationId, 'eventId' => $id, 'guestId' => $guestId, 'personalMessage' => $personalMessage, 'updatedAt' => $now,
+                'allowMultipleResponses' => AdminInvitations::sharedRecipientType($data['fullName']) !== null,
             ]);
             Api::audit($request, 'GUEST_CREATED', $id, 'Guest', $guestId);
 
@@ -270,8 +271,15 @@ final class AdminController
             if ($data !== array_replace($data, array_intersect_key((array) $guest, $data))) {
                 $this->update('Guest', $id, $guestVersion, $data);
             }
+            $invitationData = [];
             if ($invitation->personalMessage !== $personalMessage) {
-                $this->update('Invitation', $invitation->id, $invitationVersion, ['personalMessage' => $personalMessage]);
+                $invitationData['personalMessage'] = $personalMessage;
+            }
+            if (!$invitation->familyParentId && !$invitation->allowMultipleResponses && AdminInvitations::sharedRecipientType($data['fullName']) !== null) {
+                $invitationData['allowMultipleResponses'] = true;
+            }
+            if ($invitationData) {
+                $this->update('Invitation', $invitation->id, $invitationVersion, $invitationData);
             }
             Api::audit($request, 'GUEST_UPDATED', $eventId, 'Guest', $id);
 
@@ -342,7 +350,7 @@ final class AdminController
             Api::lockEvent($eventId);
             $invitation = $this->owned($request, 'Invitation', $id);
             if ($invitation->familyParentId) {
-                Api::fail(422, 'FAMILY_RESPONDER', 'Sửa nội dung tại thiệp gia đình');
+                Api::fail(422, 'FAMILY_RESPONDER', 'Sửa nội dung tại thiệp chung');
             }
             $this->checkVersion($invitation->version, $expected);
             if ($data === array_replace($data, array_intersect_key((array) $invitation, $data))) {

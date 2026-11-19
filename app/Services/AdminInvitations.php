@@ -81,6 +81,15 @@ final class AdminInvitations
         return $value;
     }
 
+    public static function sharedRecipientType(string $name): ?string
+    {
+        return match (self::normalizeGroupKey($name)) {
+            'dai_gia_dinh_thuong_yeu' => 'family',
+            'animal_solutions', 'weset_iu_dau' => 'group',
+            default => null,
+        };
+    }
+
     public static function normalizeGroupKey(string $value): string
     {
         $value = Normalizer::normalize($value, Normalizer::FORM_D);

@@ -65,6 +65,18 @@ foreach ([
 }
 assert(InvitationViews::shareMessage((object) ['displayName' => '', 'fullName' => 'Minh Trường', 'salutation' => 'Anh'], $shareUrl)
     === "Sắp tới là một ngày quan trọng của em, em mong anh sắp xếp tới tham dự và chụp với em 1 tấm ảnh kỷ niệm nha.\nThiệp mời: $shareUrl");
+foreach (['Animal Solutions', 'Weset iu dấu'] as $name) {
+    $groupGuest = (object) ['fullName' => $name, 'displayName' => '', 'salutation' => '', 'groupKey' => 'team'];
+    $groupView = InvitationViews::build($event, $templates, $groupGuest, preview: true);
+    assert($groupView['guest']['recipientAddress'] === 'mọi người');
+    assert($groupView['guest']['recipientGreeting'] === 'Thân gửi');
+    assert($groupView['personalMessage'] === "Thân mời $name. Mình mong gặp mọi người.");
+    assert($groupView['content']['sections'][1]['data']['message'] === 'Mời mọi người chụp ảnh cùng mình.');
+    assert($groupView['content']['sections'][2]['data']['title'] === 'Mọi người sẽ đến chứ?');
+    assert(InvitationViews::shareMessage($groupGuest, $shareUrl) === "Sắp tới là một ngày quan trọng của mình, mình mong mọi người sắp xếp tới tham dự và chụp với mình 1 tấm ảnh kỷ niệm nha.\nThiệp mời: $shareUrl");
+}
+assert(App\Services\AdminInvitations::sharedRecipientType(' WESET IU DẤU ') === 'group');
+assert(App\Services\AdminInvitations::sharedRecipientType('Em Quốc Duy') === null);
 $calendar = InvitationViews::calendar('fixture', $content);
 assert(str_contains($calendar, "DTSTART:20261110T010000Z\r\n"));
 assert(str_contains(str_replace("\r\n ", '', $calendar), 'A\\, B'));

@@ -314,6 +314,50 @@ test('feedback thanks the guest and immediately shows their saved wish',async({p
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
+test('shared group cards ask for responder names while family asks for a relationship',async({page})=>{
+ const content=demoContent(null),members=new Map<string,{name:string;rsvp:any}>();
+ let parentName='',parentToken='',kind:'group'|'family'='group',registrations=0;
+ const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.route('**/api/v1/guest/invitation',route=>{
+  const token=route.request().headers().authorization?.slice(7)??'';
+  const member=members.get(token);
+  return route.fulfill({json:{data:{content,media:{},guest:{displayName:parentName,recipientName:parentName,salutation:''},wallEnabled:false,rsvp:member?.rsvp??null,wish:null,canRsvp:!!member,canCreateOrEditWish:!!member,...(member?{responderName:member.name}:{familyReply:{canRegister:true,...(kind==='group'?{kind:'group'}:{})}})}}});
+ });
+ await page.route('**/api/v1/guest/opened',route=>route.fulfill({json:{data:{}}}));
+ await page.route('**/api/v1/guest/family-responders',route=>{
+  registrations++;
+  expect(route.request().headers().authorization).toBe('Bearer '+parentToken);
+  expect(route.request().headers()['idempotency-key']).toBeTruthy();
+  const token='r'.repeat(42)+registrations;
+  members.set(token,{name:route.request().postDataJSON().name,rsvp:null});
+  return route.fulfill({status:201,json:{data:{token}}});
+ });
+ await page.route('**/api/v1/guest/rsvp',route=>{
+  const token=route.request().headers().authorization?.slice(7)??'',member=members.get(token);expect(member).toBeTruthy();
+  member!.rsvp={...route.request().postDataJSON(),version:1};
+  return route.fulfill({json:{data:member!.rsvp}});
+ });
+ for(const [index,name] of ['Animal Solutions','Weset iu dấu','Đại gia đình thương yêu'].entries()){
+  parentName=name;kind=index===2?'family':'group';parentToken='p'.repeat(42)+index;
+  await page.goto('/i/'+parentToken);await page.getByRole('button',{name:'Mở thiệp',exact:true}).click();
+  const field=page.getByLabel(kind==='group'?'Người phản hồi':'Quan hệ với Kiệt',{exact:true});await expect(field).toBeVisible();
+  if(kind==='group'){
+   await expect(field).toHaveAttribute('placeholder','Nhập tên của bạn');
+   await expect(field).toHaveAttribute('autocomplete','name');
+  }else expect(await field.getAttribute('placeholder')).toBeNull();
+  for(const width of [320,390,768,1440]){
+   await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+  const responder=index===2?'Em trai':'Người phản hồi '+index;
+  await field.fill(responder);await page.getByRole('button',{name:'Tiếp tục',exact:true}).click();
+  await expect(page.locator('.response-recipient strong')).toHaveText(responder);
+  await page.getByRole('radio',{name:'Mình sẽ đến',exact:true}).check();await page.getByRole('button',{name:'Gửi lời hồi đáp',exact:true}).click();
+  await expect(page.locator('.feedback-form').getByRole('status')).toContainText('Cảm ơn');
+ }
+ expect(registrations).toBe(3);expect(errors).toEqual([]);
+});
+
 test('mobile invitation balances headings and plays music on open',async({page},testInfo)=>{
  const content=demoContent(null);
  content.host.fullName='Nguyễn Minh Anh';

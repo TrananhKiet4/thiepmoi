@@ -302,6 +302,7 @@ function FamilyReply({view,token,intro}:{view:InvitationView;token?:string;intro
  const [name,setName]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null);
  const operation=useRef<{name:string;key:string}|null>(null);
  const canRegister=!!token&&view.familyReply?.canRegister===true;
+ const groupReply=view.familyReply?.kind==='group';
  function selectResponder(value:string){
   try{if(value)sessionStorage.setItem(storageKey,value);else sessionStorage.removeItem(storageKey);}catch{}
   setCredential(value);
@@ -329,7 +330,7 @@ function FamilyReply({view,token,intro}:{view:InvitationView;token?:string;intro
     try{sessionStorage.removeItem(pendingKey);}catch{}
    }catch(error){setError(error);}finally{setBusy(false);}
   }}>
-   <Field label="Quan hệ với Kiệt"><input value={name} onChange={e=>setName(e.target.value)} maxLength={120} autoComplete="off" required disabled={!canRegister||busy}/></Field>
+   <Field label={groupReply?'Người phản hồi':'Quan hệ với Kiệt'}><input value={name} onChange={e=>setName(e.target.value)} maxLength={120} autoComplete={groupReply?'name':'off'} placeholder={groupReply?'Nhập tên của bạn':undefined} required disabled={!canRegister||busy}/></Field>
    <button type="submit" className="button" disabled={!canRegister||busy||!name.trim()}>{busy?'Đang chuẩn bị…':'Tiếp tục'}</button>
    {!view.preview&&!canRegister&&<p className="muted">Hiện đã ngừng nhận phản hồi mới.</p>}
    <ErrorBox error={error}/>

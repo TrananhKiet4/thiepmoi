@@ -32,7 +32,7 @@ final class WishImages
     {
         $invitation = Api::active($request);
         if ($invitation->allowMultipleResponses) {
-            Api::fail(422, 'RESPONDER_REQUIRED', 'Vui lòng nhập quan hệ với Kiệt trước khi gửi ảnh');
+            Api::fail(422, 'RESPONDER_REQUIRED', 'Vui lòng nhập thông tin người phản hồi trước khi gửi ảnh');
         }
         $event = DB::table('Event')->where('id', $invitation->eventId)->first();
         $content = json_decode(DB::table('EventRevision')->where('id', $event->publishedRevisionId)->value('contentJson'), true, flags: JSON_THROW_ON_ERROR);

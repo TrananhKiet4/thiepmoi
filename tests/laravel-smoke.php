@@ -150,7 +150,7 @@ try {
     $family = $create('FAMILY', 'Đại gia đình thương yêu');
     check($family['guestCode'] === 'FAMILY', 'Explicit codes still work for existing callers');
     $familyInvitation = DB::table('Invitation')->where('guestId', $family['id'])->first();
-    DB::table('Invitation')->where('id', $familyInvitation->id)->update(['allowMultipleResponses' => true]);
+    check((bool) $familyInvitation->allowMultipleResponses, 'Family invitation is shared on creation');
     $familyToken = InvitationTokens::decrypt($familyInvitation->id, $familyInvitation->tokenCiphertext, $familyInvitation->keyVersion);
     DB::table('Guest')->where('id', $family['id'])->update(['groupKey' => 'gia_dinh']);
     $familyLink = $call('GET', '/api/v1/admin/invitations/'.$familyInvitation->id.'/link');
@@ -163,6 +163,33 @@ try {
         $wall = $call('GET', '/api/v1/guest/wishes', token: $responder['token']);
         check(count($wall['items']) === 1 && $wall['items'][0]['body'] === 'Chúc mừng tốt nghiệp 🎓', 'Public wish visible to another guest');
     }
+    foreach (['Animal Solutions', 'Weset iu dấu'] as $groupIndex => $groupName) {
+        $team = $create('TEAM'.$groupIndex, $groupName);
+        $teamInvitation = DB::table('Invitation')->where('guestId', $team['id'])->first();
+        check((bool) $teamInvitation->allowMultipleResponses, 'Group invitation is shared on creation');
+        $teamToken = InvitationTokens::decrypt($teamInvitation->id, $teamInvitation->tokenCiphertext, $teamInvitation->keyVersion);
+        $teamView = $call('GET', '/api/v1/guest/invitation', token: $teamToken);
+        check($teamView['familyReply']['kind'] === 'group' && $teamView['guest']['recipientAddress'] === 'mọi người', 'Shared group form and addressing');
+        check(!$teamView['canRsvp'] && !$teamView['canCreateOrEditWish'], 'Shared link requires each responder to register');
+        $call('PUT', '/api/v1/guest/rsvp', $rsvpBody, $teamToken, ['HTTP_IDEMPOTENCY_KEY' => 'team-no-name-'.$groupIndex], 422);
+        $members = [];
+        foreach (['Thành viên A', 'Thành viên B'] as $index => $name) {
+            $member = $call('POST', '/api/v1/guest/family-responders', ['name' => $name], $teamToken, ['HTTP_IDEMPOTENCY_KEY' => 'team-'.$groupIndex.'-'.$index], 201);
+            $members[] = $member['token'];
+            $call('PUT', '/api/v1/guest/rsvp', ['status' => $index ? 'DECLINED' : 'ATTENDING', 'expectedVersion' => 0], $member['token'], ['HTTP_IDEMPOTENCY_KEY' => 'team-rsvp-'.$groupIndex.'-'.$index]);
+            $call('PUT', '/api/v1/guest/wish', ['body' => 'Lời chúc riêng '.$name, 'consentPublic' => false, 'expectedVersion' => 0], $member['token'], ['HTTP_IDEMPOTENCY_KEY' => 'team-wish-'.$groupIndex.'-'.$index]);
+        }
+        foreach ($members as $index => $memberToken) {
+            $memberView = $call('GET', '/api/v1/guest/invitation', token: $memberToken);
+            check($memberView['rsvp']['status'] === ($index ? 'DECLINED' : 'ATTENDING'), 'Group RSVPs remain independent');
+            check($memberView['wish']['body'] === 'Lời chúc riêng Thành viên '.($index ? 'B' : 'A'), 'Group wishes remain independent');
+            check($memberView['guest']['displayName'] === $groupName && !isset($memberView['familyReply']), 'Responder keeps group invitation with individual form');
+        }
+        DB::table('Invitation')->where('id', $teamInvitation->id)->update(['allowMultipleResponses' => false]);
+        $patched = $call('PATCH', '/api/v1/admin/guests/'.$team['id'], ['guestCode' => $team['guestCode'], 'fullName' => $groupName, 'expectedVersion' => $team['version'], 'expectedInvitationVersion' => $teamInvitation->version]);
+        check((bool) DB::table('Invitation')->where('id', $teamInvitation->id)->value('allowMultipleResponses'), 'Editing a legacy group enables its shared mode');
+        check(DB::table('Invitation')->where('familyParentId', $teamInvitation->id)->count() === 2, 'Enabling a group keeps existing responders');
+    }
     $call('GET', '/api/v1/admin/events/'.$eventId.'/dashboard');
     $call('GET', '/api/v1/admin/events/'.$eventId.'/guests');
     $call('GET', '/api/v1/admin/events/'.$eventId.'/wishes');
@@ -172,15 +199,26 @@ try {
     $uploadFile = tempnam(sys_get_temp_dir(), 'laravel-test-import-');
     try {
         file_put_contents($uploadFile, $book);
+        $sharedBook = PhpOffice\PhpSpreadsheet\IOFactory::load($uploadFile);
+        $sharedBook->getSheet(0)->fromArray(['SHARED_XLSX', 'Animal Solutions', 'Animal Solutions', 'animal_solutions', '', '', '', ''], null, 'A3');
+        (new PhpOffice\PhpSpreadsheet\Writer\Xlsx($sharedBook))->save($uploadFile);
+        $sharedBook->disconnectWorksheets();
         $upload = fn () => ['file' => new Illuminate\Http\UploadedFile($uploadFile, 'guests.xlsx', test: true)];
         $inspection = $call('POST', '/api/v1/admin/events/'.$eventId.'/imports/inspect', files: $upload());
         $sheet = $inspection['sheets'][0]['name'];
         $mapping = array_combine(array_keys(App\Services\ExcelTransfers::COLUMNS), array_keys(App\Services\ExcelTransfers::COLUMNS));
         $preview = $call('POST', '/api/v1/admin/events/'.$eventId.'/imports/preview', ['sheet' => $sheet, 'mapping' => json_encode($mapping)], expected: 201, files: $upload());
-        check($preview['summary']['created'] === 1 && $preview['summary']['errors'] === 0, 'XLSX import preview');
+        check($preview['summary']['created'] === 2 && $preview['summary']['errors'] === 0, 'XLSX import preview');
         $committed = $call('POST', '/api/v1/admin/imports/'.$preview['id'].'/commit', [], extra: ['HTTP_IDEMPOTENCY_KEY' => 'import-one']);
-        check($committed['created'] === 1, 'XLSX import commit');
+        check($committed['created'] === 2, 'XLSX import commit');
+        $importedTeam = DB::table('Guest')->where('eventId', $eventId)->where('guestCode', 'SHARED_XLSX')->first();
+        check((bool) DB::table('Invitation')->where('guestId', $importedTeam->id)->value('allowMultipleResponses'), 'Imported group invitations are shared');
         check($call('POST', '/api/v1/admin/imports/'.$preview['id'].'/commit', [], extra: ['HTTP_IDEMPOTENCY_KEY' => 'import-one']) === $committed, 'Import replay does not duplicate guests');
+        DB::table('Invitation')->where('guestId', $importedTeam->id)->update(['allowMultipleResponses' => false]);
+        $sharedPreview = $call('POST', '/api/v1/admin/events/'.$eventId.'/imports/preview', ['sheet' => $sheet, 'mapping' => json_encode($mapping)], expected: 201, files: $upload());
+        check($sharedPreview['summary']['updated'] === 1, 'Import detects a legacy group requiring shared responses');
+        $sharedCommit = $call('POST', '/api/v1/admin/imports/'.$sharedPreview['id'].'/commit', [], extra: ['HTTP_IDEMPOTENCY_KEY' => 'import-shared-update']);
+        check($sharedCommit['updated'] === 1 && (bool) DB::table('Invitation')->where('guestId', $importedTeam->id)->value('allowMultipleResponses'), 'Import updates preserve shared group behavior');
         $call('GET', '/api/v1/admin/events/'.$eventId.'/exports/links');
         $call('GET', '/api/v1/admin/events/'.$eventId.'/exports/responses');
     } finally {

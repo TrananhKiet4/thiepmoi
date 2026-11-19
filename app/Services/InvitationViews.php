@@ -203,7 +203,7 @@ final class InvitationViews
             'canRsvp' => !$shared && $canRsvp, 'canCreateOrEditWish' => !$shared && $canWish,
             'canWithdrawWish' => !$preview && $wish !== null && $wish->deletedAt === null,
             'eventId' => $event->id, 'wallEnabled' => (bool) $event->wallEnabled,
-            ...($shared ? ['familyReply' => ['canRegister' => $canRsvp || $canWish]] : []),
+            ...($shared ? ['familyReply' => ['canRegister' => $canRsvp || $canWish, 'kind' => AdminInvitations::sharedRecipientType($guest->fullName ?? '') === 'group' ? 'group' : 'family']] : []),
             ...($responderName !== null && $responderName !== '' ? ['responderName' => $responderName] : []),
             ...($preview ? ['preview' => true] : []),
             ...($preview && $event->wallEnabled ? ['previewWishes' => self::publicWishes($event->id, 6, exclude: $invitation?->id)['items']] : []),
@@ -250,7 +250,9 @@ final class InvitationViews
     private static function recipient(?object $guest): array
     {
         $displayName = self::displayName($guest) ?? 'Khách xem trước';
-        $family = ($guest->groupKey ?? '') === 'gia_dinh';
+        $sharedType = AdminInvitations::sharedRecipientType($guest->fullName ?? $displayName);
+        $group = $sharedType === 'group';
+        $family = ($guest->groupKey ?? '') === 'gia_dinh' || $sharedType === 'family';
         $salutation = mb_strtolower(self::normalizeSpace($guest->salutation ?? ''));
         $normalizedName = self::normalizeSpace($displayName);
         $recipientName = $salutation !== '' && str_starts_with(mb_strtolower($normalizedName), $salutation.' ')
@@ -258,12 +260,12 @@ final class InvitationViews
         $aunt = preg_match('/^thím(?:\s|$)/iu', $salutation !== '' ? $salutation : $displayName);
         $senior = preg_match('/^(anh|chị)(?:\s|$)/u', $salutation);
         $junior = preg_match('/^em(?:\s|$)/u', $salutation);
-        $address = $salutation !== '' ? $salutation : ($family ? 'đại gia đình' : ($aunt ? $displayName : 'bạn'));
+        $address = $group ? 'mọi người' : ($salutation !== '' ? $salutation : ($family ? 'đại gia đình' : ($aunt ? $displayName : 'bạn')));
         $recipientAddress = $address === 'đại gia đình' ? 'cả nhà' : $address;
         $headingAddress = preg_replace('/^(anh|chị) hai$/u', '$1', $recipientAddress);
-        $greeting = $family ? 'Thương gửi' : (preg_match('/^(bạn|em)(?:\s|$)/u', $salutation) ? 'Thân gửi' : 'Kính gửi');
-        $invite = $family ? 'Thương mời' : ($senior || $aunt ? 'Kính mời' : 'Thân mời');
-        $speaker = $salutation === 'em yêu' ? 'anh' : ($family || $aunt ? 'con' : ($senior ? 'em' : ($junior ? 'anh' : 'mình')));
+        $greeting = $group ? 'Thân gửi' : ($family ? 'Thương gửi' : (preg_match('/^(bạn|em)(?:\s|$)/u', $salutation) ? 'Thân gửi' : 'Kính gửi'));
+        $invite = $group ? 'Thân mời' : ($family ? 'Thương mời' : ($senior || $aunt ? 'Kính mời' : 'Thân mời'));
+        $speaker = $group ? 'mình' : ($salutation === 'em yêu' ? 'anh' : ($family || $aunt ? 'con' : ($senior ? 'em' : ($junior ? 'anh' : 'mình'))));
 
         return compact('displayName', 'salutation', 'recipientName', 'address', 'recipientAddress', 'headingAddress', 'greeting', 'invite', 'speaker');
     }
