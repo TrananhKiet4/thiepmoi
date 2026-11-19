@@ -460,8 +460,8 @@ function Wall({token,previewItems}:{token?:string;previewItems?:PublicWish[]}) {
   <h3>Lưu bút & lời chúc</h3>
   <div className="wish-strip" role="region" tabIndex={0} aria-label="Lời chúc của khách mời">
    {publicWishes.map(w=><blockquote className="wish-card" key={w.id}>
-    {w.image&&<a className="wish-photo" href={w.image.url} target="_blank" rel="noopener noreferrer" aria-label={`Xem ảnh trong lời chúc của ${w.displayName}`}><img src={w.image.url} alt={`Ảnh kèm lời chúc của ${w.displayName}`} loading="lazy"/></a>}
     <p>{w.body}</p>
+    {w.image&&<a className="wish-photo" href={w.image.url} target="_blank" rel="noopener noreferrer" aria-label={`Xem ảnh trong lời chúc của ${w.displayName}`}><img src={w.image.url} alt={`Ảnh kèm lời chúc của ${w.displayName}`} loading="lazy"/></a>}
     {w.isPinned&&<span className="small muted wish-pin">Lời chúc được ghim</span>}
     <footer>
      {w.attendanceStatus&&<span className="wish-attendance" data-status={w.attendanceStatus}>{statusName[w.attendanceStatus]}</span>}
