@@ -49,6 +49,7 @@ function useGuestData(token:string){
     const operation=previous?.body===serialized?previous:{body:serialized,key:crypto.randomUUID()};operations.current.set(scope,operation);controllers.current.add(c);
     try{const result=await request(path,{method,body:serialized,signal:c.signal,headers:{'Idempotency-Key':operation.key}},token);operations.current.delete(scope);
       if(method==='PUT'&&(path==='/guest/rsvp'||path==='/guest/wish'))cache.setQueryData(['invitation',token],(old:InvitationView|undefined)=>old?{...old,[path.endsWith('rsvp')?'rsvp':'wish']:result}:old);
+      void cache.invalidateQueries({queryKey:['wall',token]});
       await refetchResponse(kind);return result;
     }catch(error){
       if(error instanceof ApiError&&[401,404].includes(error.status)){setBlocked(error);cache.removeQueries({queryKey:['invitation',token]});controllers.current.forEach(controller=>controller.abort());}
@@ -282,8 +283,15 @@ function MapView({location,image}:{location:Content['ceremony'];image?:MediaView
   </div>
  </div>;
 }
+function responseRecipient(view:InvitationView){
+ const {name,salutation}=recipientNameParts(view.guest.recipientName||view.guest.displayName||view.guest.fullName||'Bạn',view.guest.salutation);
+ return view.responderName||(salutation?`${salutation} ${name}`:name);
+}
+type VisibleWish=Omit<PublicWish,'approvedAt'>&{private?:boolean};
 function FeedbackForms({view,token,save,intro}:{view:InvitationView;token?:string;save?:ReturnType<typeof useGuestData>['save'];intro:string}){
- return <><FeedbackForm view={view} token={token} save={save} intro={intro}/>{(token&&view.wallEnabled!==false||view.previewWishes!==undefined)&&<Wall key={token} token={token} previewItems={view.previewWishes}/>}</>;
+ const wish=view.wish?.deletedAt?null:view.wish;
+ const ownWish:VisibleWish|null=wish?{id:wish.id,displayName:responseRecipient(view),body:wish.body,image:wish.image,isPinned:!!wish.isPinned,attendanceStatus:wish.consentPublic&&wish.consentAttendancePublic?view.rsvp?.status??null:null,private:!wish.consentPublic||wish.moderationStatus!=='APPROVED'||view.wallEnabled===false}:null;
+ return <><FeedbackForm view={view} token={token} save={save} intro={intro}/>{(ownWish||token&&view.wallEnabled!==false||view.previewWishes!==undefined)&&<Wall key={token} token={token} previewItems={view.previewWishes} ownWish={ownWish} publicEnabled={view.wallEnabled!==false}/>}</>;
 }
 function FamilyReply({view,token,intro}:{view:InvitationView;token?:string;intro:string}){
  const storageKey=`graduation.family.${token}`;
@@ -344,16 +352,21 @@ function FamilyResponseForms({credential,intro,onChange}:{credential:string;intr
  </>;
 }
 function FeedbackForm({view,token,save,intro}:{view:InvitationView;token?:string;save?:ReturnType<typeof useGuestData>['save'];intro:string}) {
- const {name,salutation}=recipientNameParts(view.guest.recipientName||view.guest.displayName||view.guest.fullName||'Bạn',view.guest.salutation);
- const responseName=view.responderName||(salutation?`${salutation} ${name}`:name);
+ const responseName=responseRecipient(view);
  const response=view.content.sections.find(section=>section.type==='response');
  const wish=view.wish?.deletedAt?null:view.wish;
  const [status,setStatus]=useState<'ATTENDING'|'DECLINED'|''>(view.rsvp?.status??'');
  const [body,setBody]=useState(wish?.body??'');
  const [image,setImage]=useState<WishImage|null>(wish?.image??null),[uploading,setUploading]=useState(false);
- const [consent,setConsent]=useState(!!wish?.consentPublic);
+ const [consent,setConsent]=useState(wish?!!wish.consentPublic:true);
  const [attendanceConsent,setAttendanceConsent]=useState(!!wish?.consentAttendancePublic);
  const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[done,setDone]=useState('');
+ const notice=useRef<HTMLParagraphElement>(null);
+ useEffect(()=>{
+  if(!done||error)return;
+  notice.current?.focus({preventScroll:true});
+  notice.current?.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+ },[done,error]);
  const canRsvp=!!save&&!view.preview&&view.canRsvp;
  const canWish=!!save&&!view.preview&&view.canCreateOrEditWish;
  const message=body.trim();
@@ -408,7 +421,7 @@ function FeedbackForm({view,token,save,intro}:{view:InvitationView;token?:string
   <p className="response-recipient">{view.responderName?'Người phản hồi':'Khách mời'}<strong>{responseName}</strong></p>
   <fieldset disabled={!canRsvp||busy}>
    <legend>Xác nhận tham dự</legend>
-   <div className="radio-cards"><label><input type="radio" name="rsvp" checked={status==='ATTENDING'} onChange={()=>setStatus('ATTENDING')}/><Check size={20}/> Mình sẽ đến</label><label><input type="radio" name="rsvp" checked={status==='DECLINED'} onChange={()=>setStatus('DECLINED')}/><Heart size={20}/> Hẹn một dịp khác</label></div>
+   <div className="radio-cards"><label><input type="radio" name="rsvp" checked={status==='ATTENDING'} onChange={()=>setStatus('ATTENDING')}/><Check size={20}/> Mình sẽ đến</label><label><input type="radio" name="rsvp" checked={status==='DECLINED'} onChange={()=>setStatus('DECLINED')}/><Heart size={20}/> Không thể tham dự</label></div>
    {!view.preview&&!view.canRsvp&&<p className="muted">Hiện đã ngừng nhận xác nhận.</p>}
   </fieldset>
   <fieldset disabled={!canWish||busy}>
@@ -422,7 +435,7 @@ function FeedbackForm({view,token,save,intro}:{view:InvitationView;token?:string
   </fieldset>
   <button type="submit" className="button feedback-submit" disabled={busy||uploading||(!sendRsvp&&!sendWish)}><Send size={16}/>{busy||uploading?'Đang xử lý…':'Gửi lời hồi đáp'}</button>
   <ErrorBox error={error}/>
-  {done&&<p role="status" className="success">{done}</p>}
+  {done&&<p ref={notice} role="status" tabIndex={-1} className="success">{done}</p>}
   {save&&view.canWithdrawWish&&!view.preview&&<div className="row wrap">
    {wish?.consentPublic&&<Action disabled={busy||uploading} run={()=>withdraw(false)}>Rút đồng ý công khai</Action>}
    <Action disabled={busy||uploading} confirm="Bạn muốn xóa lời chúc này?" run={()=>withdraw(true)}>Xóa lời chúc</Action>
@@ -430,9 +443,9 @@ function FeedbackForm({view,token,save,intro}:{view:InvitationView;token?:string
  </form>;
 }
 
-function Wall({token,previewItems}:{token?:string;previewItems?:PublicWish[]}) {
+function Wall({token,previewItems,ownWish,publicEnabled=true}:{token?:string;previewItems?:PublicWish[];ownWish?:VisibleWish|null;publicEnabled?:boolean}) {
  const wall=useInfiniteQuery({
-  queryKey:['wall',token],enabled:!!token,gcTime:0,retry:false,
+  queryKey:['wall',token],enabled:!!token&&publicEnabled,gcTime:0,retry:false,
   initialPageParam:null as string|null,
   queryFn:async({signal,pageParam}):Promise<{items:PublicWish[];nextCursor:string|null}>=>{
    const query=pageParam?'?'+new URLSearchParams({cursor:pageParam}):'';
@@ -443,19 +456,21 @@ function Wall({token,previewItems}:{token?:string;previewItems?:PublicWish[]}) {
  });
  const {refetch}=wall;
  useEffect(()=>{
-  if(!token)return;
+  if(!token||!publicEnabled)return;
   function restore(event:PageTransitionEvent){if(event.persisted)void refetch();}
   window.addEventListener('pageshow',restore);
   return ()=>window.removeEventListener('pageshow',restore);
- },[token,refetch]);
+ },[token,publicEnabled,refetch]);
  const items=wall.data?.pages.flatMap(page=>page.items)??[];
- const publicWishes=previewItems??[...new Map(items.map(item=>[item.id,item])).values()];
+ const publicWishes=publicEnabled?(previewItems??[...new Map(items.map(item=>[item.id,item])).values()]):[];
+ const wishes:VisibleWish[]=ownWish?[ownWish,...publicWishes.filter(w=>w.id!==ownWish.id)]:publicWishes;
  return <div className="wish-wall">
   <h3>Lưu bút & lời chúc</h3>
   <div className="wish-strip" role="region" tabIndex={0} aria-label="Lời chúc của khách mời">
-   {publicWishes.map(w=><blockquote className="wish-card" key={w.id}>
+   {wishes.map(w=><blockquote className="wish-card" key={w.id} data-own={w.id===ownWish?.id||undefined}>
     <p>{w.body}</p>
     {w.image&&<a className="wish-photo" href={w.image.url} target="_blank" rel="noopener noreferrer" aria-label={`Xem ảnh trong lời chúc của ${w.displayName}`}><img src={w.image.url} alt={`Ảnh kèm lời chúc của ${w.displayName}`} loading="lazy"/></a>}
+    {w.private&&<span className="small muted wish-private">Chỉ bạn và Kiệt xem được</span>}
     {w.isPinned&&<span className="small muted wish-pin">Lời chúc được ghim</span>}
     <footer>
      {w.attendanceStatus&&<span className="wish-attendance" data-status={w.attendanceStatus}>{statusName[w.attendanceStatus]}</span>}
@@ -463,8 +478,8 @@ function Wall({token,previewItems}:{token?:string;previewItems?:PublicWish[]}) {
     </footer>
    </blockquote>)}
   </div>
-  {wall.isLoading&&<p className="muted" role="status">Đang tải lời chúc…</p>}
-  <ErrorBox error={wall.error}/>
-  {token&&(wall.hasNextPage||wall.isError)&&<button className="button secondary" disabled={wall.isFetching} onClick={()=>void (wall.isError&&!wall.isFetchNextPageError?refetch():wall.fetchNextPage())}>{wall.isError?'Thử tải lại':'Xem thêm lời chúc'}</button>}
+  {publicEnabled&&wall.isLoading&&<p className="muted" role="status">Đang tải lời chúc…</p>}
+  {publicEnabled&&<ErrorBox error={wall.error}/>}
+  {publicEnabled&&token&&(wall.hasNextPage||wall.isError)&&<button className="button secondary" disabled={wall.isFetching} onClick={()=>void (wall.isError&&!wall.isFetchNextPageError?refetch():wall.fetchNextPage())}>{wall.isError?'Thử tải lại':'Xem thêm lời chúc'}</button>}
  </div>;
 }

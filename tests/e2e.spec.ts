@@ -43,8 +43,9 @@ test('two people reply independently on the same family link',async({page,browse
    await visitor.getByLabel('Quan hệ với Kiệt',{exact:true}).fill(`Người thử ${index+1}`);
    await visitor.getByRole('button',{name:'Tiếp tục',exact:true}).click();
    await expect(visitor.locator('.response-recipient strong')).toHaveText(`Người thử ${index+1}`);
-   await visitor.getByRole('radio',{name:index?'Hẹn một dịp khác':'Mình sẽ đến',exact:true}).check();
+   await visitor.getByRole('radio',{name:index?'Không thể tham dự':'Mình sẽ đến',exact:true}).check();
    await visitor.getByLabel('Lời chúc của bạn',{exact:true}).fill(`Lời chúc thử ${index+1}`);
+   await visitor.getByLabel('Tôi đồng ý hiển thị tên, lời chúc và ảnh đính kèm trên thiệp.',{exact:true}).uncheck();
    await visitor.getByRole('button',{name:'Gửi lời hồi đáp',exact:true}).click();
    await expect(visitor.getByText('Đã lưu xác nhận tham dự và lời chúc. Cảm ơn bạn!',{exact:true})).toBeVisible();
   }
@@ -233,6 +234,84 @@ test('guest salutations appear on the envelope and response with the Ánh Tuyế
  await page.getByRole('button',{name:'Mở thiệp',exact:true}).click();
  await expect(page.locator('.response-recipient strong')).toHaveText('Mẹ');
  expect(errors).toEqual([]);
+});
+
+test('feedback thanks the guest and immediately shows their saved wish',async({page})=>{
+ const content=demoContent(null),ownerToken='x'.repeat(43),otherToken='y'.repeat(43);
+ let wish:any=null,rsvp:any=null,wallEnabled=true,failWish=false,echoOwn=false,wallReads=0,rsvpWrites=0;
+ const wishKeys:string[]=[];
+ const otherWish={id:'another-wish',displayName:'Khách khác',body:'Lời chúc của một người bạn',approvedAt:new Date().toISOString(),isPinned:false,attendanceStatus:null};
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.route('**/api/v1/guest/invitation',route=>{
+  const owner=route.request().headers().authorization===`Bearer ${ownerToken}`;
+  return route.fulfill({json:{data:{content,media:{},guest:{recipientName:owner?'Minh Trường':'Khách khác',salutation:owner?'Anh':'Bạn'},wish:owner?wish:null,rsvp:owner?rsvp:null,wallEnabled,canRsvp:true,canCreateOrEditWish:true,canWithdrawWish:owner&&!!wish&&!wish.deletedAt}}});
+ });
+ await page.route('**/api/v1/guest/opened',route=>route.fulfill({json:{data:{}}}));
+ await page.route('**/api/v1/guest/wishes*',route=>{
+  wallReads++;
+  return route.fulfill({json:{data:{items:[otherWish,...(echoOwn&&wish?.consentPublic&&!wish.deletedAt?[{...wish,displayName:'Anh Minh Trường',attendanceStatus:null}]:[])],nextCursor:null}}});
+ });
+ await page.route('**/api/v1/guest/rsvp',route=>{
+  rsvpWrites++;rsvp={...route.request().postDataJSON(),version:(rsvp?.version??0)+1};
+  return route.fulfill({json:{data:rsvp}});
+ });
+ await page.route('**/api/v1/guest/wish/visibility',route=>{
+  wish={...wish,consentPublic:false,consentAttendancePublic:false,moderationStatus:'NONE',version:wish.version+1};
+  return route.fulfill({json:{data:wish}});
+ });
+ await page.route('**/api/v1/guest/wish',route=>{
+  if(route.request().method()==='DELETE'){
+   wish={...wish,deletedAt:new Date().toISOString(),version:wish.version+1};
+   return route.fulfill({status:204});
+  }
+  wishKeys.push(route.request().headers()['idempotency-key']);
+  if(failWish)return route.fulfill({status:503,json:{error:{code:'DATABASE_BUSY',message:'Hệ thống đang bận, vui lòng thử lại'}}});
+  const body=route.request().postDataJSON();
+  wish={...body,id:'own-wish',version:(wish?.version??0)+1,moderationStatus:body.consentPublic?'APPROVED':'NONE',approvedAt:body.consentPublic?new Date().toISOString():null,deletedAt:null};
+  return route.fulfill({json:{data:wish}});
+ });
+ const open=async(token=ownerToken)=>{await page.goto('/i/'+token);await page.getByRole('button',{name:'Mở thiệp',exact:true}).click();await page.locator('.feedback-form').waitFor();};
+ const form=page.locator('.feedback-form'),ownCard=page.locator('.wish-card[data-own="true"]');
+ const consent=form.getByLabel('Tôi đồng ý hiển thị tên, lời chúc và ảnh đính kèm trên thiệp.',{exact:true});
+ const submit=form.getByRole('button',{name:'Gửi lời hồi đáp',exact:true});
+ await open();
+ await expect(consent).toBeChecked();
+ await expect(form.getByLabel('Hiển thị trạng thái tham dự cùng lời chúc',{exact:true})).not.toBeChecked();
+ await expect(form.getByRole('radio',{name:'Hẹn một dịp khác',exact:true})).toHaveCount(0);
+ await form.getByRole('radio',{name:'Không thể tham dự',exact:true}).check();
+ await form.getByLabel('Lời chúc của bạn',{exact:true}).fill('Chúc Kiệt thật nhiều thành công!');
+ await form.getByLabel('Hiển thị trạng thái tham dự cùng lời chúc',{exact:true}).check();
+ const initialReads=wallReads;
+ await submit.click();
+ await expect(form.getByRole('status')).toContainText('Cảm ơn bạn!');
+ await expect(form.getByRole('status')).toBeFocused();
+ await expect(ownCard.locator('>p')).toHaveText('Chúc Kiệt thật nhiều thành công!');
+ await expect(ownCard.locator('.wish-private')).toHaveCount(0);
+ await expect(ownCard.locator('[data-status="DECLINED"]')).toHaveCount(1);
+ await expect(page.locator('.wish-card').first()).toHaveAttribute('data-own','true');
+ await expect.poll(()=>wallReads).toBeGreaterThan(initialReads);
+ expect(rsvpWrites).toBe(1);expect(wishKeys.length).toBe(1);
+ echoOwn=true;
+ await form.getByRole('radio',{name:'Mình sẽ đến',exact:true}).check();await submit.click();
+ await expect(ownCard.locator('[data-status="ATTENDING"]')).toHaveCount(1);
+ await expect(ownCard).toHaveCount(1);expect(wishKeys.length).toBe(1);
+ await consent.uncheck();await form.getByLabel('Lời chúc của bạn',{exact:true}).fill('Lời chúc gửi riêng cho Kiệt');await submit.click();
+ await expect(ownCard.locator('.wish-private')).toHaveText('Chỉ bạn và Kiệt xem được');
+ await expect(ownCard.locator('>p')).toHaveText('Lời chúc gửi riêng cho Kiệt');
+ await open();await expect(consent).not.toBeChecked();await expect(ownCard.locator('.wish-private')).toBeVisible();
+ await open(otherToken);await expect(ownCard).toHaveCount(0);await expect(page.locator('.wish-wall')).not.toContainText('Lời chúc gửi riêng cho Kiệt');
+ wallEnabled=false;const readsBefore=wallReads;
+ await open();await expect(ownCard.locator('.wish-private')).toBeVisible();expect(wallReads).toBe(readsBefore);
+ await expect(page.locator('.wish-wall')).not.toContainText(otherWish.body);
+ page.once('dialog',dialog=>dialog.accept());await form.getByRole('button',{name:'Xóa lời chúc',exact:true}).click();
+ await expect(ownCard).toHaveCount(0);
+ wish=null;rsvp=null;wallEnabled=true;failWish=true;
+ await open();await form.getByRole('radio',{name:'Mình sẽ đến',exact:true}).check();await form.getByLabel('Lời chúc của bạn',{exact:true}).fill('Lời chúc gửi lại sau lỗi');
+ await submit.click();await expect(form.getByRole('alert')).toBeVisible();await expect(form.getByRole('status')).not.toContainText('Cảm ơn');await expect(ownCard).toHaveCount(0);
+ const writesBeforeRetry=rsvpWrites;failWish=false;await submit.click();
+ await expect(form.getByRole('status')).toContainText('Cảm ơn bạn!');await expect(ownCard.locator('>p')).toHaveText('Lời chúc gửi lại sau lỗi');
+ expect(rsvpWrites).toBe(writesBeforeRetry);expect(wishKeys.at(-1)).toBe(wishKeys.at(-2));
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
 test('mobile invitation balances headings and plays music on open',async({page},testInfo)=>{
@@ -471,7 +550,7 @@ test('published guest links receive updates and open feedback without losing typ
    await expect(feedback.locator('button[type="submit"]')).toBeDisabled();
    release();
    await expect(guestPage.getByRole('button',{name:'Xóa lời chúc',exact:true})).toHaveCount(0);
-   await guestPage.getByRole('radio',{name:'Hẹn một dịp khác',exact:true}).check();
+   await guestPage.getByRole('radio',{name:'Không thể tham dự',exact:true}).check();
    await submit.click();
    await expect(feedback.getByRole('status')).toContainText('Đã lưu');
   }finally{release();await guestPage.unrouteAll({behavior:'wait'});}
@@ -582,7 +661,7 @@ test('real Excel invitations, private responses, moderation, link rotation and e
   await guestPage.setViewportSize(originalViewport);
   await guestPage.getByRole('radio', { name: 'Mình sẽ đến', exact: true }).check();
   await guestPage.getByLabel('Lời chúc của bạn', { exact: true }).fill(wishText);
-  await guestPage.getByLabel('Tôi đồng ý hiển thị tên và lời chúc').check();
+  await guestPage.getByLabel('Tôi đồng ý hiển thị tên, lời chúc và ảnh đính kèm trên thiệp.',{exact:true}).check();
   await guestPage.getByLabel('Hiển thị trạng thái tham dự cùng lời chúc').check();
   await guestPage.getByRole('button', { name: 'Gửi lời hồi đáp', exact: true }).click();
   await expect(guestPage.getByText('Đã lưu xác nhận tham dự và đăng lời chúc. Cảm ơn bạn!', { exact: true })).toBeVisible();
@@ -607,7 +686,7 @@ test('real Excel invitations, private responses, moderation, link rotation and e
   await expect(guestPage.locator('.wish-wall').getByRole('alert')).toHaveCount(0);
   const secondWish = 'Chúc mừng tốt nghiệp ' + suffix;
   await guestPage.getByLabel('Lời chúc của bạn', { exact: true }).fill(secondWish);
-  await guestPage.getByLabel('Tôi đồng ý hiển thị tên và lời chúc').check();
+  await guestPage.getByLabel('Tôi đồng ý hiển thị tên, lời chúc và ảnh đính kèm trên thiệp.',{exact:true}).check();
   await guestPage.getByRole('button', { name: 'Gửi lời hồi đáp', exact: true }).click();
   await expect(guestPage.getByText('Lời chúc đã được đăng. Cảm ơn bạn!', { exact: true })).toBeVisible();
   await guestPage.goto(thirdLink);
@@ -628,7 +707,7 @@ test('real Excel invitations, private responses, moderation, link rotation and e
   await guestPage.setViewportSize(originalViewport);
   await guestPage.goto(firstLink);
   await guestPage.getByRole('button', { name: 'Mở thiệp', exact: true }).click();
-  await expect(guestPage.locator('.wish-wall').getByText(wishText, { exact: true })).toHaveCount(0);
+  await expect(guestPage.locator('.wish-card[data-own="true"]').getByText(wishText, { exact: true })).toBeVisible();
   await guestPage.getByLabel('Lời chúc của bạn', { exact: true }).fill(wishText + ' — đã chỉnh sửa');
   await guestPage.getByRole('button', { name: 'Gửi lời hồi đáp', exact: true }).click();
   await expect(guestPage.getByText('Lời chúc đã được đăng. Cảm ơn bạn!', { exact: true })).toBeVisible();
@@ -750,7 +829,7 @@ test('a lost RSVP response retries the same operation and a version conflict pre
   const token = credentialFromLink(link);
   const external = await page.request.put('/api/v1/guest/rsvp', { headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': crypto.randomUUID() }, data: { status: 'ATTENDING', note: 'Thay đổi từ phiên khác', expectedVersion: 1 } });
   expect(external.ok()).toBe(true);
-  const attendance = form.getByRole('radio', { name: 'Hẹn một dịp khác', exact: true });
+  const attendance = form.getByRole('radio', { name: 'Không thể tham dự', exact: true });
   let failRefresh = true;
   await guestPage.route('**/api/v1/guest/invitation', async route => {
     if (failRefresh) { failRefresh = false; await route.abort('failed'); }
