@@ -200,7 +200,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    : s.data.title?<FittedLine text={s.data.title.replace(/\s+/gu,' ').trim()}/>:<>Mỗi chặng đường, <em className="section-title-accent">một điều để nhớ.</em></>}</h2>
   {s.data.intro&&<p className="invite-prose story-intro">{s.data.intro}</p>}
   <div className="story-list">{s.data.items.map((item,i)=><article key={item.id} className={'story-item'+(item.image||item.imageAssetId?'':' story-letter')}>
-   {(item.image||item.imageAssetId)&&<div className="story-image">{item.image?<AssetImage asset={{...item.image,id:item.id,alt:item.title,type:'IMAGE'}} priority={false}/>:img(item.imageAssetId)}</div>}<div><p className="eyebrow">{item.label||`CHƯƠNG ${i+1}`}</p><h3><em className="section-title-accent"><FittedLine text={item.title.replace(/\s+/gu,' ').trim()} minimumFontSize={8}/></em></h3><p>{item.body}</p></div>
+   {(item.image||item.imageAssetId)&&<div className="story-image">{item.image?<AssetImage asset={{...item.image,id:item.id,alt:item.title,type:'IMAGE'}} priority={false}/>:img(item.imageAssetId)}</div>}<div><p className="eyebrow story-label"><FittedLine text={item.label||`CHƯƠNG ${i+1}`} minimumFontSize={8}/></p><h3><em className="section-title-accent"><FittedLine text={item.title.replace(/\s+/gu,' ').trim()} minimumFontSize={8}/></em></h3><p>{item.body}</p></div>
   </article>)}</div></>;
   case 'gallery':return <>
    <h2 className="gallery-title">{s.data.title?s.data.title.split(/\r?\n/).map((line,index)=>index===0?<FittedLine key={index} text={line}/>:<em key={index} className="section-title-accent"><FittedLine text={line}/></em>):<><FittedLine text="Cảm ơn vì đã"/><em className="section-title-accent"><FittedLine text="ở trong thanh xuân của Kiệt."/></em></>}</h2>
@@ -421,14 +421,6 @@ function FeedbackForm({view,save,intro}:{view:InvitationView;save?:ReturnType<ty
  </form>;
 }
 
-const sampleWishes=[
- {displayName:'Bạn bè',body:'Chúc mừng cậu tốt nghiệp! Mong chặng đường mới đầy niềm vui và tụi mình còn nhiều dịp để ăn mừng cùng nhau.'},
- {displayName:'Đồng nghiệp',body:'Chúc mừng cột mốc mới! Chúc bạn luôn giữ được sự nhiệt tình và gặp nhiều cơ hội để làm điều mình yêu thích.'},
- {displayName:'Gia đình',body:'Cả nhà tự hào về con. Chúc con vững vàng, bình an và luôn vui trên con đường mình chọn.'},
- {displayName:'Thầy cô',body:'Chúc mừng em đã hoàn thành chặng đường đại học. Mong em luôn ham học hỏi và tự tin đón nhận những thử thách mới.'},
- {displayName:'Bạn cùng lớp',body:'Sau bao buổi học và những lần chạy deadline cùng nhau, cuối cùng cũng tới ngày tốt nghiệp. Chúc cậu có một khởi đầu thật đẹp!'},
-].map(wish=>({...wish,id:'sample-'+wish.displayName,isPinned:false,attendanceStatus:null}));
-
 function Wall({token,previewItems}:{token?:string;previewItems?:PublicWish[]}) {
  const wall=useInfiniteQuery({
   queryKey:['wall',token],enabled:!!token,gcTime:0,retry:false,
@@ -449,12 +441,11 @@ function Wall({token,previewItems}:{token?:string;previewItems?:PublicWish[]}) {
  },[token,refetch]);
  const items=wall.data?.pages.flatMap(page=>page.items)??[];
  const publicWishes=previewItems??[...new Map(items.map(item=>[item.id,item])).values()];
- const cards=[...publicWishes,...sampleWishes];
  return <div className="wish-wall">
   <h3>Lưu bút & lời chúc</h3>
   <p className="muted small">Vuốt hoặc cuộn ngang để xem thêm</p>
   <div className="wish-strip" role="region" tabIndex={0} aria-label="Lời chúc của khách mời">
-   {cards.map(w=><blockquote className="wish-card" key={w.id}>
+   {publicWishes.map(w=><blockquote className="wish-card" key={w.id}>
     <p>{w.body}</p>
     {w.isPinned&&<span className="small muted wish-pin">Lời chúc được ghim</span>}
     <footer>
