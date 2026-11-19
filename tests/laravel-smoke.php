@@ -163,7 +163,7 @@ try {
         $wall = $call('GET', '/api/v1/guest/wishes', token: $responder['token']);
         check(count($wall['items']) === 1 && $wall['items'][0]['body'] === 'Chúc mừng tốt nghiệp 🎓', 'Public wish visible to another guest');
     }
-    foreach (['Animal Solutions', 'Weset iu dấu'] as $groupIndex => $groupName) {
+    foreach (['Animal Solutions', 'Weset iu dấu', 'Câu lạc bộ Tọa Độ Xanh'] as $groupIndex => $groupName) {
         $team = $create('TEAM'.$groupIndex, $groupName);
         $teamInvitation = DB::table('Invitation')->where('guestId', $team['id'])->first();
         check((bool) $teamInvitation->allowMultipleResponses, 'Group invitation is shared on creation');

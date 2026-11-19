@@ -65,7 +65,7 @@ foreach ([
 }
 assert(InvitationViews::shareMessage((object) ['displayName' => '', 'fullName' => 'Minh Trường', 'salutation' => 'Anh'], $shareUrl)
     === "Sắp tới là một ngày quan trọng của em, em mong anh sắp xếp tới tham dự và chụp với em 1 tấm ảnh kỷ niệm nha.\nThiệp mời: $shareUrl");
-foreach (['Animal Solutions', 'Weset iu dấu'] as $name) {
+foreach (['Animal Solutions', 'Weset iu dấu', 'Câu lạc bộ Tọa Độ Xanh'] as $name) {
     $groupGuest = (object) ['fullName' => $name, 'displayName' => '', 'salutation' => '', 'groupKey' => 'team'];
     $groupView = InvitationViews::build($event, $templates, $groupGuest, preview: true);
     assert($groupView['guest']['recipientAddress'] === 'mọi người');

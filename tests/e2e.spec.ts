@@ -338,8 +338,8 @@ test('shared group cards ask for responder names while family asks for a relatio
   member!.rsvp={...route.request().postDataJSON(),version:1};
   return route.fulfill({json:{data:member!.rsvp}});
  });
- for(const [index,name] of ['Animal Solutions','Weset iu dấu','Đại gia đình thương yêu'].entries()){
-  parentName=name;kind=index===2?'family':'group';parentToken='p'.repeat(42)+index;
+ for(const [index,name] of ['Animal Solutions','Weset iu dấu','Câu lạc bộ Tọa Độ Xanh','Đại gia đình thương yêu'].entries()){
+  parentName=name;kind=name==='Đại gia đình thương yêu'?'family':'group';parentToken='p'.repeat(42)+index;
   await page.goto('/i/'+parentToken);await page.getByRole('button',{name:'Mở thiệp',exact:true}).click();
   const field=page.getByLabel(kind==='group'?'Người phản hồi':'Quan hệ với Kiệt',{exact:true});await expect(field).toBeVisible();
   if(kind==='group'){
@@ -349,13 +349,13 @@ test('shared group cards ask for responder names while family asks for a relatio
   for(const width of [320,390,768,1440]){
    await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
-  const responder=index===2?'Em trai':'Người phản hồi '+index;
+  const responder=kind==='family'?'Em trai':'Người phản hồi '+index;
   await field.fill(responder);await page.getByRole('button',{name:'Tiếp tục',exact:true}).click();
   await expect(page.locator('.response-recipient strong')).toHaveText(responder);
   await page.getByRole('radio',{name:'Mình sẽ đến',exact:true}).check();await page.getByRole('button',{name:'Gửi lời hồi đáp',exact:true}).click();
   await expect(page.locator('.feedback-form').getByRole('status')).toContainText('Cảm ơn');
  }
- expect(registrations).toBe(3);expect(errors).toEqual([]);
+ expect(registrations).toBe(4);expect(errors).toEqual([]);
 });
 
 test('mobile invitation balances headings and plays music on open',async({page},testInfo)=>{

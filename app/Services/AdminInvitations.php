@@ -85,7 +85,7 @@ final class AdminInvitations
     {
         return match (self::normalizeGroupKey($name)) {
             'dai_gia_dinh_thuong_yeu' => 'family',
-            'animal_solutions', 'weset_iu_dau' => 'group',
+            'animal_solutions', 'weset_iu_dau', 'cau_lac_bo_toa_do_xanh' => 'group',
             default => null,
         };
     }
