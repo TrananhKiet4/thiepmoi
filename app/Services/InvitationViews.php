@@ -241,12 +241,10 @@ final class InvitationViews
     public static function shareMessage(object $guest, string $url): string
     {
         $recipient = self::recipient($guest);
-        $name = $recipient['recipientName'];
-        if ($recipient['salutation'] !== '' && mb_strtolower(self::normalizeSpace($name)) !== $recipient['salutation']) {
-            $name = self::sentenceCase($recipient['salutation']).' '.$name;
-        }
+        $speaker = $recipient['speaker'];
+        $address = mb_strtolower($recipient['recipientAddress']);
 
-        return $recipient['invite'].' '.$name.' xem thiệp mời tốt nghiệp của '.$recipient['speaker'].":\n".$url;
+        return "Sắp tới là một ngày quan trọng của $speaker, $speaker mong $address sắp xếp tới tham dự và chụp với $speaker 1 tấm ảnh kỷ niệm nha.\nThiệp mời: $url";
     }
 
     private static function recipient(?object $guest): array

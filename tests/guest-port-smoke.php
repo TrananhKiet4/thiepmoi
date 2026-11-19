@@ -49,22 +49,22 @@ assert($templated['content']['sections'][2]['data']['wishTitle'] === 'Gửi lờ
 assert($templated['content']['sections'][3]['data']['message'] === 'Cảm ơn chị hai. Em rất trân trọng.');
 $shareUrl = 'https://trananhkiet.id.vn/i/Ab123/khach-moi';
 foreach ([
-    ['Đại gia đình thương yêu', '', 'gia_dinh', 'Thương mời Đại gia đình thương yêu', 'con'],
-    ['Em yêu Ánh Tuyết', 'Em yêu', 'gia_dinh', 'Thương mời Em yêu Ánh Tuyết', 'anh'],
-    ['Anh Minh Trường', 'Anh', 'toa_do_xanh', 'Kính mời Anh Minh Trường', 'em'],
-    ['Diễm My', 'Chị', 'toa_do_xanh', 'Kính mời Chị Diễm My', 'em'],
-    ['Anh hai Hoàng Sơn', 'Anh hai', 'udung', 'Kính mời Anh hai Hoàng Sơn', 'em'],
-    ['Chị hai Bích Trâm', 'Chị hai', 'udung', 'Kính mời Chị hai Bích Trâm', 'em'],
-    ['Thím iu', '', 'udung', 'Kính mời Thím iu', 'con'],
-    ['Thím iu', 'Thím iu', 'udung', 'Kính mời Thím iu', 'con'],
-    ['Bạn Trọng Phúc', 'Bạn', 'ban', 'Thân mời Bạn Trọng Phúc', 'mình'],
-    ['Em Huyền Trâm', 'Em', 'toa_do_xanh', 'Thân mời Em Huyền Trâm', 'anh'],
-] as [$name, $salutation, $group, $greeting, $speaker]) {
+    ['Đại gia đình thương yêu', '', 'gia_dinh', 'cả nhà', 'con'],
+    ['Em yêu Ánh Tuyết', 'Em yêu', 'gia_dinh', 'em yêu', 'anh'],
+    ['Anh Minh Trường', 'Anh', 'toa_do_xanh', 'anh', 'em'],
+    ['Diễm My', 'Chị', 'toa_do_xanh', 'chị', 'em'],
+    ['Anh hai Hoàng Sơn', 'Anh hai', 'udung', 'anh hai', 'em'],
+    ['Chị hai Bích Trâm', 'Chị hai', 'udung', 'chị hai', 'em'],
+    ['Thím iu', '', 'udung', 'thím iu', 'con'],
+    ['Thím iu', 'Thím iu', 'udung', 'thím iu', 'con'],
+    ['Bạn Trọng Phúc', 'Bạn', 'ban', 'bạn', 'mình'],
+    ['Em Huyền Trâm', 'Em', 'toa_do_xanh', 'em', 'anh'],
+] as [$name, $salutation, $group, $address, $speaker]) {
     $recipient = (object) ['displayName' => $name, 'fullName' => 'Tên đầy đủ', 'salutation' => $salutation, 'groupKey' => $group];
-    assert(InvitationViews::shareMessage($recipient, $shareUrl) === "$greeting xem thiệp mời tốt nghiệp của $speaker:\n$shareUrl", $greeting);
+    assert(InvitationViews::shareMessage($recipient, $shareUrl) === "Sắp tới là một ngày quan trọng của $speaker, $speaker mong $address sắp xếp tới tham dự và chụp với $speaker 1 tấm ảnh kỷ niệm nha.\nThiệp mời: $shareUrl", $name);
 }
 assert(InvitationViews::shareMessage((object) ['displayName' => '', 'fullName' => 'Minh Trường', 'salutation' => 'Anh'], $shareUrl)
-    === "Kính mời Anh Minh Trường xem thiệp mời tốt nghiệp của em:\n$shareUrl");
+    === "Sắp tới là một ngày quan trọng của em, em mong anh sắp xếp tới tham dự và chụp với em 1 tấm ảnh kỷ niệm nha.\nThiệp mời: $shareUrl");
 $calendar = InvitationViews::calendar('fixture', $content);
 assert(str_contains($calendar, "DTSTART:20261110T010000Z\r\n"));
 assert(str_contains(str_replace("\r\n ", '', $calendar), 'A\\, B'));

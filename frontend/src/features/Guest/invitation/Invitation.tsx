@@ -129,7 +129,6 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
  const heroTitle=hero?.type==='hero'?hero.data.title:'Ngày mình tốt nghiệp.';
  const splitHeroTitle=/^một hành trình mới bắt đầu[.!]?$/iu.test(heroTitle.replace(/\s+/gu,' ').trim());
  const hasMusic=c.music.enabled&&!!media(c.music.assetId);
- const message=view.personalMessage||(opening?.type==='opening'?opening.data.messageTemplate:'Mời bạn cùng mình lưu giữ khoảnh khắc đáng nhớ.').replaceAll('{{guestName}}',name).replaceAll('{{hostName}}',c.host.fullName).replaceAll('{{salutation}}',view.guest.salutation||'');
  async function startMusic(){
   const player=audio.current;
   if(!player)return;
@@ -166,9 +165,6 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
     <button className="wax-seal" aria-label="Mở thiệp" aria-disabled={phase==='opening'} onClick={open}><GraduationCap size={30} strokeWidth={1}/><span>Mở thiệp</span></button>
    </div>
    <p className="envelope-hint">CHẠM VÀO CON DẤU ĐỂ MỞ THIỆP</p>
-   <p className="envelope-message">{message}</p>
-   {opening?.type==='opening'&&(opening.data.coverAssetId||opening.data.coverImage)&&<div className="envelope-cover">{img(opening.data.coverAssetId,true,opening.data.coverImage)}</div>}
-   <span className="envelope-year">CLASS OF {year}</span>
   </section>:<>
    <nav className="invite-nav" aria-label="Các phần của thiệp">
     <a className="invite-brand" href="#invitation-top"><GraduationCap size={25} strokeWidth={1.2}/><span>{c.host.fullName}<small>GRADUATION · {year}</small></span></a>

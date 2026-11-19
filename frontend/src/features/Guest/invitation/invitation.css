@@ -59,9 +59,6 @@
 .invitation .wax-seal span { font-size: 11px; margin-top: 2px; }
 .invitation .wax-seal:hover { transform: translateX(-50%) rotate(0deg) scale(1.06); }
 .invitation .envelope-hint { font-size: 9px; letter-spacing: 2px; color: #70695f; margin: 28px 0 16px; }
-.invitation .envelope-message { font-family: var(--invite-heading); color: #625a54; font-size: 17px; max-width: 560px; line-height: 1.7; }
-.invitation .envelope-cover { width: 85px; height: 100px; margin: 7px 0 15px; background: #fffdf8; }
-.invitation .envelope-year { position: static; margin-top: 25px; font-size: 9px; letter-spacing: 4px; color: #7b7264; }
 .invitation .envelope.is-opening { animation: envelope-reveal var(--envelope-duration) ease-in both; }
 .invitation .is-opening .envelope-panels::before, .invitation .is-opening .envelope-panels::after { animation: envelope-part var(--envelope-duration) cubic-bezier(.58, .03, .25, 1) both; }
 .invitation .is-opening .wax-seal { animation: wax-release .48s ease-out both; cursor: default; }
@@ -145,7 +142,7 @@
   overflow-wrap: break-word;
   text-wrap: balance;
 }
-.invitation :is(.envelope-message, .hero-text>p:not(.eyebrow), .invite-prose, .story-item>div>p:last-child, .invitation-notes li, .map-card>p, .feedback-intro, .feedback-form .success, .wish-card p, .closing>p:not(.signature)) {
+.invitation :is(.hero-text>p:not(.eyebrow), .invite-prose, .story-item>div>p:last-child, .invitation-notes li, .map-card>p, .feedback-intro, .feedback-form .success, .wish-card p, .closing>p:not(.signature)) {
   overflow-wrap: break-word;
   white-space: pre-line;
   text-wrap: pretty;
@@ -467,7 +464,6 @@
   .invitation .envelope-letter { padding: 24px 15px; min-height: 170px; }
   .invitation .envelope-letter .eyebrow { font-size: 8px; }
   .invitation .envelope-hint { font-size: 8px; letter-spacing: 1.4px; }
-  .invitation .envelope-message { font-size: 16px; padding: 0 5px; }
   .invitation .wax-seal { width: 75px; height: 75px; bottom: 30px; }
   .invitation .sparkle-one { width: 48px; left: 2px; top: 17%; }
   .invitation .sparkle-two { width: 43px; right: 2px; top: 53%; }

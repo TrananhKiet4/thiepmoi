@@ -133,7 +133,7 @@ try {
     $link = $call('GET', '/api/v1/admin/invitations/'.$invitation->id.'/link');
     $url = $link['url'] ?? $link['link'] ?? null;
     check(is_string($url), 'Invitation URL response');
-    check($link['message'] === "Thân mời Khách thử xem thiệp mời tốt nghiệp của mình:\n$url", 'Share message uses guest name, invitation tone and speaker');
+    check($link['message'] === "Sắp tới là một ngày quan trọng của mình, mình mong bạn sắp xếp tới tham dự và chụp với mình 1 tấm ảnh kỷ niệm nha.\nThiệp mời: $url", 'Share message uses guest address and speaker');
     $parts = explode('/', trim(parse_url($url, PHP_URL_PATH), '/'));
     $token = $parts[1].'.'.$parts[2];
     check(strlen($parts[1]) === 5, 'Five-character invitation code');
@@ -154,7 +154,7 @@ try {
     $familyToken = InvitationTokens::decrypt($familyInvitation->id, $familyInvitation->tokenCiphertext, $familyInvitation->keyVersion);
     DB::table('Guest')->where('id', $family['id'])->update(['groupKey' => 'gia_dinh']);
     $familyLink = $call('GET', '/api/v1/admin/invitations/'.$familyInvitation->id.'/link');
-    check($familyLink['message'] === 'Thương mời Đại gia đình thương yêu xem thiệp mời tốt nghiệp của con:'."\n".$familyLink['url'], 'Family share message uses the same addressing rules as the invitation');
+    check($familyLink['message'] === 'Sắp tới là một ngày quan trọng của con, con mong cả nhà sắp xếp tới tham dự và chụp với con 1 tấm ảnh kỷ niệm nha.'."\nThiệp mời: ".$familyLink['url'], 'Family share message uses the same addressing rules as the invitation');
     $call('PUT', '/api/v1/guest/rsvp', $rsvpBody, $familyToken, ['HTTP_IDEMPOTENCY_KEY' => 'family-missing-name'], 422);
     foreach (['Người A', 'Người B'] as $index => $name) {
         $responder = $call('POST', '/api/v1/guest/family-responders', ['name' => $name], $familyToken, ['HTTP_IDEMPOTENCY_KEY' => 'family-'.$index], 201);

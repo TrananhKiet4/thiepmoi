@@ -100,7 +100,7 @@ test('admin edits a guest letter and previews it on the existing link',async({pa
   await edit.click();
   dialog=page.getByRole('dialog');
   await dialog.getByRole('button',{name:'Xem thiệp đã lưu',exact:true}).click();
-  await expect(dialog.locator('.envelope-message')).toHaveText('Lời mở dành riêng');
+  await expect(dialog.locator('.envelope-message, .envelope-cover, .envelope-year')).toHaveCount(0);
   await expect(dialog.locator('.envelope-letter h1')).toHaveText(name);
   await dialog.getByRole('button',{name:'Mở thiệp',exact:true}).click();
   await expect(dialog.locator('.invitation-letter h2')).toHaveText('Một lời hẹn riêng');
@@ -116,7 +116,7 @@ test('admin edits a guest letter and previews it on the existing link',async({pa
   await expect(dialog.locator('.invitation-letter > .eyebrow')).toHaveCount(0);
   await expect(dialog.locator('.invitation-letter > .signature')).toHaveCount(0);
   await guestPage.goto(url);
-  await expect(guestPage.locator('.envelope-message')).toHaveText('Lời mở dành riêng');
+  await expect(guestPage.locator('.envelope-message, .envelope-cover, .envelope-year')).toHaveCount(0);
   await guestPage.getByRole('button',{name:'Mở thiệp',exact:true}).click();
   await expect(guestPage.locator('.invitation-letter .invite-prose')).toHaveText('Hẹn gặp bạn ở lễ tốt nghiệp.');
   await expect(guestPage.locator('.response-recipient strong')).toHaveText(name);
@@ -167,7 +167,7 @@ test('blue invitation preview renders both new Vietnamese fonts',async({page},te
    await expect(dialog.locator('.envelope h1')).toHaveCSS('color','rgb(35, 76, 124)');
    await expect.poll(async()=>{
     const {root}=await cdp.send('DOM.getDocument');
-    const {nodeId}=await cdp.send('DOM.querySelector',{nodeId:root.nodeId,selector:'.envelope-message'});
+    const {nodeId}=await cdp.send('DOM.querySelector',{nodeId:root.nodeId,selector:'.envelope-heading>span'});
     const {fonts}=await cdp.send('CSS.getPlatformFontsForNode',{nodeId});
     return [...new Set(fonts.filter(font=>font.glyphCount>0).map(font=>font.familyName))];
    }).toEqual([family]);
@@ -519,7 +519,7 @@ test('real Excel invitations, private responses, moderation, link rotation and e
   }
   await guestPage.setViewportSize(originalViewport);
   await guestPage.screenshot({path:`.data/qa/guest-envelope-${testInfo.project.name}.png`,fullPage:true});
-  await guestPage.locator('.envelope-year').scrollIntoViewIfNeeded();
+  await guestPage.locator('.envelope-hint').scrollIntoViewIfNeeded();
   await guestPage.getByRole('button', { name: 'Mở thiệp', exact: true }).press('Enter');
   await expect(guestPage.locator('.hero-text h1')).toBeFocused();
   await expect.poll(()=>guestPage.evaluate(()=>scrollY)).toBe(0);
@@ -639,7 +639,7 @@ test('an unfinished date can be saved as a draft and blocks publication', async 
     expect(draft.draft.contentJson.ceremony.startAt).toBe('');
     await page.getByRole('button',{name:'Xem trước',exact:true}).click();
     const preview=page.getByRole('dialog');
-    await expect(preview.locator('.envelope-year')).toHaveText('CLASS OF …');
+    await expect(preview.locator('.envelope-message, .envelope-cover, .envelope-year')).toHaveCount(0);
     await preview.getByRole('button',{name:'Mở thiệp',exact:true}).click();
     await expect(preview.locator('.hero-text h1')).toBeVisible();
     await preview.getByRole('button',{name:'Đóng',exact:true}).click();
