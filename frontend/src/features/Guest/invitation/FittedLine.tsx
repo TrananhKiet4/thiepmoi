@@ -1,11 +1,12 @@
-import {useLayoutEffect, useRef} from 'react';
+import {useLayoutEffect, useRef, type ReactNode} from 'react';
 
-export function FittedLine({text}: {text: string}) {
+export function FittedLine({text, children}: {text: string; children?: ReactNode}) {
   const line = useRef<HTMLSpanElement>(null);
   const label = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
     const frame = line.current!, content = label.current!;
     let active = true;
+    let resizeFrame = 0;
     function fit() {
       if (!active) return;
       content.style.fontSize = '';
@@ -20,10 +21,13 @@ export function FittedLine({text}: {text: string}) {
       }
     }
     fit();
-    const observer = new ResizeObserver(fit);
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(fit);
+    });
     observer.observe(frame);
     void document.fonts.ready.then(fit);
-    return () => { active = false; observer.disconnect(); };
+    return () => { active = false; observer.disconnect(); cancelAnimationFrame(resizeFrame); };
   }, [text]);
-  return <span className="invite-fitted-line" ref={line}><span ref={label}>{text}</span></span>;
+  return <span className="invite-fitted-line" ref={line}><span ref={label}>{children??text}</span></span>;
 }

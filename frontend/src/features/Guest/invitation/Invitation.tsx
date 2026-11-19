@@ -182,9 +182,9 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
     </div>
     <div className="hero-text">
      <p className="eyebrow">MỘT CHẶNG ĐƯỜNG · MỘT KHỞI ĐẦU MỚI</p>
-     <h1 tabIndex={-1} className={splitHeroTitle?'hero-title-lines':undefined}>{splitHeroTitle
-      ? <><FittedLine text="Một hành trình mới"/>{' '}<strong className="hero-title-highlight">Bắt đầu</strong></>
-      : heroTitle}</h1>
+     <h1 tabIndex={-1} className={splitHeroTitle?'hero-title-lines':undefined}><FittedLine text={heroTitle.replace(/\s+/gu,' ').trim()}>{splitHeroTitle
+      ? <>Một hành trình mới <strong className="hero-title-highlight">Bắt đầu</strong></>
+      : undefined}</FittedLine></h1>
      {hero?.type==='hero'&&hero.data.subtitle&&<p className="hero-subtitle">{hero.data.subtitle}</p>}
      <p>{c.host.university}<br/>{c.host.major}{c.host.cohort&&' · '+c.host.cohort}</p>
     </div>
@@ -195,15 +195,15 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
   </>}
  </main>;
  function renderSection(s:Section){switch(s.type){
-  case 'story':return <><h2 className="story-title">{/^thanh xuân ấy(?:,|\s)\s*chúng ta (?:đã )?có nhau$/iu.test(s.data.title?.trim()??'')
-   ? <><FittedLine text="Thanh xuân ấy"/>{' '}<em className="section-title-accent"><FittedLine text="Chúng ta có nhau"/></em></>
-   : s.data.title||<>Mỗi chặng đường, <em className="section-title-accent">một điều để nhớ.</em></>}</h2>
+  case 'story':return <><h2 className="story-title"><FittedLine text={(s.data.title||'Mỗi chặng đường, một điều để nhớ.').replace(/\s+/gu,' ').trim()}>{/^thanh xuân ấy(?:,|\s)\s*chúng ta (?:đã )?có nhau$/iu.test(s.data.title?.trim()??'')
+   ? <>Thanh xuân ấy <em className="section-title-accent">Chúng ta có nhau</em></>
+   : s.data.title?undefined:<>Mỗi chặng đường, <em className="section-title-accent">một điều để nhớ.</em></>}</FittedLine></h2>
   {s.data.intro&&<p className="invite-prose story-intro">{s.data.intro}</p>}
   <div className="story-list">{s.data.items.map((item,i)=><article key={item.id} className={'story-item'+(item.image||item.imageAssetId?'':' story-letter')}>
    {(item.image||item.imageAssetId)&&<div className="story-image">{item.image?<AssetImage asset={{...item.image,id:item.id,alt:item.title,type:'IMAGE'}} priority={false}/>:img(item.imageAssetId)}</div>}<div><p className="eyebrow">{item.label||`CHƯƠNG ${i+1}`}</p><h3><em className="section-title-accent">{item.title}</em></h3><p>{item.body}</p></div>
   </article>)}</div></>;
   case 'gallery':return <>
-   <h2>{s.data.title?s.data.title.split(/\r?\n/).map((line,index)=>index===0?<span key={index}>{line}{' '}</span>:<em key={index} className="section-title-accent">{line}</em>):<>Cảm ơn vì đã <em className="section-title-accent">ở trong thanh xuân của Kiệt.</em></>}</h2>
+   <h2><FittedLine text={(s.data.title||'Cảm ơn vì đã ở trong thanh xuân của Kiệt.').replace(/\s+/gu,' ').trim()}>{s.data.title?s.data.title.split(/\r?\n/).map((line,index)=>index===0?<span key={index}>{line}{' '}</span>:<em key={index} className="section-title-accent">{line}</em>):<>Cảm ơn vì đã <em className="section-title-accent">ở trong thanh xuân của Kiệt.</em></>}</FittedLine></h2>
    <CompanionFilm/>
   </>;
   case 'invitation':return <div className="invitation-letter">
@@ -218,7 +218,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    const notes=(s.data.notes??defaultInvitationNotes).split('\n').map(line=>line.trim()).filter(Boolean);
    const title=s.data.title.trim();
    return <>
-    <h2>{!title||title.toLocaleLowerCase('vi')==='chúng mình gặp nhau ở đây'?'Nơi ta gặp nhau':title}</h2>
+    <h2><FittedLine text={!title||title.toLocaleLowerCase('vi')==='chúng mình gặp nhau ở đây'?'Nơi ta gặp nhau':title}/></h2>
     <MapView location={location} image={media(location.mapImageAssetId)}/>
     {location.entranceNote&&<p className="invite-prose">{location.entranceNote}</p>}
     {notes.length>0&&<aside className="invitation-notes" aria-label="Lưu ý khi đến dự lễ">
@@ -228,7 +228,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
     </aside>}
    </>;
   }
-  case 'response':return <><h2>{s.data.title}</h2>{view.familyReply?<FamilyReply view={view} token={token} intro={s.data.wishIntro}/>:<FeedbackForms view={view} token={token} save={save} intro={s.data.wishIntro}/>}</>;
+  case 'response':return <><h2><FittedLine text={s.data.title}/></h2>{view.familyReply?<FamilyReply view={view} token={token} intro={s.data.wishIntro}/>:<FeedbackForms view={view} token={token} save={save} intro={s.data.wishIntro}/>}</>;
   case 'closing':return <div className="closing"><span className="large-star" aria-hidden="true">✧</span><h2>{s.data.message}</h2><p>{view.rsvp?.status==='ATTENDING'?s.data.attendingMessage:view.rsvp?.status==='DECLINED'?s.data.declinedMessage:''}</p><p className="signature">{c.host.fullName}</p></div>;
   default:return null;
  }}

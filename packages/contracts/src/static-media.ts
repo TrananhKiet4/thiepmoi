@@ -33,12 +33,12 @@ export const staticMedia: Readonly<Record<string, MediaView & {originalName: str
   },
   "7aab6128-dce2-46cc-ac2f-721660e6c8b6": {
     "id": "7aab6128-dce2-46cc-ac2f-721660e6c8b6",
-    "originalName": "Nhạc nền M4A",
-    "alt": "Nhạc nền M4A",
+    "originalName": "Cảm ơn người đã thức cùng tôi · Piano Cover Phùng Khánh Linh",
+    "alt": "Cảm ơn người đã thức cùng tôi · Piano Cover Phùng Khánh Linh",
     "type": "AUDIO",
     "width": null,
     "height": null,
-    "url": "/invitation-assets/music/nhac-nen-7aab6128.m4a"
+    "url": "/invitation-assets/music/cam-on-nguoi-da-thuc-cung-toi-e4096fd7ab45.m4a"
   },
   "881f80e5-ced2-4ded-8a54-931e519ad4a2": {
     "id": "881f80e5-ced2-4ded-8a54-931e519ad4a2",
