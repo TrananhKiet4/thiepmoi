@@ -182,9 +182,9 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
     </div>
     <div className="hero-text">
      <p className="eyebrow">MỘT CHẶNG ĐƯỜNG · MỘT KHỞI ĐẦU MỚI</p>
-     <h1 tabIndex={-1} className={splitHeroTitle?'hero-title-lines':undefined}><FittedLine text={heroTitle.replace(/\s+/gu,' ').trim()}>{splitHeroTitle
-      ? <>Một hành trình mới <strong className="hero-title-highlight">Bắt đầu</strong></>
-      : undefined}</FittedLine></h1>
+     <h1 tabIndex={-1} className={splitHeroTitle?'hero-title-lines':undefined}>{splitHeroTitle
+      ? <><FittedLine text="Một hành trình mới"/>{' '}<strong className="hero-title-highlight"><FittedLine text="Bắt đầu"/></strong></>
+      : <FittedLine text={heroTitle.replace(/\s+/gu,' ').trim()}/>}</h1>
      {hero?.type==='hero'&&hero.data.subtitle&&<p className="hero-subtitle">{hero.data.subtitle}</p>}
      <p>{c.host.university}<br/>{c.host.major}{c.host.cohort&&' · '+c.host.cohort}</p>
     </div>
@@ -195,15 +195,15 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
   </>}
  </main>;
  function renderSection(s:Section){switch(s.type){
-  case 'story':return <><h2 className="story-title"><FittedLine text={(s.data.title||'Mỗi chặng đường, một điều để nhớ.').replace(/\s+/gu,' ').trim()}>{/^thanh xuân ấy(?:,|\s)\s*chúng ta (?:đã )?có nhau$/iu.test(s.data.title?.trim()??'')
-   ? <>Thanh xuân ấy <em className="section-title-accent">Chúng ta có nhau</em></>
-   : s.data.title?undefined:<>Mỗi chặng đường, <em className="section-title-accent">một điều để nhớ.</em></>}</FittedLine></h2>
+  case 'story':return <><h2 className="story-title">{/^thanh xuân ấy(?:,|\s)\s*chúng ta (?:đã )?có nhau$/iu.test(s.data.title?.trim()??'')
+   ? <><FittedLine text="Thanh xuân ấy"/>{' '}<em className="section-title-accent"><FittedLine text="Chúng ta có nhau"/></em></>
+   : s.data.title?<FittedLine text={s.data.title.replace(/\s+/gu,' ').trim()}/>:<>Mỗi chặng đường, <em className="section-title-accent">một điều để nhớ.</em></>}</h2>
   {s.data.intro&&<p className="invite-prose story-intro">{s.data.intro}</p>}
   <div className="story-list">{s.data.items.map((item,i)=><article key={item.id} className={'story-item'+(item.image||item.imageAssetId?'':' story-letter')}>
-   {(item.image||item.imageAssetId)&&<div className="story-image">{item.image?<AssetImage asset={{...item.image,id:item.id,alt:item.title,type:'IMAGE'}} priority={false}/>:img(item.imageAssetId)}</div>}<div><p className="eyebrow">{item.label||`CHƯƠNG ${i+1}`}</p><h3><em className="section-title-accent">{item.title}</em></h3><p>{item.body}</p></div>
+   {(item.image||item.imageAssetId)&&<div className="story-image">{item.image?<AssetImage asset={{...item.image,id:item.id,alt:item.title,type:'IMAGE'}} priority={false}/>:img(item.imageAssetId)}</div>}<div><p className="eyebrow">{item.label||`CHƯƠNG ${i+1}`}</p><h3><em className="section-title-accent"><FittedLine text={item.title.replace(/\s+/gu,' ').trim()} minimumFontSize={8}/></em></h3><p>{item.body}</p></div>
   </article>)}</div></>;
   case 'gallery':return <>
-   <h2><FittedLine text={(s.data.title||'Cảm ơn vì đã ở trong thanh xuân của Kiệt.').replace(/\s+/gu,' ').trim()}>{s.data.title?s.data.title.split(/\r?\n/).map((line,index)=>index===0?<span key={index}>{line}{' '}</span>:<em key={index} className="section-title-accent">{line}</em>):<>Cảm ơn vì đã <em className="section-title-accent">ở trong thanh xuân của Kiệt.</em></>}</FittedLine></h2>
+   <h2 className="gallery-title">{s.data.title?s.data.title.split(/\r?\n/).map((line,index)=>index===0?<FittedLine key={index} text={line}/>:<em key={index} className="section-title-accent"><FittedLine text={line}/></em>):<><FittedLine text="Cảm ơn vì đã"/><em className="section-title-accent"><FittedLine text="ở trong thanh xuân của Kiệt."/></em></>}</h2>
    <CompanionFilm/>
   </>;
   case 'invitation':return <div className="invitation-letter">

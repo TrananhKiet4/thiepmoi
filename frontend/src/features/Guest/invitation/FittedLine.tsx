@@ -1,6 +1,6 @@
 import {useLayoutEffect, useRef, type ReactNode} from 'react';
 
-export function FittedLine({text, children}: {text: string; children?: ReactNode}) {
+export function FittedLine({text, children, minimumFontSize = 10}: {text: string; children?: ReactNode; minimumFontSize?: number}) {
   const line = useRef<HTMLSpanElement>(null);
   const label = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
@@ -16,8 +16,8 @@ export function FittedLine({text, children}: {text: string; children?: ReactNode
       if (available > 0 && width > available) {
         const fontSize = Number.parseFloat(getComputedStyle(frame).fontSize);
         const fitted = Math.floor(fontSize * available / width * 10) / 10;
-        content.style.fontSize = `${Math.max(10, fitted)}px`;
-        if (fitted < 10) content.style.whiteSpace = '';
+        content.style.fontSize = `${Math.max(minimumFontSize, fitted)}px`;
+        if (fitted < minimumFontSize) content.style.whiteSpace = '';
       }
     }
     fit();
@@ -28,6 +28,6 @@ export function FittedLine({text, children}: {text: string; children?: ReactNode
     observer.observe(frame);
     void document.fonts.ready.then(fit);
     return () => { active = false; observer.disconnect(); cancelAnimationFrame(resizeFrame); };
-  }, [text]);
+  }, [text, minimumFontSize]);
   return <span className="invite-fitted-line" ref={line}><span ref={label}>{children??text}</span></span>;
 }

@@ -113,7 +113,7 @@
 .invitation .hero-text h1:focus { outline: none; }
 .invitation .hero-title-lines { width: 100%; font-family: "Times New Roman", serif; text-transform: uppercase; white-space: normal; }
 .invitation .hero-title-highlight {
-  display: inline;
+  display: block;
   color: #6e8194;
   font-style: italic;
   font-weight: 400;
@@ -156,6 +156,8 @@
 .invitation .story-item h3 { font-size: 30px; }
 .invitation .story-title { white-space: normal; }
 .invitation .story-title .section-title-accent { display: block; }
+.invitation .gallery-title { white-space: normal; }
+.invitation .gallery-title .section-title-accent { display: block; }
 .invitation .story-title em, .invitation .story-item h3 em { color: #6e8194; font-style: italic; font-weight: 400; }
 .invitation .story-item>div>p:last-child { font-size: 15px; color: #625c5a; }
 .invitation .story-intro, .invitation .story-item>div>p:last-child {
