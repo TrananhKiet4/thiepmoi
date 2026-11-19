@@ -59,5 +59,5 @@ export const companionPhotos = [
   { id: '57', file: '57-013173b85e90', width: 1080, height: 1440, smallWidth: 600 },
   { id: '58', file: '58-5eff6b57c6b0', width: 1440, height: 962, smallWidth: 600 },
   { id: '59', file: '59-6b2faf86fbb2', width: 1387, height: 1280, smallWidth: 600 },
-  { id: '60', file: '60-a793db1eb4e9', width: 1440, height: 960, smallWidth: 600 },
+  { id: '60', file: '60-8dd7072d13da', width: 1440, height: 960, smallWidth: 600 },
 ] as const;
