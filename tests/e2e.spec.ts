@@ -341,7 +341,7 @@ test('campus map selection survives draft save and renders in preview',async({pa
   const schedule=dialog.locator('.graduation-schedule');
   expect(await schedule.evaluate(element=>element.scrollWidth<=element.clientWidth+1)).toBe(true);
   await schedule.screenshot({path:`.data/qa/graduation-schedule-${testInfo.project.name}.png`});
-  await expect(dialog.getByRole('heading',{name:'Một chút lưu ý nhỏ',exact:true})).toBeVisible();
+  await expect(dialog.getByRole('heading',{name:'Một chút lưu ý nhỏ',exact:true})).toHaveCount(0);
   const footer=dialog.locator('.scrapbook-footer');
   await expect(footer.getByRole('link',{name:'0900000000',exact:true})).toHaveAttribute('href','tel:0900000000');
   await expect(footer.getByRole('link',{name:'Facebook',exact:true})).toHaveAttribute('href','https://www.facebook.com/test.contact');

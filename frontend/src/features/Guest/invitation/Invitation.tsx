@@ -1,4 +1,4 @@
-import {defaultInvitationNotes,googleMapsLink} from '@invite/contracts';
+import {googleMapsLink} from '@invite/contracts';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {useParams} from 'react-router-dom';
 import {useInfiniteQuery,useQuery,useQueryClient} from '@tanstack/react-query';
@@ -223,17 +223,11 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
   </div>;
   case 'map': {
    const location=s.data.locationSource==='MEETUP'&&c.meetup?c.meetup:c.ceremony;
-   const notes=(s.data.notes??defaultInvitationNotes).split('\n').map(line=>line.trim()).filter(Boolean);
    const title=s.data.title.trim();
    return <>
     <h2><FittedLine text={!title||title.toLocaleLowerCase('vi')==='chúng mình gặp nhau ở đây'?'Nơi ta gặp nhau':title}/></h2>
     <MapView location={location} image={picture(location.mapImageAssetId,location.mapImage)}/>
     {location.entranceNote&&<p className="invite-prose">{location.entranceNote}</p>}
-    {notes.length>0&&<aside className="invitation-notes" aria-label="Lưu ý khi đến dự lễ">
-     <p className="eyebrow">THÔNG TIN CẦN BIẾT</p>
-     <h3>Một chút lưu ý nhỏ</h3>
-     <ol>{notes.map((note,index)=><li key={index}>{note}</li>)}</ol>
-    </aside>}
    </>;
   }
   case 'response':return <><h2><FittedLine text={s.data.title}/></h2>{view.familyReply?<FamilyReply view={view} token={token} intro={s.data.wishIntro}/>:<FeedbackForms view={view} token={token} save={save} intro={s.data.wishIntro}/>}</>;

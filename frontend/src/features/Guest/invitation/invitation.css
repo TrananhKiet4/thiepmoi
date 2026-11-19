@@ -143,7 +143,7 @@
   overflow-wrap: break-word;
   text-wrap: balance;
 }
-.invitation :is(.hero-text>p:not(.eyebrow), .invite-prose, .story-item>div>p:last-child, .invitation-notes li, .map-card>p, .feedback-intro, .feedback-form .success, .wish-card p, .closing>p:not(.signature)) {
+.invitation :is(.hero-text>p:not(.eyebrow), .invite-prose, .story-item>div>p:last-child, .map-card>p, .feedback-intro, .feedback-form .success, .wish-card p, .closing>p:not(.signature)) {
   overflow-wrap: break-word;
   white-space: pre-line;
   text-wrap: pretty;
@@ -361,39 +361,6 @@
 .invitation .closing .large-star { font-size: 80px; color: var(--invite-blue); margin-bottom: 15px; }
 .invitation .closing h2 { font-size: clamp(30px, 3.4vw, 42px); }
 .invitation .closing>p:not(.signature) { color: #625c5a; }
-.invitation .invitation-notes {
-  position: relative;
-  max-width: 850px;
-  margin: 42px auto 0;
-  padding: clamp(20px, 4vw, 42px);
-  border: 1px solid var(--blue-line, #ded2bd);
-  border-radius: 16px;
-  background: var(--blue-paper, #fffdf8);
-  box-shadow: 0 10px 30px #243e5910;
-}
-.invitation .invitation-notes::before {
-  content: "";
-  position: absolute;
-  top: -8px;
-  left: 50%;
-  width: 76px;
-  height: 16px;
-  background: #e8d7a37d;
-  transform: translateX(-50%) rotate(-3deg);
-}
-.invitation .invitation-notes h3 { margin: 12px 0 20px; font-size: clamp(23px, 4.6vw, 35px); }
-.invitation .invitation-notes ol { display: grid; gap: 10px; text-align: left; }
-.invitation .invitation-notes li {
-  list-style-position: inside;
-  list-style-type: decimal;
-  padding: 12px 14px;
-  border: 1px solid var(--blue-line, #e1d7c9);
-  border-radius: 10px;
-  background: #ffffff99;
-  font-size: 14px;
-  line-height: 1.6;
-}
-.invitation .invitation-notes li::marker { color: var(--invite-accent); font-weight: 700; }
 .invitation .scrapbook-footer {
   padding: 42px 8vw 26px;
   background: var(--blue-paper, #faf7f1);
