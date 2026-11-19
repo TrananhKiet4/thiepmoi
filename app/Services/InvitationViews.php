@@ -124,21 +124,11 @@ final class InvitationViews
             $guest = DB::table('Guest')->where('id', $card->guestId)->first();
         }
 
-        $displayName = self::displayName($guest) ?? 'Khách xem trước';
-        $family = ($guest->groupKey ?? '') === 'gia_dinh';
-        $salutation = mb_strtolower(self::normalizeSpace($guest->salutation ?? ''));
-        $normalizedName = self::normalizeSpace($displayName);
-        $recipientName = $salutation !== '' && str_starts_with(mb_strtolower($normalizedName), $salutation.' ')
-            ? mb_substr($normalizedName, mb_strlen($salutation) + 1) : $displayName;
-        $aunt = preg_match('/^thím(?:\s|$)/iu', $salutation !== '' ? $salutation : $displayName);
-        $senior = preg_match('/^(anh|chị)(?:\s|$)/u', $salutation);
-        $junior = preg_match('/^em(?:\s|$)/u', $salutation);
-        $address = $salutation !== '' ? $salutation : ($family ? 'đại gia đình' : ($aunt ? $displayName : 'bạn'));
-        $recipientAddress = $address === 'đại gia đình' ? 'cả nhà' : $address;
-        $headingAddress = preg_replace('/^(anh|chị) hai$/u', '$1', $recipientAddress);
-        $greeting = $family ? 'Thương gửi' : (preg_match('/^(bạn|em)(?:\s|$)/u', $salutation) ? 'Thân gửi' : 'Kính gửi');
-        $invite = $family ? 'Thương mời' : ($senior || $aunt ? 'Kính mời' : 'Thân mời');
-        $speaker = $salutation === 'em yêu' ? 'anh' : ($family || $aunt ? 'con' : ($senior ? 'em' : ($junior ? 'anh' : 'mình')));
+        [
+            'displayName' => $displayName, 'recipientName' => $recipientName,
+            'address' => $address, 'recipientAddress' => $recipientAddress, 'headingAddress' => $headingAddress,
+            'greeting' => $greeting, 'invite' => $invite, 'speaker' => $speaker,
+        ] = self::recipient($guest);
         $vars = [
             '{{guestName}}' => $recipientName, '{{hostName}}' => $content['host']['fullName'],
             '{{salutation}}' => $guest->salutation ?? 'bạn', '{{recipientAddress}}' => $address,
@@ -246,6 +236,38 @@ final class InvitationViews
         }
 
         return $calendar;
+    }
+
+    public static function shareMessage(object $guest, string $url): string
+    {
+        $recipient = self::recipient($guest);
+        $name = $recipient['recipientName'];
+        if ($recipient['salutation'] !== '' && mb_strtolower(self::normalizeSpace($name)) !== $recipient['salutation']) {
+            $name = self::sentenceCase($recipient['salutation']).' '.$name;
+        }
+
+        return $recipient['invite'].' '.$name.' xem thiệp mời tốt nghiệp của '.$recipient['speaker'].":\n".$url;
+    }
+
+    private static function recipient(?object $guest): array
+    {
+        $displayName = self::displayName($guest) ?? 'Khách xem trước';
+        $family = ($guest->groupKey ?? '') === 'gia_dinh';
+        $salutation = mb_strtolower(self::normalizeSpace($guest->salutation ?? ''));
+        $normalizedName = self::normalizeSpace($displayName);
+        $recipientName = $salutation !== '' && str_starts_with(mb_strtolower($normalizedName), $salutation.' ')
+            ? mb_substr($normalizedName, mb_strlen($salutation) + 1) : $displayName;
+        $aunt = preg_match('/^thím(?:\s|$)/iu', $salutation !== '' ? $salutation : $displayName);
+        $senior = preg_match('/^(anh|chị)(?:\s|$)/u', $salutation);
+        $junior = preg_match('/^em(?:\s|$)/u', $salutation);
+        $address = $salutation !== '' ? $salutation : ($family ? 'đại gia đình' : ($aunt ? $displayName : 'bạn'));
+        $recipientAddress = $address === 'đại gia đình' ? 'cả nhà' : $address;
+        $headingAddress = preg_replace('/^(anh|chị) hai$/u', '$1', $recipientAddress);
+        $greeting = $family ? 'Thương gửi' : (preg_match('/^(bạn|em)(?:\s|$)/u', $salutation) ? 'Thân gửi' : 'Kính gửi');
+        $invite = $family ? 'Thương mời' : ($senior || $aunt ? 'Kính mời' : 'Thân mời');
+        $speaker = $salutation === 'em yêu' ? 'anh' : ($family || $aunt ? 'con' : ($senior ? 'em' : ($junior ? 'anh' : 'mình')));
+
+        return compact('displayName', 'salutation', 'recipientName', 'address', 'recipientAddress', 'headingAddress', 'greeting', 'invite', 'speaker');
     }
 
     private static function displayName(?object $guest): ?string

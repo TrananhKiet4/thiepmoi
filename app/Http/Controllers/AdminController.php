@@ -324,9 +324,7 @@ final class AdminController
             $invitation = $this->owned($request, 'Invitation', $id);
             $guest = DB::table('Guest')->where('id', $invitation->guestId)->first();
             $url = AdminInvitations::link($invitation, $guest->fullName);
-            $name = $guest->displayName !== '' ? $guest->displayName : $guest->fullName;
-
-            return ['url' => $url, 'message' => "Thân mời $name xem thiệp mời tốt nghiệp: $url"];
+            return ['url' => $url, 'message' => InvitationViews::shareMessage($guest, $url)];
         }, 3));
     }
 
