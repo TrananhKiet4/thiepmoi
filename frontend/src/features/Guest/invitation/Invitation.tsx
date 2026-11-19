@@ -74,12 +74,18 @@ function GuestData({token}:{token:string}) {
   }
   return <><ErrorBox error={query.error}/><Invitation view={query.data!} token={token} save={save}/></>;
 }
-function EnvelopeName({name}:{name:string}) {
+function EnvelopeName({name,salutation=''}:{name:string;salutation?:string}) {
+ const title=salutation.normalize('NFC').replace(/\s+/gu,' ').trim();
+ const fullName=name.normalize('NFC').replace(/\s+/gu,' ').trim();
+ const recipient=title&&fullName.toLocaleLowerCase('vi').startsWith(title.toLocaleLowerCase('vi')+' ')?fullName.slice(title.length+1):fullName;
+ const showTitle=!!title&&recipient.toLocaleLowerCase('vi')!=='ánh tuyết'&&recipient.toLocaleLowerCase('vi')!==title.toLocaleLowerCase('vi');
+ const displayName=showTitle?`${title} ${recipient}`:recipient;
  const heading=useRef<HTMLHeadingElement>(null);
  const text=useRef<HTMLSpanElement>(null);
  useLayoutEffect(()=>{
   const box=heading.current!,label=text.current!;
   let active=true;
+  let resizeFrame=0;
   function fit(){
    if(!active)return;
    label.style.fontSize='';
@@ -91,12 +97,12 @@ function EnvelopeName({name}:{name:string}) {
    }
   }
   fit();
-  const observer=new ResizeObserver(fit);
+  const observer=new ResizeObserver(()=>{cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(fit);});
   observer.observe(box);
-  void document.fonts.load('400 1em "Fz Alpha Brights"',name).then(fit,fit);
-  return()=>{active=false;observer.disconnect();};
- },[name]);
- return <h1 ref={heading}><span ref={text}>{name}</span></h1>;
+  void document.fonts.load('400 1em "Fz Alpha Brights"',displayName).then(fit,fit);
+  return()=>{active=false;observer.disconnect();cancelAnimationFrame(resizeFrame);};
+ },[displayName]);
+ return <h1 ref={heading}><span ref={text}>{showTitle&&<span className="envelope-salutation">{title} </span>}{recipient}</span></h1>;
 }
 export function Invitation({view,token,save}: {view:InvitationView;token?:string;save?:ReturnType<typeof useGuestData>['save']}) {
  const [phase,setPhase]=useState<'closed'|'opening'|'opened'>('closed');
@@ -160,7 +166,7 @@ export function Invitation({view,token,save}: {view:InvitationView;token?:string
    <p className="envelope-heading" aria-hidden="true"><span>Graduation</span><em>Invitation</em></p>
    <p className="eyebrow envelope-school">{c.host.university}</p>
    <div className="paper-envelope">
-    <div className="envelope-letter"><p className="eyebrow">{opening?.type==='opening'?opening.data.title:'MỘT LỜI MỜI DÀNH RIÊNG CHO'}</p><EnvelopeName name={name}/></div>
+    <div className="envelope-letter"><p className="eyebrow">{opening?.type==='opening'?opening.data.title:'MỘT LỜI MỜI DÀNH RIÊNG CHO'}</p><EnvelopeName name={name} salutation={view.guest.salutation}/></div>
     <div className="envelope-fold" aria-hidden="true"/>
     <button className="wax-seal" aria-label="Mở thiệp" aria-disabled={phase==='opening'} onClick={open}><GraduationCap size={30} strokeWidth={1}/><span>Mở thiệp</span></button>
    </div>

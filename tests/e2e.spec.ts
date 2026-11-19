@@ -101,7 +101,7 @@ test('admin edits a guest letter and previews it on the existing link',async({pa
   dialog=page.getByRole('dialog');
   await dialog.getByRole('button',{name:'Xem thiệp đã lưu',exact:true}).click();
   await expect(dialog.locator('.envelope-message, .envelope-cover, .envelope-year')).toHaveCount(0);
-  await expect(dialog.locator('.envelope-letter h1')).toHaveText(name);
+  await expect(dialog.locator('.envelope-letter h1')).toHaveText(displayName);
   await dialog.getByRole('button',{name:'Mở thiệp',exact:true}).click();
   await expect(dialog.locator('.invitation-letter h2')).toHaveText('Một lời hẹn riêng');
   await expect(dialog.locator('.guest-recipient strong')).toHaveText(displayName);
@@ -189,6 +189,38 @@ test('blue invitation preview renders both new Vietnamese fonts',async({page},te
    expect(restored.ok()).toBe(true);
   }
  }
+});
+
+test('envelope includes the guest salutation except for Ánh Tuyết',async({page})=>{
+ const content=demoContent(null);
+ const errors:string[]=[];
+ page.on('pageerror',error=>errors.push(error.message));
+ let guest:any;
+ await page.route('**/api/v1/guest/invitation',route=>route.fulfill({json:{data:{content,media:{},guest,wallEnabled:false}}}));
+ for(const [name,salutation,expected] of [
+  ['Quang Minh','Anh','Anh Quang Minh'],
+  ['Chị hai Bích Trâm','Chị hai','Chị hai Bích Trâm'],
+  ['Em yêu Ánh Tuyết','Em yêu','Ánh Tuyết'],
+  ['Ánh Tuyết','Em yêu','Ánh Tuyết'],
+  ['Minh Anh','Em yêu','Em yêu Minh Anh'],
+  ['Đại gia đình thương yêu','','Đại gia đình thương yêu'],
+  ['Thím iu','Thím iu','Thím iu'],
+ ]){
+  guest={displayName:name,salutation};
+  await page.goto('/i/'+'x'.repeat(43));
+  const heading=page.locator('.envelope-letter h1');
+  await expect(heading).toHaveText(expected);
+  for(const width of [320,390,768,1440]){
+   await page.setViewportSize({width,height:900});
+   await expect.poll(()=>heading.evaluate(element=>{
+    const label=element.firstElementChild!,box=element.getBoundingClientRect(),text=label.getBoundingClientRect();
+    return text.width<=box.width+1&&document.documentElement.scrollWidth<=innerWidth;
+   })).toBe(true);
+  }
+  if(expected==='Anh Quang Minh')await expect(heading.locator('.envelope-salutation')).toHaveCSS('font-family',/^"?Times New Roman"?, serif$/);
+  if(expected==='Ánh Tuyết')await expect(heading.locator('.envelope-salutation')).toHaveCount(0);
+ }
+ expect(errors).toEqual([]);
 });
 
 test('mobile invitation balances headings and plays music on open',async({page},testInfo)=>{
