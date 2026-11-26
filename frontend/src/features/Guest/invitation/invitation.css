@@ -293,6 +293,7 @@
   padding: 18px 4px 14px;
   margin-bottom: 12px;
 }
+.invitation .wish-load-trigger { flex: 0 0 1px; }
 .invitation .wish-card {
   position: relative;
   display: flex;

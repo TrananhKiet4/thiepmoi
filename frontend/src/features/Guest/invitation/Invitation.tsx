@@ -445,16 +445,26 @@ function FeedbackForm({view,token,save,intro}:{view:InvitationView;token?:string
 }
 
 function Wall({token,previewItems,ownWish,publicEnabled=true}:{token?:string;previewItems?:PublicWish[];ownWish?:VisibleWish|null;publicEnabled?:boolean}) {
+ const strip=useRef<HTMLDivElement>(null),tail=useRef<HTMLSpanElement>(null);
  const wall=useInfiniteQuery({
   queryKey:['wall',token],enabled:!!token&&publicEnabled,gcTime:0,retry:false,
   initialPageParam:null as string|null,
   queryFn:async({signal,pageParam}):Promise<{items:PublicWish[];nextCursor:string|null}>=>{
-   const query=pageParam?'?'+new URLSearchParams({cursor:pageParam}):'';
-   return request('/guest/wishes'+query,{signal},token);
+   const query=new URLSearchParams({limit:'20',...(pageParam?{cursor:pageParam}:{})});
+   return request('/guest/wishes?'+query,{signal},token);
   },
   getNextPageParam:last=>last.nextCursor,
   refetchInterval:30000,refetchOnWindowFocus:true,
  });
+ const {hasNextPage,isFetching,isFetchNextPageError,fetchNextPage}=wall;
+ useEffect(()=>{
+  if(!token||!publicEnabled||previewItems!==undefined||!hasNextPage||isFetching||isFetchNextPageError||!strip.current||!tail.current)return;
+  const observer=new IntersectionObserver(entries=>{
+   if(entries.some(entry=>entry.isIntersecting))void fetchNextPage({cancelRefetch:false});
+  },{root:strip.current,rootMargin:'0px 320px'});
+  observer.observe(tail.current);
+  return()=>observer.disconnect();
+ },[token,publicEnabled,previewItems,hasNextPage,isFetching,isFetchNextPageError,fetchNextPage]);
  const {refetch}=wall;
  useEffect(()=>{
   if(!token||!publicEnabled)return;
@@ -467,7 +477,7 @@ function Wall({token,previewItems,ownWish,publicEnabled=true}:{token?:string;pre
  const wishes:VisibleWish[]=ownWish?[ownWish,...publicWishes.filter(w=>w.id!==ownWish.id)]:publicWishes;
  return <div className="wish-wall">
   <h3>Lưu bút & lời chúc</h3>
-  <div className="wish-strip" role="region" tabIndex={0} aria-label="Lời chúc của khách mời">
+  <div ref={strip} className="wish-strip" role="region" tabIndex={0} aria-label="Lời chúc của khách mời" aria-busy={wall.isLoading||wall.isFetchingNextPage}>
    {wishes.map(w=><blockquote className="wish-card" key={w.id} data-own={w.id===ownWish?.id||undefined}>
     <p>{w.body}</p>
     {w.image&&<a className="wish-photo" href={w.image.url} target="_blank" rel="noopener noreferrer" aria-label={`Xem ảnh trong lời chúc của ${w.displayName}`}><img src={w.image.url} alt={`Ảnh kèm lời chúc của ${w.displayName}`} loading="lazy"/></a>}
@@ -478,9 +488,10 @@ function Wall({token,previewItems,ownWish,publicEnabled=true}:{token?:string;pre
      <cite>{w.displayName}</cite>
     </footer>
    </blockquote>)}
+   {publicEnabled&&wall.hasNextPage&&<span ref={tail} className="wish-load-trigger" aria-hidden="true"/>}
   </div>
-  {publicEnabled&&wall.isLoading&&<p className="muted" role="status">Đang tải lời chúc…</p>}
+  {publicEnabled&&(wall.isLoading||wall.isFetchingNextPage)&&<p className="muted" role="status">{wall.isFetchingNextPage?'Đang tải thêm lời chúc…':'Đang tải lời chúc…'}</p>}
   {publicEnabled&&<ErrorBox error={wall.error}/>}
-  {publicEnabled&&token&&(wall.hasNextPage||wall.isError)&&<button className="button secondary" disabled={wall.isFetching} onClick={()=>void (wall.isError&&!wall.isFetchNextPageError?refetch():wall.fetchNextPage())}>{wall.isError?'Thử tải lại':'Xem thêm lời chúc'}</button>}
+  {publicEnabled&&token&&wall.isError&&<button className="button secondary" disabled={wall.isFetching} onClick={()=>void (!wall.isFetchNextPageError?refetch():wall.fetchNextPage())}>Thử tải lại</button>}
  </div>;
 }

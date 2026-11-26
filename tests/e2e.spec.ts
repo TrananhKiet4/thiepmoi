@@ -358,6 +358,57 @@ test('shared group cards ask for responder names while family asks for a relatio
  expect(registrations).toBe(4);expect(errors).toEqual([]);
 });
 
+test('wish wall loads all pages when scrolled without a load-more button',async({page})=>{
+ const content=demoContent(null);
+ const own={id:'own',body:'Lời chúc riêng của bạn',consentPublic:false,moderationStatus:'NONE',version:1};
+ const wishes=Array.from({length:47},(_,index)=>({id:'public-'+index,displayName:'Khách '+index,body:'Lời chúc '+index,approvedAt:new Date().toISOString(),isPinned:index<2,attendanceStatus:null}));
+ const feed=[...wishes.slice(0,21),wishes[0],...wishes.slice(21)];
+ let failNext=false,delayed=false;
+ const requests:string[]=[];
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.route('**/api/v1/guest/invitation',route=>route.fulfill({json:{data:{content,media:{},guest:{displayName:'Khách kiểm tra'},wish:own,wallEnabled:true,canRsvp:false,canCreateOrEditWish:false}}}));
+ await page.route('**/api/v1/guest/opened',route=>route.fulfill({json:{data:{}}}));
+ await page.route('**/api/v1/guest/wishes*',async route=>{
+  const query=new URL(route.request().url()).searchParams;
+  expect(query.get('limit')).toBe('20');
+  const cursor=query.get('cursor')??'0',start=Number(cursor);requests.push(cursor);
+  if(failNext&&start===20){failNext=false;await route.fulfill({status:503,json:{error:{code:'DATABASE_BUSY',message:'Tải lời chúc bị gián đoạn'}}});return;}
+  if(delayed&&start===20)await new Promise(resolve=>setTimeout(resolve,150));
+  await route.fulfill({json:{data:{items:feed.slice(start,start+20),nextCursor:start+20<feed.length?String(start+20):null}}});
+ });
+ const open=async()=>{await page.goto('/i/'+'w'.repeat(43));await page.getByRole('button',{name:'Mở thiệp',exact:true}).click();await expect(page.locator('.wish-card')).toHaveCount(21);};
+ const wall=page.locator('.wish-wall'),strip=wall.getByRole('region',{name:'Lời chúc của khách mời'});
+ const more=wall.getByRole('button',{name:'Xem thêm lời chúc',exact:true});
+ for(const width of [320,1440]){
+  requests.length=0;delayed=true;
+  await page.setViewportSize({width,height:900});await open();await wall.scrollIntoViewIfNeeded();
+  await expect(more).toHaveCount(0);
+  expect([...new Set(requests)]).toEqual(['0']);
+  const before=await strip.evaluate(element=>element.scrollLeft);
+  await strip.evaluate(element=>{for(let i=0;i<5;i++)element.scrollLeft=element.scrollWidth;});
+  await expect(wall.locator('.wish-card')).toHaveCount(40);
+  expect(requests.filter(cursor=>cursor==='20')).toHaveLength(1);
+  expect(await strip.evaluate(element=>element.scrollLeft)).toBeGreaterThan(before);
+  await strip.focus();await strip.press('End');
+  await strip.evaluate(element=>element.scrollLeft=element.scrollWidth);
+  await expect(wall.locator('.wish-card')).toHaveCount(48);
+  await expect(wall.locator('.wish-load-trigger')).toHaveCount(0);
+  await expect(more).toHaveCount(0);
+  expect(await wall.locator('.wish-card>p').allTextContents()).toEqual([own.body,...wishes.map(wish=>wish.body)]);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ }
+ requests.length=0;failNext=true;delayed=false;
+ await open();await wall.scrollIntoViewIfNeeded();await strip.evaluate(element=>element.scrollLeft=element.scrollWidth);
+ await expect(wall.getByRole('alert')).toContainText('Tải lời chúc bị gián đoạn');
+ await expect(wall.locator('.wish-card')).toHaveCount(21);
+ await expect(more).toHaveCount(0);expect(requests.filter(cursor=>cursor==='20')).toHaveLength(1);
+ await wall.getByRole('button',{name:'Thử tải lại',exact:true}).click();
+ await expect(wall.locator('.wish-card')).toHaveCount(40);
+ await expect(wall.getByRole('alert')).toHaveCount(0);
+ await strip.evaluate(element=>element.scrollLeft=element.scrollWidth);
+ await expect(wall.locator('.wish-card')).toHaveCount(48);
+});
+
 test('mobile invitation balances headings and plays music on open',async({page},testInfo)=>{
  const content=demoContent(null);
  content.host.fullName='Nguyễn Minh Anh';
